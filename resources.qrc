@@ -1,0 +1,14 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="hard-drive.png">resources/icons/hard-drive.png</file>
+        <file alias="folder.png">resources/icons/folder.png</file>
+        <file alias="folder-big.png">resources/icons/folder-big.png</file>
+        <file alias="file-big.png">resources/icons/file-big.png</file>
+        <file alias="image-big.png">resources/icons/image-big.png</file>
+        <file alias="image-error-big.png">resources/icons/image-error-big.png</file>
+        <file alias="back-big.png">resources/icons/back-big.png</file>
+    </qresource>
+    <qresource prefix="/database">
+        <file alias="thumbnails.s3db">resources/thumbnails.s3db</file>
+    </qresource>
+</RCC>

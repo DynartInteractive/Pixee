@@ -1,0 +1,86 @@
+#pathEdit {
+	color: #fff;
+	background-color: #555;
+	padding: 3px 5px 4px 5px;
+	border: none;
+}
+QMainWindow {
+	background-color: #333;
+}
+QMainWindow::separator {
+	background-color: #222;
+}
+QStatusBar {
+	background-color: #222;
+	color: #fff;
+	min-height: 24px;
+	line-height: 24px;
+}
+QTreeView {
+	color: #ccc;
+	background-color: #333;
+	alternate-background-color: #3F3F3F;
+	border: none;
+}
+QTreeView::item:selected {
+	background-color: #2b4580;
+	color: #fff;
+}
+QTreeView::item:focus {
+	border: none;
+	color: #fff;
+}
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {
+    border-image: none;
+    image: url(":/images/branch-closed.png");
+}
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings  {
+    border-image: none;
+    image: url(":/images/branch-open.png");
+}
+
+QListView {
+	color: #ccc;
+	background-color: #333;
+	border: none;
+}
+
+QDockWidget {
+	color: #fff;
+	font-weight: bold;
+}
+QDockWidget::title {
+    text-align: left;
+    background: #555;
+    padding: 5px;
+}
+QDockWidget::close-button, QDockWidget::float-button {
+    border: 1px solid transparent;
+    background: #555;
+    color: #fff;
+}
+QDockWidget::close-button:hover, QDockWidget::float-button:hover {
+    background: #555;
+}
+QDockWidget::close-button:pressed, QDockWidget::float-button:pressed {
+    padding: 1px -1px -1px 1px;
+}
+
+QScrollBar:vertical {
+	background-color: #333;
+	min-height: 16px;
+	width: 8px;
+}
+QScrollBar::sub-line, QScrollBar::sub-line:pressed, QScrollBar::add-line, QScrollBar::add-line:pressed {
+	height: 0;
+}
+QScrollBar::add-page:enabled, QScrollBar::sub-page:enabled  {
+    background: none;
+}
+QScrollBar::handle {
+	background-color: #666;
+	min-height: 64px;
+}
+ 
