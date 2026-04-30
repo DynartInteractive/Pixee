@@ -142,6 +142,14 @@ void MainWindow::create() {
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
     restoreState(settings.value("mainWindowState").toByteArray());
 
+    // If a previous session's saved state left the folders dock detached
+    // from any dock area (and not floating either), Qt won't know how to
+    // show it again. Re-anchor it to the left so the menu toggle works.
+    if (dockWidgetArea(_dockWidget) == Qt::NoDockWidgetArea
+            && !_dockWidget->isFloating()) {
+        addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
+    }
+
     // Path edit drives navigation on Enter.
     QObject::connect(_pathLineEdit, &QLineEdit::returnPressed,
                      this, &MainWindow::goToPathFromLineEdit);
@@ -296,6 +304,23 @@ void MainWindow::createMenus() {
     QAction* refreshAction = viewMenu->addAction(tr("&Refresh"));
     refreshAction->setShortcut(QKeySequence::Refresh);  // F5 on most platforms
     connect(refreshAction, &QAction::triggered, this, &MainWindow::refreshCurrentFolder);
+
+    viewMenu->addSeparator();
+    // Manual QAction with two-way binding to the dock's visibility. We don't
+    // use QDockWidget::toggleViewAction() because it disables itself any
+    // time Qt thinks the dock isn't properly parented to the main window
+    // (which can happen after a saveState/restoreState round-trip from a
+    // weird previous run).
+    QAction* foldersToggle = new QAction(tr("&Folders"), this);
+    foldersToggle->setCheckable(true);
+    foldersToggle->setChecked(_dockWidget->isVisible());
+    connect(foldersToggle, &QAction::toggled, this, [this](bool on) {
+        _dockWidget->setVisible(on);
+        if (on) _dockWidget->raise();
+    });
+    connect(_dockWidget, &QDockWidget::visibilityChanged,
+            foldersToggle, &QAction::setChecked);
+    viewMenu->addAction(foldersToggle);
 
     QMenu* helpMenu = mb->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About"));
