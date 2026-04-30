@@ -1,0 +1,29 @@
+# Qt Creator
+.qtcreator/
+*.pro.user
+*.pro.user.*
+CMakeLists.txt.user*
+
+# Build output
+build/
+build-*/
+debug/
+release/
+Makefile*
+*.o
+*.obj
+*.exe
+*.dll
+*.pdb
+*.ilk
+
+# Qt-generated artifacts (in case they ever land in the source tree)
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qm
+
+# OS noise
+.DS_Store
+Thumbs.db
