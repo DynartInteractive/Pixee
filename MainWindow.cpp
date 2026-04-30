@@ -1,7 +1,12 @@
-#include <QStorageInfo>
+#include <QAction>
+#include <QKeySequence>
 #include <QLabel>
+#include <QMenuBar>
+#include <QMessageBox>
 #include <QSettings>
 #include <QSortFilterProxyModel>
+#include <QStatusBar>
+#include <QStorageInfo>
 #include <QVBoxLayout>
 
 #include "MainWindow.h"
@@ -72,6 +77,10 @@ void MainWindow::create() {
     v->addWidget(_pathLineEdit);
     v->addWidget(_fileListView);
     setCentralWidget(w);
+
+    // Menu bar + status bar
+    createMenus();
+    statusBar();  // force-create so it appears even when empty
 
     // Read settings
 
@@ -163,6 +172,7 @@ void MainWindow::navigateTo(FileItem* item) {
         QSignalBlocker block(_folderTreeView->selectionModel());
         _folderTreeView->selectionModel()->clearSelection();
         _folderTreeView->selectionModel()->clearCurrentIndex();
+        updateStatusBar(nullptr);
         return;
     }
     _fileModel->appendFileItems(item->fileInfo().filePath(), item);
@@ -171,6 +181,66 @@ void MainWindow::navigateTo(FileItem* item) {
     _fileListView->setRootIndex(proxyIdx);
     _pathLineEdit->setText(displayPath(item->fileInfo().filePath()));
     expandFolderTreeTo(item);
+    updateStatusBar(item);
+}
+
+FileItem* MainWindow::currentFolder() const {
+    const QModelIndex proxyIdx = _fileListView->rootIndex();
+    if (!proxyIdx.isValid()) return nullptr;
+    const QModelIndex sourceIdx = _fileFilterModel->mapToSource(proxyIdx);
+    if (!sourceIdx.isValid()) return nullptr;
+    return static_cast<FileItem*>(sourceIdx.internalPointer());
+}
+
+void MainWindow::refreshCurrentFolder() {
+    FileItem* folder = currentFolder();
+    if (!folder) return;
+    _fileModel->refreshFolder(folder);
+    updateStatusBar(folder);
+}
+
+void MainWindow::updateStatusBar(FileItem* folder) {
+    if (!folder || folder == _fileModel->rootItem()) {
+        statusBar()->clearMessage();
+        return;
+    }
+    int images = 0;
+    int folders = 0;
+    for (int i = 0; i < folder->childCount(); ++i) {
+        FileItem* c = folder->child(i);
+        if (!c) continue;
+        if (c->fileType() == FileType::Image) {
+            ++images;
+        } else if (c->fileType() == FileType::Folder
+                   && c->fileInfo().fileName() != "..") {
+            ++folders;
+        }
+    }
+    statusBar()->showMessage(tr("Images: %1  |  Folders: %2").arg(images).arg(folders));
+}
+
+void MainWindow::createMenus() {
+    QMenuBar* mb = menuBar();
+
+    QMenu* fileMenu = mb->addMenu(tr("&File"));
+    QAction* quitAction = fileMenu->addAction(tr("&Quit"));
+    quitAction->setShortcut(QKeySequence::Quit);
+    connect(quitAction, &QAction::triggered, this, &MainWindow::close);
+
+    QMenu* viewMenu = mb->addMenu(tr("&View"));
+    QAction* refreshAction = viewMenu->addAction(tr("&Refresh"));
+    refreshAction->setShortcut(QKeySequence::Refresh);  // F5 on most platforms
+    connect(refreshAction, &QAction::triggered, this, &MainWindow::refreshCurrentFolder);
+
+    QMenu* helpMenu = mb->addMenu(tr("&Help"));
+    QAction* aboutAction = helpMenu->addAction(tr("&About"));
+    connect(aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
+}
+
+void MainWindow::showAbout() {
+    QMessageBox::about(this, tr("About Pixee"),
+        tr("<b>Pixee</b><br><br>An image manager built on Qt 6."
+           "<br><a href=\"https://github.com/DynartInteractive/Pixee\">Pixee on GitHub</a>"));
 }
 
 void MainWindow::expandFolderTreeTo(FileItem* item) {

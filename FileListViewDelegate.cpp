@@ -37,6 +37,11 @@ FileListViewDelegate::FileListViewDelegate(Config* config, Theme* theme, FileFil
         pp.fillRect(0, kCheckerCell, kCheckerCell, kCheckerCell, c2);
     }
     _checkerBrush = QBrush(pattern);
+
+    _indexMargin      = theme->intValue("file-item.index-thumbnail-margin", 24);
+    _indexBorderSize  = theme->intValue("file-item.index-thumbnail-border-size", 1);
+    _indexOffsetY     = theme->intValue("file-item.index-thumbnail-offset-y", 0);
+    _indexBorderColor = theme->color("file-item.index-thumbnail-border-color", QColor("#888"));
 }
 
 
@@ -93,6 +98,17 @@ void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option
         }
     } else {
         _drawPixmap(p, fileItem->pixmap(), bgRect, fileItem->fileType() == FileType::Folder && !fileItem->pixmap()->isNull());
+
+        // Folder cells: overlay the auto-picked index thumbnail (if loaded)
+        // on top of the folder icon, with a margin from the cell edges and
+        // an optional border around the thumbnail.
+        if (fileItem->fileType() == FileType::Folder
+                && fileItem->fileInfo().fileName() != "..") {
+            const QImage indexImage = index.data(FileModel::IndexImageRole).value<QImage>();
+            if (!indexImage.isNull()) {
+                _drawIndexThumbnail(p, indexImage, bgRect);
+            }
+        }
     }
 
     // draw selection
@@ -123,4 +139,33 @@ void FileListViewDelegate::_drawPixmap(QPainter *p, QPixmap* pixmap, QRect &bgRe
     }
     */
     p->drawPixmap(rect.x(), rect.y(), *pixmap);
+}
+
+void FileListViewDelegate::_drawIndexThumbnail(QPainter* p, const QImage& image, const QRect& bgRect) const {
+    if (image.isNull()) return;
+
+    const int m = _indexMargin;
+    const int b = _indexBorderSize;
+    const int dy = _indexOffsetY;  // shift the overlay vertically; tunes against the folder graphic
+    QRect outer = bgRect.adjusted(m, m + dy, -m, -m + dy);
+    if (outer.isEmpty()) return;
+    // The image fits inside `outer` minus the border on each side.
+    QRect imageBox = outer.adjusted(b, b, -b, -b);
+    if (imageBox.isEmpty()) return;
+
+    const QPixmap pixmap = QPixmap::fromImage(image);
+    const QSize fitted = pixmap.size().scaled(imageBox.size(), Qt::KeepAspectRatio);
+    const QRect imageRect = QStyle::alignedRect(
+        Qt::LeftToRight, Qt::AlignCenter, fitted, imageBox);
+
+    // Border (drawn just outside the image rect).
+    if (b > 0) {
+        const QRect borderRect = imageRect.adjusted(-b, -b, b, b);
+        p->setPen(Qt::NoPen);
+        p->setBrush(_indexBorderColor);
+        p->drawRect(borderRect);
+    }
+
+    // The image itself — smooth-scaled into its rect.
+    p->drawPixmap(imageRect, pixmap, pixmap.rect());
 }

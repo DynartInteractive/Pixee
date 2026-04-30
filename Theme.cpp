@@ -58,6 +58,13 @@ QColor Theme::color(QString name, QColor defaultValue) {
     return result;
 }
 
+int Theme::intValue(QString name, int defaultValue) {
+    if (!_values.contains(name)) return defaultValue;
+    bool ok = false;
+    const int v = _values.value(name).toInt(&ok);
+    return ok ? v : defaultValue;
+}
+
 void Theme::_loadStyle() {
     if (_config->theme() == "default") {
         _style = "";

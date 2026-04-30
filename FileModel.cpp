@@ -8,6 +8,7 @@
 #include "Config.h"
 #include "Theme.h"
 #include "FileItem.h"
+#include "FolderEnumerator.h"
 #include "ThumbnailCache.h"
 
 FileModel::FileModel(Config* config, Theme* theme, ThumbnailCache* cache, QObject* parent)
@@ -27,6 +28,17 @@ FileModel::FileModel(Config* config, Theme* theme, ThumbnailCache* cache, QObjec
         connect(_cache, &ThumbnailCache::thumbnailMiss, this, &FileModel::onThumbnailMiss);
         connect(_cache, &ThumbnailCache::thumbnailPending, this, &FileModel::onThumbnailPending);
     }
+
+    // Worker thread for off-GUI directory enumeration. The enumerator is
+    // auto-deleted when the thread stops; requestEnumerate dispatches via
+    // a queued signal so the directory read runs off the GUI thread.
+    _enumerator = new FolderEnumerator();
+    _enumerator->moveToThread(&_enumThread);
+    connect(&_enumThread, &QThread::finished, _enumerator, &QObject::deleteLater);
+    connect(this, &FileModel::requestEnumerateSignal, _enumerator, &FolderEnumerator::enumerate);
+    connect(_enumerator, &FolderEnumerator::enumerated, this, &FileModel::onEnumerated);
+    _enumThread.start();
+
     populateDrives();
 }
 
@@ -35,19 +47,22 @@ void FileModel::populateDrives() {
     if (drives.isEmpty()) return;
 
     beginInsertRows(QModelIndex(), 0, drives.size() - 1);
-    QPixmap* folderPixmap = _theme->pixmap("folder");
+    QPixmap* hardDrivePixmap = _theme->pixmap("hard-drive");
     for (const QFileInfo& info : drives) {
-        FileItem* drive = new FileItem(info, FileType::Folder, folderPixmap, _rootItem);
+        FileItem* drive = new FileItem(info, FileType::Folder, hardDrivePixmap, _rootItem);
         _rootItem->appendChild(drive);
+        _itemsByPath.insert(info.filePath(), drive);
         // Loading placeholder so the expand arrow appears before the drive
         // is opened. appendFileItems will replace it on first expansion.
-        FileItem* loading = new FileItem(QFileInfo(), FileType::Loading, folderPixmap, drive);
+        FileItem* loading = new FileItem(QFileInfo(), FileType::Loading, hardDrivePixmap, drive);
         drive->appendChild(loading);
     }
     endInsertRows();
 }
 
 FileModel::~FileModel() {
+    _enumThread.quit();
+    _enumThread.wait();
     delete _rootItem;
 }
 
@@ -71,6 +86,18 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
         if (_pending.contains(path))    return StatePending;
         return StateIdle;
     }
+    if (role == IndexSourcePathRole) {
+        if (item->fileType() != FileType::Folder) return QVariant();
+        return _folderIndexes.value(item->fileInfo().filePath());
+    }
+    if (role == IndexImageRole) {
+        if (item->fileType() != FileType::Folder) return QVariant();
+        const QString src = _folderIndexes.value(item->fileInfo().filePath());
+        if (src.isEmpty()) return QVariant();
+        const auto it = _thumbnails.constFind(src);
+        if (it == _thumbnails.constEnd()) return QVariant();
+        return it.value();
+    }
     if (role == Qt::DecorationRole) {
         if (item->fileType() == FileType::Folder) {
             QIcon* icon = _theme->icon("folder");
@@ -82,7 +109,7 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
     // Drives (children of the synthetic root) get their drive-letter path as
     // the display name; for everything else strip down to the file name.
     if (item->parent() == _rootItem) {
-        return item->fileInfo().filePath();
+        return item->fileInfo().filePath().split("/").first();
     }
     return item->fileInfo().filePath().split("/").last();
 }
@@ -162,20 +189,45 @@ void FileModel::appendFileItems(const QString& dirPath, FileItem* parent) {
         parent->removeChild(0);
         endRemoveRows();
     } else {
-        // Already populated; don't refresh. (The lazy-load runs once per
-        // session — TODO: refresh on demand.)
+        // Already populated; the lazy-load runs once per session. Use
+        // refreshFolder() to force a re-read.
         return;
     }
 
+    populateFolder(dirPath, parent);
+}
 
+void FileModel::refreshFolder(FileItem* parent) {
+    if (!parent || parent == _rootItem) return;
+
+    const QModelIndex parentIdx = indexFor(parent);
+    if (parent->childCount() > 0) {
+        beginRemoveRows(parentIdx, 0, parent->childCount() - 1);
+        for (int i = parent->childCount() - 1; i >= 0; --i) {
+            FileItem* child = parent->child(i);
+            forgetSubtree(child);
+            parent->removeChild(i);
+        }
+        endRemoveRows();
+    }
+    populateFolder(parent->fileInfo().filePath(), parent);
+}
+
+void FileModel::populateFolder(const QString& dirPath, FileItem* parent) {
     QDir dir(dirPath);
-    QFileInfoList fileList = dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDot);
+    const QFileInfoList fileList = dir.entryInfoList(
+        QDir::Dirs | QDir::Files | QDir::NoDot, QDir::Name);
+    applyEntries(parent, fileList);
+}
 
-    int firstRow = parent->childCount(); // Get the row number where the new rows will be inserted
-    int lastRow = firstRow + fileList.size() - 1; // Calculate the last row number
+void FileModel::applyEntries(FileItem* parent, const QFileInfoList& fileList) {
+    if (fileList.isEmpty()) return;
 
-    // Begin inserting rows
+    const int firstRow = parent->childCount();
+    const int lastRow = firstRow + fileList.size() - 1;
     beginInsertRows(createIndex(parent->row(), 0, parent), firstRow, lastRow);
+
+    QString firstImagePath;  // for the folder index auto-pick
 
     for (const auto& fileInfo : fileList) {
         FileType fileType = FileType::File;
@@ -186,6 +238,9 @@ void FileModel::appendFileItems(const QString& dirPath, FileItem* parent) {
             const QString ext = fileInfo.suffix().toLower();
             if (_imageExtensions.contains(ext)) {
                 fileType = FileType::Image;
+                if (firstImagePath.isEmpty()) {
+                    firstImagePath = fileInfo.filePath();
+                }
             }
         }
 
@@ -199,23 +254,71 @@ void FileModel::appendFileItems(const QString& dirPath, FileItem* parent) {
         } else if (fileType == FileType::Image) {
             pixmap = _theme->pixmap("image");
         }
-        // Create and append new FileItem
         FileItem* newItem = new FileItem(fileInfo, fileType, pixmap, parent);
         parent->appendChild(newItem);
 
-        // If it's a folder, append a "Loading..." child item
         if (fileType == FileType::Folder) {
+            // Loading placeholder so the expand arrow renders before the
+            // folder's own contents are scanned.
             FileItem* childItem = new FileItem(QFileInfo(), FileType::Loading, pixmap, newItem);
             newItem->appendChild(childItem);
+            // Track the folder by path so it can repaint when its index
+            // image's thumbnail arrives. Skip ".." (the path resolves to
+            // the parent and would alias).
+            if (fileInfo.fileName() != "..") {
+                _itemsByPath.insert(fileInfo.filePath(), newItem);
+            }
         } else if (fileType == FileType::Image) {
-            // Track the item by path so onThumbnailReady can route dataChanged.
-            // Subscriptions themselves are driven by FileListView based on viewport.
             _itemsByPath.insert(fileInfo.filePath(), newItem);
         }
     }
 
-    // End inserting rows
+    // Auto-pick the folder's index image (first image alphabetically). The
+    // user's future "set as index" feature will override this entry.
+    if (!firstImagePath.isEmpty() && parent != _rootItem) {
+        const QString folderPath = parent->fileInfo().filePath();
+        const QString previous = _folderIndexes.value(folderPath);
+        if (previous != firstImagePath) {
+            if (!previous.isEmpty()) {
+                _indexUsers[previous].remove(folderPath);
+                if (_indexUsers[previous].isEmpty()) _indexUsers.remove(previous);
+            }
+            _folderIndexes.insert(folderPath, firstImagePath);
+            _indexUsers[firstImagePath].insert(folderPath);
+        }
+    }
+
     endInsertRows();
+}
+
+void FileModel::forgetSubtree(FileItem* item) {
+    if (!item) return;
+    const QString path = item->fileInfo().filePath();
+    if (!path.isEmpty()) {
+        _itemsByPath.remove(path);
+        _thumbnails.remove(path);
+        _pending.remove(path);
+        // Keep _failed so the cache's negative cache stays consistent.
+
+        // If this path was a folder with an index assignment, drop its
+        // entry; if it was the index source for any folder, untrack the
+        // reverse mapping too.
+        const QString prevSource = _folderIndexes.value(path);
+        if (!prevSource.isEmpty()) {
+            _indexUsers[prevSource].remove(path);
+            if (_indexUsers[prevSource].isEmpty()) _indexUsers.remove(prevSource);
+            _folderIndexes.remove(path);
+        }
+        if (_indexUsers.contains(path)) {
+            for (const QString& folder : _indexUsers.value(path)) {
+                _folderIndexes.remove(folder);
+            }
+            _indexUsers.remove(path);
+        }
+    }
+    for (int i = 0; i < item->childCount(); ++i) {
+        forgetSubtree(item->child(i));
+    }
 }
 
 void FileModel::onThumbnailReady(QString path, QImage image) {
@@ -223,6 +326,11 @@ void FileModel::onThumbnailReady(QString path, QImage image) {
     _failed.remove(path);
     _thumbnails.insert(path, image);
     emitDataChangedFor(path);
+    // Folders that adopted this path as their index need to repaint too.
+    const auto users = _indexUsers.value(path);
+    for (const QString& folderPath : users) {
+        emitDataChangedFor(folderPath);
+    }
 }
 
 void FileModel::onThumbnailMiss(QString path) {
@@ -230,6 +338,10 @@ void FileModel::onThumbnailMiss(QString path) {
     _thumbnails.remove(path);
     _failed.insert(path);
     emitDataChangedFor(path);
+    const auto users = _indexUsers.value(path);
+    for (const QString& folderPath : users) {
+        emitDataChangedFor(folderPath);
+    }
 }
 
 void FileModel::onThumbnailPending(QString path) {
@@ -243,16 +355,55 @@ void FileModel::onThumbnailPending(QString path) {
 
 void FileModel::emitDataChangedFor(const QString& path) {
     auto it = _itemsByPath.constFind(path);
-    if (it == _itemsByPath.constEnd()) {
-        return;
-    }
+    if (it == _itemsByPath.constEnd()) return;
     FileItem* item = it.value();
     const QModelIndex idx = createIndex(item->row(), 0, item);
-    emit dataChanged(idx, idx, { Qt::DecorationRole, ThumbnailRole, ThumbnailStateRole });
+    emit dataChanged(idx, idx,
+        { Qt::DecorationRole, ThumbnailRole, ThumbnailStateRole, IndexImageRole });
 }
 
 FileItem* FileModel::rootItem() const {
     return _rootItem;
+}
+
+QString FileModel::folderIndexSource(const QString& folderPath) const {
+    return _folderIndexes.value(folderPath);
+}
+
+void FileModel::requestEnumerate(FileItem* parent) {
+    if (!parent || parent == _rootItem) return;
+    // Already populated (no Loading placeholder) — nothing to do.
+    if (parent->childCount() != 1
+            || parent->child(0)->fileType() != FileType::Loading) {
+        return;
+    }
+    const QString dirPath = parent->fileInfo().filePath();
+    if (_enumeratingPaths.contains(dirPath)) return;
+    _enumeratingPaths.insert(dirPath);
+    emit requestEnumerateSignal(dirPath);
+}
+
+void FileModel::onEnumerated(QString dirPath, QFileInfoList entries) {
+    _enumeratingPaths.remove(dirPath);
+
+    auto it = _itemsByPath.constFind(dirPath);
+    if (it == _itemsByPath.constEnd()) return;
+    FileItem* parent = it.value();
+
+    // If the synchronous path (appendFileItems / refreshFolder) raced and
+    // already populated this folder, the Loading placeholder is gone —
+    // discard our async result.
+    if (parent->childCount() != 1
+            || parent->child(0)->fileType() != FileType::Loading) {
+        return;
+    }
+
+    beginRemoveRows(createIndex(parent->row(), 0, parent), 0, 0);
+    parent->removeChild(0);
+    endRemoveRows();
+
+    applyEntries(parent, entries);
+    emit folderPopulated(dirPath);
 }
 
 QModelIndex FileModel::indexFor(FileItem* item) const {

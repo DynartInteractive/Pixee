@@ -15,6 +15,7 @@ SOURCES += \
     FileListView.cpp \
     FileListViewDelegate.cpp \
     FileModel.cpp \
+    FolderEnumerator.cpp \
     FolderTreeView.cpp \
     MainWindow.cpp \
     Pixee.cpp \
@@ -33,6 +34,7 @@ HEADERS += \
     FileListViewDelegate.h \
     FileModel.h \
     FileType.h \
+    FolderEnumerator.h \
     FolderTreeView.h \
     MainWindow.h \
     Pixee.h \

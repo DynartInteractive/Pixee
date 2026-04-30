@@ -10,6 +10,7 @@ public:
     Theme(Config* config);
     void apply(QWidget* widget);
     QColor color(QString name, QColor defaultValue);
+    int intValue(QString name, int defaultValue);
     QString realPath(QString path);
     QPixmap* pixmap(QString name);
     QIcon* icon(QString name);

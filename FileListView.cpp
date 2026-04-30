@@ -55,6 +55,16 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
         connect(_cache, &ThumbnailCache::thumbnailReady, this, &FileListView::onCacheReady);
         connect(_cache, &ThumbnailCache::thumbnailMiss,  this, &FileListView::onCacheMiss);
     }
+
+    // When a subfolder finishes async enumeration, its index source becomes
+    // discoverable — re-run subscriptions to pick it up. Use the debounce
+    // timer directly so the auto-expand state is preserved (we don't reset
+    // window expansion on a model-driven re-tick).
+    if (auto* fm = qobject_cast<FileModel*>(fileFilterModel->sourceModel())) {
+        connect(fm, &FileModel::folderPopulated, this, [this](const QString&) {
+            _updateTimer.start();
+        });
+    }
 }
 
 void FileListView::setRootIndex(const QModelIndex& index) {
@@ -186,6 +196,8 @@ void FileListView::updateSubscriptions() {
     QSet<QString> wanted;
     wanted.reserve(lastRow - firstRow + 1);
 
+    auto* fileModel = qobject_cast<FileModel*>(_fileFilterModel->sourceModel());
+
     // Pass 2: subscribe / re-prioritize in row order so the generator's
     // sequence-number tie-breaker reflects top-left → bottom-right order.
     for (int row = firstRow; row <= lastRow; ++row) {
@@ -194,7 +206,34 @@ void FileListView::updateSubscriptions() {
         QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
         if (!srcIdx.isValid()) continue;
         FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
-        if (!item || item->fileType() != FileType::Image) continue;
+        if (!item) continue;
+
+        // Decide which path's thumbnail this row needs. For images, it's
+        // the file itself. For folders, it's the folder's auto-picked
+        // index image (skipped for ".."). Other types — placeholder only.
+        QString subscribePath;
+        QFileInfo subscribeInfo;
+        if (item->fileType() == FileType::Image) {
+            subscribeInfo = item->fileInfo();
+            subscribePath = subscribeInfo.filePath();
+        } else if (item->fileType() == FileType::Folder
+                   && item->fileInfo().fileName() != ".."
+                   && fileModel) {
+            // Kick off an async enumeration if the folder isn't populated yet.
+            // No-op for already-populated folders or in-flight requests; the
+            // folderPopulated signal will trigger another updateSubscriptions
+            // when the result arrives, and the source will resolve then.
+            fileModel->requestEnumerate(item);
+            const QString src = fileModel->folderIndexSource(item->fileInfo().filePath());
+            if (src.isEmpty()) continue;
+            subscribeInfo = QFileInfo(src);
+            if (!subscribeInfo.exists() || !subscribeInfo.isFile()) continue;
+            subscribePath = src;
+        } else {
+            continue;
+        }
+
+        if (wanted.contains(subscribePath)) continue;  // same source already handled this pass
 
         int distance;
         if (row >= fullStart && row <= fullEnd) {
@@ -207,18 +246,15 @@ void FileListView::updateSubscriptions() {
             distance = 1 + (row - lastAny);            // prefetch below
         }
 
-        const QFileInfo info = item->fileInfo();
-        const QString path = info.filePath();
-
-        wanted.insert(path);
-        if (_lastSubscribed.contains(path)) {
-            _cache->setPriority(path, distance);
+        wanted.insert(subscribePath);
+        if (_lastSubscribed.contains(subscribePath)) {
+            _cache->setPriority(subscribePath, distance);
         } else {
-            _cache->subscribe(path,
-                              info.lastModified().toSecsSinceEpoch(),
-                              info.size(),
+            _cache->subscribe(subscribePath,
+                              subscribeInfo.lastModified().toSecsSinceEpoch(),
+                              subscribeInfo.size(),
                               distance);
-            _activeJobs.insert(path);
+            _activeJobs.insert(subscribePath);
         }
     }
 

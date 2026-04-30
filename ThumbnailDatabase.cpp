@@ -31,16 +31,22 @@ void ThumbnailDatabase::connectDatabase() {
     }
     const QString create =
         "CREATE TABLE IF NOT EXISTS pixee_thumbnails ("
-        "  path   TEXT    PRIMARY KEY,"
-        "  mtime  INTEGER NOT NULL,"
-        "  size   INTEGER NOT NULL,"
-        "  width  INTEGER NOT NULL,"
-        "  height INTEGER NOT NULL,"
-        "  data   BLOB    NOT NULL"
+        "  path        TEXT    PRIMARY KEY,"
+        "  mtime       INTEGER NOT NULL,"
+        "  size        INTEGER NOT NULL,"
+        "  width       INTEGER NOT NULL,"
+        "  height      INTEGER NOT NULL,"
+        "  data        BLOB    NOT NULL,"
+        "  source_path TEXT"
         ")";
     if (!q.exec(create)) {
         qWarning() << "ThumbnailDatabase: create table failed:" << q.lastError().text();
     }
+    // Lightweight forward-migration for installs that already had the
+    // pre-source_path schema. Failure ("duplicate column name") is fine —
+    // it just means the column is already present.
+    QSqlQuery alter(_db);
+    alter.exec("ALTER TABLE pixee_thumbnails ADD COLUMN source_path TEXT");
 }
 
 void ThumbnailDatabase::lookup(QString path, qint64 mtime, qint64 size) {

@@ -26,7 +26,12 @@ private:
     QBrush _selectionBrush;
     QBrush _checkerBrush;
     QPen _textPen;
+    int _indexMargin;
+    int _indexBorderSize;
+    int _indexOffsetY;
+    QColor _indexBorderColor;
     void _drawPixmap(QPainter *p, QPixmap* pixmap, QRect &rect, bool border) const;
+    void _drawIndexThumbnail(QPainter* p, const QImage& image, const QRect& bgRect) const;
 };
 
 #endif // FILELISTVIEWDELEGATE_H

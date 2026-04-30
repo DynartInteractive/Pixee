@@ -28,11 +28,16 @@ public:
 
 private slots:
     void goToPathFromLineEdit();
+    void refreshCurrentFolder();
+    void showAbout();
 
 private:
     void navigateTo(FileItem* item);
     void expandFolderTreeTo(FileItem* item);
+    void createMenus();
+    void updateStatusBar(FileItem* folder);
     QString displayPath(const QString& storedPath) const;
+    FileItem* currentFolder() const;
 
     Pixee* _pixee;
     FileModel* _fileModel;
