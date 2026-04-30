@@ -8,14 +8,16 @@
 ThumbnailGenerator::ThumbnailGenerator(int targetSize, int jpegQuality, int workerCount, QObject* parent)
     : QObject(parent) {
     if (workerCount < 1) workerCount = 1;
+    _abortVersion.storeRelease(0);
     _workers.reserve(workerCount);
     for (int i = 0; i < workerCount; ++i) {
         QThread* t = new QThread();
-        ThumbnailWorker* w = new ThumbnailWorker(targetSize, jpegQuality);
+        ThumbnailWorker* w = new ThumbnailWorker(targetSize, jpegQuality, &_abortVersion);
         w->moveToThread(t);
         connect(t, &QThread::finished, w, &QObject::deleteLater);
         connect(w, &ThumbnailWorker::generated, this, &ThumbnailGenerator::onWorkerGenerated);
         connect(w, &ThumbnailWorker::failed, this, &ThumbnailGenerator::onWorkerFailed);
+        connect(w, &ThumbnailWorker::aborted, this, &ThumbnailGenerator::onWorkerAborted);
         t->start();
         _workers.append({ t, w, false });
     }
@@ -50,7 +52,10 @@ void ThumbnailGenerator::abandonAll() {
     _currentPriority.clear();
     decltype(_queue) empty;
     std::swap(_queue, empty);
-    // _processing entries stay until each worker finishes naturally.
+    // Bump the abort version so any worker mid-task notices the mismatch
+    // at its next chunk boundary and bails out via the aborted signal.
+    _abortVersion.fetchAndAddRelease(1);
+    // _processing entries stay until each worker finishes (or aborts).
 }
 
 void ThumbnailGenerator::onWorkerGenerated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes) {
@@ -62,6 +67,13 @@ void ThumbnailGenerator::onWorkerGenerated(QString path, qint64 mtime, qint64 si
 
 void ThumbnailGenerator::onWorkerFailed(QString path) {
     emit failed(path);
+    _processing.remove(path);
+    markIdle(sender());
+    dispatch();
+}
+
+void ThumbnailGenerator::onWorkerAborted(QString path) {
+    emit aborted(path);
     _processing.remove(path);
     markIdle(sender());
     dispatch();
@@ -111,7 +123,9 @@ void ThumbnailGenerator::dispatch() {
 
         idle->busy = true;
         emit started(path);
+        const int taskVersion = _abortVersion.loadAcquire();
         QMetaObject::invokeMethod(idle->worker, "process", Qt::QueuedConnection,
-            Q_ARG(QString, path), Q_ARG(qint64, mtime), Q_ARG(qint64, size));
+            Q_ARG(QString, path), Q_ARG(qint64, mtime), Q_ARG(qint64, size),
+            Q_ARG(int, taskVersion));
     }
 }

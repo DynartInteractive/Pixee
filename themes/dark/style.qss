@@ -1,5 +1,5 @@
-#pathEdit {
-	color: #fff;
+#pathLineEdit {
+	color: #ccc;
 	background-color: #555;
 	padding: 3px 5px 4px 5px;
 	border: none;

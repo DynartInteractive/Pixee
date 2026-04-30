@@ -24,6 +24,7 @@ private:
     QBrush _backgroundBrush;
     QBrush _borderBrush;
     QBrush _selectionBrush;
+    QBrush _checkerBrush;
     QPen _textPen;
     void _drawPixmap(QPainter *p, QPixmap* pixmap, QRect &rect, bool border) const;
 };

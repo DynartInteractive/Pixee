@@ -1,7 +1,10 @@
 #include "FileListViewDelegate.h"
 
+#include <QApplication>
 #include <QImage>
 #include <QPainter>
+#include <QPalette>
+#include <QPixmap>
 #include "Theme.h"
 #include "FileFilterModel.h"
 #include "FileItem.h"
@@ -18,6 +21,22 @@ FileListViewDelegate::FileListViewDelegate(Config* config, Theme* theme, FileFil
     _textPen = theme->color("file-item.text-color", QColor(24, 24, 24));
     _borderBrush = theme->color("file-item.border-color", QColor(255, 255, 255));
     _selectionBrush = theme->color("file-item.selection-color", QColor(0, 128, 255, 48));
+
+    // Checker pattern for transparent thumbnails. Defaults track the system
+    // palette's QPalette::Base / AlternateBase so a default-themed light UI
+    // gets sensible greys; the dark theme overrides via style.ini.
+    const QPalette pal = parent ? parent->palette() : QApplication::palette();
+    const QColor c1 = theme->color("file-item.checked-bg-color1", pal.color(QPalette::Base));
+    const QColor c2 = theme->color("file-item.checked-bg-color2", pal.color(QPalette::AlternateBase));
+    constexpr int kCheckerCell = 8;
+    QPixmap pattern(kCheckerCell * 2, kCheckerCell * 2);
+    pattern.fill(c1);
+    {
+        QPainter pp(&pattern);
+        pp.fillRect(kCheckerCell, 0, kCheckerCell, kCheckerCell, c2);
+        pp.fillRect(0, kCheckerCell, kCheckerCell, kCheckerCell, c2);
+    }
+    _checkerBrush = QBrush(pattern);
 }
 
 
@@ -43,25 +62,24 @@ void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option
     auto textRect = QRect(bgRect.x() + 6, bgRect.bottom(), bgRect.width() - 12, 28);
     p->setPen(Qt::NoPen);
 
-    // draw icon
-    if (fileItem->fileType() == FileType::Folder) {
-        /*if (file->isDotDot()) {
-            drawPixmap(p, theme->backPixmap, bgRect, false);
-        } else {*/
-        _drawPixmap(p, _theme->pixmap("folder"), bgRect, false);
-        //}
-    } else if (fileItem->fileType() == FileType::Image) {
+    if (fileItem->fileType() == FileType::Image) {
+        // Solid cell background for image cells. The checker pattern only
+        // appears under the actual thumbnail rect so transparency in the
+        // image shows through, while non-square thumbs sit on a clean colour
+        // border.
         p->setBrush(_backgroundBrush);
         p->drawRect(bgRect);
-    }
 
-    if (fileItem->fileType() == FileType::Image) {
         const QImage thumbImage = index.data(FileModel::ThumbnailRole).value<QImage>();
         if (!thumbImage.isNull()) {
-            QPixmap thumbPixmap = QPixmap::fromImage(thumbImage);
-            _drawPixmap(p, &thumbPixmap, bgRect, false);
+            const QPixmap thumbPixmap = QPixmap::fromImage(thumbImage);
+            const QRect imgRect = QStyle::alignedRect(
+                Qt::LeftToRight, Qt::AlignCenter, thumbPixmap.size(), bgRect);
+            p->setBrush(_checkerBrush);
+            p->drawRect(imgRect);
+            p->drawPixmap(imgRect.x(), imgRect.y(), thumbPixmap);
         } else {
-            // Pick the placeholder by thumbnail state.
+            // Placeholders sit directly on the solid background — no checker.
             const int state = index.data(FileModel::ThumbnailStateRole).toInt();
             QPixmap* placeholder = fileItem->pixmap();  // default "image" pixmap
             if (state == FileModel::StateFailed) {

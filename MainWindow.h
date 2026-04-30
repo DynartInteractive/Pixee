@@ -11,6 +11,8 @@
 #include "FileFilterModel.h"
 #include "Pixee.h"
 
+class FileItem;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -23,7 +25,15 @@ public:
     void create();
     void exit();
     void goToFolderByFileIndex(const QModelIndex& fileIndex);
+
+private slots:
+    void goToPathFromLineEdit();
+
 private:
+    void navigateTo(FileItem* item);
+    void expandFolderTreeTo(FileItem* item);
+    QString displayPath(const QString& storedPath) const;
+
     Pixee* _pixee;
     FileModel* _fileModel;
     FileFilterModel* _folderFilterModel;

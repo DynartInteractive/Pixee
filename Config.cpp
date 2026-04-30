@@ -63,6 +63,7 @@ void Config::_setUpImageExtensions() {
     foreach (auto extension, _imageExtensions) {
         _imageFileNameFilters.append("*." + extension);
     }
+    qDebug() << "Supported image formats:" << _imageExtensions;
 }
 
 void Config::_setUpUserFolder() {

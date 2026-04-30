@@ -41,6 +41,14 @@ bool FileFilterModel::lessThan(const QModelIndex& left, const QModelIndex& right
     FileItem* leftItem = static_cast<FileItem*>(left.internalPointer());
     FileItem* rightItem = static_cast<FileItem*>(right.internalPointer());
 
+    // ".." always sorts first, even before folder names that ASCII-precede
+    // it (e.g. "!something" — yes, those exist on Windows).
+    const bool leftIsDotDot  = leftItem->fileInfo().fileName()  == "..";
+    const bool rightIsDotDot = rightItem->fileInfo().fileName() == "..";
+    if (leftIsDotDot != rightIsDotDot) {
+        return leftIsDotDot;
+    }
+
     // Check if both items are directories
     bool leftIsDir = leftItem->fileType() == FileType::Folder;
     bool rightIsDir = rightItem->fileType() == FileType::Folder;

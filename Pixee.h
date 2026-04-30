@@ -3,9 +3,9 @@
 
 #include <QApplication>
 
-class MainWindow;
+#include "Config.h"
 
-class Config;
+class MainWindow;
 class Theme;
 class ThumbnailCache;
 

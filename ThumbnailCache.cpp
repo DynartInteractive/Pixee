@@ -26,6 +26,7 @@ ThumbnailCache::ThumbnailCache(Config* config, QObject* parent)
     connect(this, &ThumbnailCache::requestAbandonAll, _generator, &ThumbnailGenerator::abandonAll);
     connect(_generator, &ThumbnailGenerator::generated, this, &ThumbnailCache::onGenerated);
     connect(_generator, &ThumbnailGenerator::failed, this, &ThumbnailCache::onGenerationFailed);
+    connect(_generator, &ThumbnailGenerator::aborted, this, &ThumbnailCache::onGenerationAborted);
     // Forward "decoding has started for this path" to the model. We tie the
     // pending state to actual generator work, not to subscribe-time, so the
     // queued placeholder reflects what the workers are actively chewing on.
@@ -150,4 +151,13 @@ void ThumbnailCache::onGenerationFailed(QString path) {
     if (_subscribers.contains(path)) {
         emit thumbnailMiss(path);
     }
+}
+
+void ThumbnailCache::onGenerationAborted(QString path) {
+    // The worker bailed because abandonAll bumped the abort version. Treat
+    // as if the work never happened: clean up state but do NOT mark the
+    // path as failed. If the user re-subscribes later we want to retry.
+    _inGen.remove(path);
+    _pendingMeta.remove(path);
+    _priorities.remove(path);
 }

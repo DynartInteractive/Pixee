@@ -17,6 +17,10 @@
 namespace {
 constexpr int kPrefetchRows = 5;
 constexpr int kUpdateDebounceMs = 50;
+// How many rows the window grows by each time the current active batch
+// finishes. Larger = fewer iterations to cover a big folder, but each
+// batch is also bigger.
+constexpr int kExpansionStep = 100;
 }
 
 FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, FileFilterModel* fileFilterModel)
@@ -46,6 +50,11 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
             this, &FileListView::scheduleSubscriptionUpdate);
     connect(fileFilterModel, &QAbstractItemModel::modelReset,
             this, &FileListView::scheduleSubscriptionUpdate);
+
+    if (_cache) {
+        connect(_cache, &ThumbnailCache::thumbnailReady, this, &FileListView::onCacheReady);
+        connect(_cache, &ThumbnailCache::thumbnailMiss,  this, &FileListView::onCacheMiss);
+    }
 }
 
 void FileListView::setRootIndex(const QModelIndex& index) {
@@ -58,6 +67,9 @@ void FileListView::setRootIndex(const QModelIndex& index) {
         _cache->abandonAll();
     }
     _lastSubscribed.clear();
+    _activeJobs.clear();
+    _windowExpansion = 0;
+    _windowCoversFolder = false;
 
     QListView::setRootIndex(index);
 
@@ -109,6 +121,10 @@ void FileListView::wheelEvent(QWheelEvent* event) {
 }
 
 void FileListView::scheduleSubscriptionUpdate() {
+    // Triggered by user activity (scroll / resize / model change). Restart
+    // the prefetch growth from scratch around the new viewport.
+    _windowExpansion = 0;
+    _windowCoversFolder = false;
     _updateTimer.start();
 }
 
@@ -162,8 +178,10 @@ void FileListView::updateSubscriptions() {
     const int fullStart = (firstFull == -1) ? firstAny : firstFull;
     const int fullEnd   = (lastFull  == -1) ? lastAny  : lastFull;
 
-    const int firstRow = std::max(0, firstAny - kPrefetchRows);
-    const int lastRow  = std::min(totalRows - 1, lastAny + kPrefetchRows);
+    const int radius = kPrefetchRows + _windowExpansion;
+    const int firstRow = std::max(0, firstAny - radius);
+    const int lastRow  = std::min(totalRows - 1, lastAny + radius);
+    _windowCoversFolder = (firstRow == 0 && lastRow == totalRows - 1);
 
     QSet<QString> wanted;
     wanted.reserve(lastRow - firstRow + 1);
@@ -200,6 +218,7 @@ void FileListView::updateSubscriptions() {
                               info.lastModified().toSecsSinceEpoch(),
                               info.size(),
                               distance);
+            _activeJobs.insert(path);
         }
     }
 
@@ -207,7 +226,36 @@ void FileListView::updateSubscriptions() {
     const QSet<QString> toRemove = _lastSubscribed - wanted;
     for (const QString& path : toRemove) {
         _cache->unsubscribe(path);
+        _activeJobs.remove(path);
     }
 
     _lastSubscribed = wanted;
+}
+
+void FileListView::onCacheReady(QString path, QImage) {
+    onCacheJobDone(path);
+}
+
+void FileListView::onCacheMiss(QString path) {
+    onCacheJobDone(path);
+}
+
+void FileListView::onCacheJobDone(const QString& path) {
+    if (!_activeJobs.remove(path)) return;
+    if (_activeJobs.isEmpty()) {
+        tryExpandWindow();
+    }
+}
+
+void FileListView::tryExpandWindow() {
+    // Already covering the whole folder — nothing more to fetch.
+    if (_windowCoversFolder) return;
+    if (!_cache || !model() || !rootIndex().isValid()) {
+        // Drive list view (no rootIndex) — leave alone, no folder to expand.
+        // Note: the very first updateSubscriptions on app start also has
+        // an invalid rootIndex if the user hasn't navigated yet.
+        if (rootIndex().isValid() == false) return;
+    }
+    _windowExpansion += kExpansionStep;
+    updateSubscriptions();
 }

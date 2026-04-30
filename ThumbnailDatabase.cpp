@@ -68,7 +68,9 @@ void ThumbnailDatabase::lookup(QString path, qint64 mtime, qint64 size) {
     }
     const QByteArray bytes = q.value(2).toByteArray();
     QImage image;
-    if (!image.loadFromData(bytes, "JPEG")) {
+    // Format unspecified — Qt sniffs PNG vs JPEG from the magic bytes, so we
+    // can transparently handle both encodings the worker produces.
+    if (!image.loadFromData(bytes)) {
         qWarning() << "ThumbnailDatabase: failed to decode cached thumb for" << path;
         emit notFound(path);
         return;

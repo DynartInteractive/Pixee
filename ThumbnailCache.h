@@ -47,6 +47,7 @@ private slots:
     void onNotFound(QString path);
     void onGenerated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes);
     void onGenerationFailed(QString path);
+    void onGenerationAborted(QString path);
 
 private:
     QThread _dbThread;

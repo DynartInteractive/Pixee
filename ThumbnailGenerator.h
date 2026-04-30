@@ -1,6 +1,7 @@
 #ifndef THUMBNAILGENERATOR_H
 #define THUMBNAILGENERATOR_H
 
+#include <QAtomicInt>
 #include <QByteArray>
 #include <QHash>
 #include <QImage>
@@ -42,6 +43,9 @@ public slots:
 signals:
     void generated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes);
     void failed(QString path);
+    // Emitted when a worker bailed out of a task because abandonAll bumped
+    // the abort version while it was running.
+    void aborted(QString path);
     // Emitted when a path is dispatched to a worker for decoding — i.e. the
     // moment work on it actually begins, not when it was queued.
     void started(QString path);
@@ -49,6 +53,7 @@ signals:
 private slots:
     void onWorkerGenerated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes);
     void onWorkerFailed(QString path);
+    void onWorkerAborted(QString path);
 
 private:
     struct QueueItem {
@@ -77,6 +82,9 @@ private:
     QHash<QString, int> _currentPriority;
     QSet<QString> _processing;
     QList<WorkerSlot> _workers;
+    // Bumped by abandonAll(); workers compare against the per-task snapshot
+    // they were dispatched with. Mismatch = task has been abandoned.
+    QAtomicInt _abortVersion;
 };
 
 #endif // THUMBNAILGENERATOR_H

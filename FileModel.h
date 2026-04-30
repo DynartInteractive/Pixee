@@ -7,6 +7,7 @@
 #include <QSet>
 #include <QString>
 
+class Config;
 class Theme;
 class FileItem;
 class ThumbnailCache;
@@ -25,7 +26,7 @@ public:
         StateFailed
     };
 
-    explicit FileModel(Theme* theme, ThumbnailCache* cache, QObject* parent = nullptr);
+    explicit FileModel(Config* config, Theme* theme, ThumbnailCache* cache, QObject* parent = nullptr);
     ~FileModel();
 
     QVariant data(const QModelIndex& index, int role) const override;
@@ -37,6 +38,11 @@ public:
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
     void appendFileItems(const QString& dirPath, FileItem* parent);
+    // Walk and lazy-load the tree segment-by-segment until the path is
+    // reached. Returns the source QModelIndex of the leaf folder, or an
+    // invalid index if any segment doesn't exist or isn't a folder.
+    QModelIndex expandPath(const QString& path);
+    QModelIndex indexFor(FileItem* item) const;
     FileItem* rootItem() const;
 
 private slots:
@@ -55,6 +61,7 @@ private:
     QHash<QString, QImage> _thumbnails;
     QSet<QString> _pending;
     QSet<QString> _failed;
+    QSet<QString> _imageExtensions;
 };
 
 #endif // FILEMODEL_H

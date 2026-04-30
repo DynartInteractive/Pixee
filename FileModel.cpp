@@ -5,15 +5,23 @@
 #include <QPainter>
 #include <QFileInfo>
 
+#include "Config.h"
 #include "Theme.h"
 #include "FileItem.h"
 #include "ThumbnailCache.h"
 
-FileModel::FileModel(Theme* theme, ThumbnailCache* cache, QObject* parent)
+FileModel::FileModel(Config* config, Theme* theme, ThumbnailCache* cache, QObject* parent)
     : QAbstractItemModel(parent) {
     _theme = theme;
     _cache = cache;
     _rootItem = new FileItem(QFileInfo(), FileType::Folder, _theme->pixmap("folder"));
+    // Build a quick-lookup set from whatever Qt's plugins reported supporting
+    // — keeps the image classifier honest as the Qt build changes.
+    if (config) {
+        for (const QString& ext : config->imageExtensions()) {
+            _imageExtensions.insert(ext.toLower());
+        }
+    }
     if (_cache) {
         connect(_cache, &ThumbnailCache::thumbnailReady, this, &FileModel::onThumbnailReady);
         connect(_cache, &ThumbnailCache::thumbnailMiss, this, &FileModel::onThumbnailMiss);
@@ -175,8 +183,8 @@ void FileModel::appendFileItems(const QString& dirPath, FileItem* parent) {
         if (fileInfo.isDir()) {
             fileType = FileType::Folder;
         } else {
-            QString ext = fileInfo.suffix().toLower();
-            if (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "webp" || ext == "gif") {
+            const QString ext = fileInfo.suffix().toLower();
+            if (_imageExtensions.contains(ext)) {
                 fileType = FileType::Image;
             }
         }
@@ -245,4 +253,59 @@ void FileModel::emitDataChangedFor(const QString& path) {
 
 FileItem* FileModel::rootItem() const {
     return _rootItem;
+}
+
+QModelIndex FileModel::indexFor(FileItem* item) const {
+    if (!item || item == _rootItem) return QModelIndex();
+    return createIndex(item->row(), 0, item);
+}
+
+QModelIndex FileModel::expandPath(const QString& path) {
+    if (path.isEmpty()) return QModelIndex();
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isDir()) return QModelIndex();
+
+    // Build the path chain from root drive to the leaf folder.
+    QStringList chain;
+    QDir walker(info.absoluteFilePath());
+    while (true) {
+        chain.prepend(walker.absolutePath());
+        if (!walker.cdUp()) break;
+    }
+
+    auto normalize = [](QString s) {
+        if (!s.endsWith('/')) s.append('/');
+        return s;
+    };
+
+    FileItem* parent = _rootItem;
+    QModelIndex parentIndex;
+    for (const QString& seg : chain) {
+        const QString segNorm = normalize(seg);
+
+        // Lazy-load the parent's children if not done yet (no-op on root,
+        // and on already-loaded folders).
+        if (parent != _rootItem) {
+            appendFileItems(parent->fileInfo().filePath(), parent);
+        }
+
+        FileItem* match = nullptr;
+        for (int i = 0; i < parent->childCount(); ++i) {
+            FileItem* c = parent->child(i);
+            if (c->fileType() != FileType::Folder) continue;
+            if (c->fileInfo().fileName() == "..") continue;
+            const QString childPath = normalize(c->fileInfo().filePath());
+            if (childPath.compare(segNorm, Qt::CaseInsensitive) == 0) {
+                match = c;
+                break;
+            }
+        }
+        if (!match) return QModelIndex();
+        parent = match;
+        parentIndex = createIndex(match->row(), 0, match);
+    }
+
+    // Make sure the leaf's contents are loaded so the file list will show them.
+    appendFileItems(parent->fileInfo().filePath(), parent);
+    return parentIndex;
 }

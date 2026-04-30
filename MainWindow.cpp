@@ -5,6 +5,7 @@
 #include <QVBoxLayout>
 
 #include "MainWindow.h"
+#include "Config.h"
 #include "FileFilterModel.h"
 #include "FileItem.h"
 #include "FileModel.h"
@@ -24,7 +25,7 @@ void MainWindow::create() {
 
     // Models
 
-    _fileModel = new FileModel(_pixee->theme(), _pixee->thumbnailCache());
+    _fileModel = new FileModel(_pixee->config(), _pixee->theme(), _pixee->thumbnailCache());
 
     _folderFilterModel = new FileFilterModel();
     _folderFilterModel->setSourceModel(_fileModel);
@@ -78,6 +79,10 @@ void MainWindow::create() {
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
     restoreState(settings.value("mainWindowState").toByteArray());
 
+    // Path edit drives navigation on Enter.
+    QObject::connect(_pathLineEdit, &QLineEdit::returnPressed,
+                     this, &MainWindow::goToPathFromLineEdit);
+
     // Add events
 
     // When expand in folder tree: append files
@@ -106,9 +111,10 @@ void MainWindow::create() {
         }
     );
 
-    // When double click item in list: go to folder
+    // When double-clicked or Enter on a selected list item: go to folder.
+    // `activated` covers both: it's the standard "open this item" trigger.
     QObject::connect(
-        _fileListView, &QListView::doubleClicked,
+        _fileListView, &QListView::activated,
         this, [=](const QModelIndex& fileFilterIndex) {
             const QModelIndex fileIndex = _fileFilterModel->mapToSource(fileFilterIndex);
             if (fileIndex.isValid()) {
@@ -117,20 +123,108 @@ void MainWindow::create() {
         }
     );
 
+    // Restore the last path the user was viewing. expandPath does the
+    // multi-step lazy load synchronously — fine on local disk, can stutter
+    // briefly on slow shares, but only once at startup.
+    const QString lastPath = settings.value("lastPath").toString();
+    if (!lastPath.isEmpty()) {
+        const QModelIndex sourceIdx = _fileModel->expandPath(lastPath);
+        if (sourceIdx.isValid()) {
+            FileItem* item = static_cast<FileItem*>(sourceIdx.internalPointer());
+            navigateTo(item);
+        } else {
+            navigateTo(nullptr);
+        }
+    } else {
+        navigateTo(nullptr);
+    }
 }
 
 void MainWindow::goToFolderByFileIndex(const QModelIndex& fileIndex) {
     FileItem* fileItem = static_cast<FileItem*>(fileIndex.internalPointer());
-    if (fileItem && fileItem->fileType() == FileType::Folder) {
-        _fileListView->selectionModel()->clear();
-        if (fileItem->fileInfo().fileName() == "..") {
-            _fileModel->appendFileItems(fileItem->parent()->fileInfo().filePath(), fileItem->parent());
-        } else {
-            _fileModel->appendFileItems(fileItem->fileInfo().filePath(), fileItem);
-        }
-        QModelIndex fileRootIndex = _fileFilterModel->mapFromSource(fileIndex);
-        _fileListView->setRootIndex(fileRootIndex);
+    if (!fileItem || fileItem->fileType() != FileType::Folder) return;
+
+    FileItem* target = fileItem;
+    if (fileItem->fileInfo().fileName() == "..") {
+        // ".." resolves to the current folder's parent. The current folder
+        // is the ".." item's tree parent; its tree parent is the grandparent.
+        target = fileItem->parent() ? fileItem->parent()->parent() : nullptr;
     }
+    navigateTo(target);
+}
+
+void MainWindow::navigateTo(FileItem* item) {
+    _fileListView->selectionModel()->clear();
+    if (!item || item == _fileModel->rootItem()) {
+        // Drive list (synthetic root). Showing top-level needs an invalid root.
+        _fileListView->setRootIndex(QModelIndex());
+        _pathLineEdit->setText(QString());
+        // Also drop the folder tree's current selection.
+        QSignalBlocker block(_folderTreeView->selectionModel());
+        _folderTreeView->selectionModel()->clearSelection();
+        _folderTreeView->selectionModel()->clearCurrentIndex();
+        return;
+    }
+    _fileModel->appendFileItems(item->fileInfo().filePath(), item);
+    const QModelIndex sourceIdx = _fileModel->indexFor(item);
+    const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(sourceIdx);
+    _fileListView->setRootIndex(proxyIdx);
+    _pathLineEdit->setText(displayPath(item->fileInfo().filePath()));
+    expandFolderTreeTo(item);
+}
+
+void MainWindow::expandFolderTreeTo(FileItem* item) {
+    if (!item || item == _fileModel->rootItem()) return;
+
+    // Collect the chain root → leaf so we expand parents before the leaf.
+    QList<FileItem*> chain;
+    for (FileItem* it = item; it && it != _fileModel->rootItem(); it = it->parent()) {
+        chain.prepend(it);
+    }
+
+    // The folder tree's selection model is what triggers goToFolderByFileIndex
+    // via selectionChanged. Block it while we set the current index so the
+    // navigation doesn't recurse back through this method.
+    QSignalBlocker block(_folderTreeView->selectionModel());
+
+    for (FileItem* it : chain) {
+        const QModelIndex srcIdx = _fileModel->indexFor(it);
+        const QModelIndex folderProxyIdx = _folderFilterModel->mapFromSource(srcIdx);
+        if (folderProxyIdx.isValid()) {
+            _folderTreeView->expand(folderProxyIdx);
+        }
+    }
+
+    const QModelIndex leafProxy = _folderFilterModel->mapFromSource(_fileModel->indexFor(item));
+    if (leafProxy.isValid()) {
+        _folderTreeView->selectionModel()->setCurrentIndex(
+            leafProxy, QItemSelectionModel::ClearAndSelect);
+        _folderTreeView->scrollTo(leafProxy);
+    }
+}
+
+QString MainWindow::displayPath(const QString& storedPath) const {
+    if (storedPath.isEmpty()) return storedPath;
+    if (!_pixee->config()->useBackslash()) return storedPath;
+    QString out = storedPath;
+    out.replace('/', '\\');
+    return out;
+}
+
+void MainWindow::goToPathFromLineEdit() {
+    const QString text = _pathLineEdit->text().trimmed();
+    if (text.isEmpty() || text == "/") {
+        navigateTo(nullptr);
+        return;
+    }
+    const QModelIndex sourceIdx = _fileModel->expandPath(text);
+    if (!sourceIdx.isValid()) {
+        // Path doesn't exist or isn't a folder — leave the line edit alone
+        // so the user can fix the typo.
+        return;
+    }
+    FileItem* item = static_cast<FileItem*>(sourceIdx.internalPointer());
+    navigateTo(item);
 }
 
 QSize MainWindow::sizeHint() const {
@@ -148,6 +242,7 @@ void MainWindow::exit() {
     QSettings settings;
     settings.setValue("mainWindowGeometry", saveGeometry());
     settings.setValue("mainWindowState", saveState());
+    settings.setValue("lastPath", _pathLineEdit->text());
 }
 
 MainWindow::~MainWindow() {}
