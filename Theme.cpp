@@ -114,6 +114,7 @@ void Theme::_loadImages() {
     // falls back to the default "image" placeholder.
     _pixmaps["image-queued"] = _createPixmap(":/icons/image-in-queue-big.png");
     _icons["folder"] = _createIcon(":/icons/folder.png");
+    _icons["hard-drive"] = _createIcon(":/icons/hard-drive.png");
 }
 
 QPixmap* Theme::_createPixmap(QString path) {

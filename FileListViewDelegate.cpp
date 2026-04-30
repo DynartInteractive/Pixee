@@ -166,6 +166,13 @@ void FileListViewDelegate::_drawIndexThumbnail(QPainter* p, const QImage& image,
         p->drawRect(borderRect);
     }
 
+    // Checker pattern under the actual image so transparency in the
+    // index thumbnail (e.g. PNGs with alpha) reads as background, not
+    // as the folder icon bleeding through.
+    p->setPen(Qt::NoPen);
+    p->setBrush(_checkerBrush);
+    p->drawRect(imageRect);
+
     // The image itself — smooth-scaled into its rect.
     p->drawPixmap(imageRect, pixmap, pixmap.rect());
 }

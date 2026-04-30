@@ -28,6 +28,7 @@ private slots:
     void updateSubscriptions();
     void onCacheReady(QString path, QImage image);
     void onCacheMiss(QString path);
+    void onRowsAboutToBeRemoved(const QModelIndex& parent, int first, int last);
 
 private:
     void onCacheJobDone(const QString& path);

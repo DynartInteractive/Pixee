@@ -47,14 +47,14 @@ void FileModel::populateDrives() {
     if (drives.isEmpty()) return;
 
     beginInsertRows(QModelIndex(), 0, drives.size() - 1);
-    QPixmap* hardDrivePixmap = _theme->pixmap("hard-drive");
+    QPixmap* folderPixmap = _theme->pixmap("folder");
     for (const QFileInfo& info : drives) {
-        FileItem* drive = new FileItem(info, FileType::Folder, hardDrivePixmap, _rootItem);
+        FileItem* drive = new FileItem(info, FileType::Folder, folderPixmap, _rootItem);
         _rootItem->appendChild(drive);
         _itemsByPath.insert(info.filePath(), drive);
         // Loading placeholder so the expand arrow appears before the drive
         // is opened. appendFileItems will replace it on first expansion.
-        FileItem* loading = new FileItem(QFileInfo(), FileType::Loading, hardDrivePixmap, drive);
+        FileItem* loading = new FileItem(QFileInfo(), FileType::Loading, folderPixmap, drive);
         drive->appendChild(loading);
     }
     endInsertRows();
@@ -100,7 +100,14 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
     }
     if (role == Qt::DecorationRole) {
         if (item->fileType() == FileType::Folder) {
-            QIcon* icon = _theme->icon("folder");
+            // Drives (children of the synthetic root) get the hard-drive
+            // icon; everything else gets the folder icon.
+            QIcon* icon = nullptr;
+            if (item->parent() == _rootItem) {
+                icon = _theme->icon("hard-drive");
+            }
+            if (!icon) icon = _theme->icon("folder");
+            if (!icon) return QVariant();
             return QVariant(*icon);
         }
     } else if (role != Qt::DisplayRole) {

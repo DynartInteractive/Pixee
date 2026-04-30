@@ -50,6 +50,11 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
             this, &FileListView::scheduleSubscriptionUpdate);
     connect(fileFilterModel, &QAbstractItemModel::modelReset,
             this, &FileListView::scheduleSubscriptionUpdate);
+    // Drop subscriptions for rows about to disappear (e.g. F5 refresh) so the
+    // post-refresh updateSubscriptions tick does a fresh subscribe instead
+    // of just bumping priority — the cache is what re-delivers the image.
+    connect(fileFilterModel, &QAbstractItemModel::rowsAboutToBeRemoved,
+            this, &FileListView::onRowsAboutToBeRemoved);
 
     if (_cache) {
         connect(_cache, &ThumbnailCache::thumbnailReady, this, &FileListView::onCacheReady);
@@ -266,6 +271,35 @@ void FileListView::updateSubscriptions() {
     }
 
     _lastSubscribed = wanted;
+}
+
+void FileListView::onRowsAboutToBeRemoved(const QModelIndex& parent, int first, int last) {
+    if (!_cache || _lastSubscribed.isEmpty()) return;
+    auto* fm = qobject_cast<FileModel*>(_fileFilterModel->sourceModel());
+    if (!fm) return;
+
+    for (int row = first; row <= last; ++row) {
+        const QModelIndex proxyIdx = _fileFilterModel->index(row, 0, parent);
+        if (!proxyIdx.isValid()) continue;
+        const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
+        if (!srcIdx.isValid()) continue;
+        FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+        if (!item) continue;
+
+        QString path;
+        if (item->fileType() == FileType::Image) {
+            path = item->fileInfo().filePath();
+        } else if (item->fileType() == FileType::Folder
+                   && item->fileInfo().fileName() != "..") {
+            path = fm->folderIndexSource(item->fileInfo().filePath());
+        }
+
+        if (!path.isEmpty() && _lastSubscribed.contains(path)) {
+            _cache->unsubscribe(path);
+            _lastSubscribed.remove(path);
+            _activeJobs.remove(path);
+        }
+    }
 }
 
 void FileListView::onCacheReady(QString path, QImage) {

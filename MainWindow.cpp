@@ -257,7 +257,11 @@ void MainWindow::expandFolderTreeTo(FileItem* item) {
     // navigation doesn't recurse back through this method.
     QSignalBlocker block(_folderTreeView->selectionModel());
 
-    for (FileItem* it : chain) {
+    // Expand the *ancestors* but not the selected folder itself — leaving
+    // the leaf collapsed lets cursor-up/down move between siblings without
+    // forcibly unfolding each folder's children as you pass over it.
+    for (int i = 0; i < chain.size() - 1; ++i) {
+        FileItem* it = chain[i];
         const QModelIndex srcIdx = _fileModel->indexFor(it);
         const QModelIndex folderProxyIdx = _folderFilterModel->mapFromSource(srcIdx);
         if (folderProxyIdx.isValid()) {
