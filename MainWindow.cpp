@@ -636,6 +636,16 @@ void MainWindow::closeEvent(QCloseEvent* event __attribute__((unused))) {
 
 void MainWindow::exit() {
 
+    // Restore the browser layout before saving — saveState() captures the
+    // visibility of the menu bar / status bar / dock widgets, so closing
+    // mid-viewer (or fullscreen) would otherwise leave the next launch with
+    // chrome hidden and no obvious way to bring it back.
+    if (isFullScreen()) exitFullscreen();
+    if (_centerStack && _centerStack->currentIndex() != 0) {
+        _centerStack->setCurrentIndex(0);
+        if (_dockWasVisible) _dockWidget->show();
+    }
+
     // Write settings
 
     QSettings settings;
