@@ -7,6 +7,7 @@ class MainWindow;
 
 class Config;
 class Theme;
+class ThumbnailCache;
 
 class Pixee
 {
@@ -16,9 +17,11 @@ public:
     void exit();
     Config* config() const;
     Theme* theme() const;
+    ThumbnailCache* thumbnailCache() const;
 private:
     Config* _config;
     Theme* _theme;
+    ThumbnailCache* _thumbnailCache;
     QApplication* _app;
     MainWindow* _mainWindow;
 };

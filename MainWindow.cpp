@@ -24,7 +24,7 @@ void MainWindow::create() {
 
     // Models
 
-    _fileModel = new FileModel(_pixee->theme());
+    _fileModel = new FileModel(_pixee->theme(), _pixee->thumbnailCache());
 
     _folderFilterModel = new FileFilterModel();
     _folderFilterModel->setSourceModel(_fileModel);
@@ -47,6 +47,7 @@ void MainWindow::create() {
     _fileListView = new FileListView(
         _pixee->config(),
         _pixee->theme(),
+        _pixee->thumbnailCache(),
         _fileFilterModel
     );
 

@@ -4,6 +4,7 @@
 
 #include "Config.h"
 #include "Theme.h"
+#include "ThumbnailCache.h"
 #include "MainWindow.h"
 
 Pixee::Pixee(int argc, char** argv) {
@@ -14,6 +15,7 @@ Pixee::Pixee(int argc, char** argv) {
 
     _config = new Config();
     _theme = new Theme(_config);
+    _thumbnailCache = new ThumbnailCache(_config);
 
     _mainWindow = new MainWindow(this);
     _mainWindow->create();
@@ -42,6 +44,7 @@ void Pixee::exit() {
     _mainWindow->exit();
     QApplication::quit();
     delete _mainWindow;
+    delete _thumbnailCache;
 }
 
 Theme* Pixee::theme() const {
@@ -50,4 +53,8 @@ Theme* Pixee::theme() const {
 
 Config* Pixee::config() const {
     return _config;
+}
+
+ThumbnailCache* Pixee::thumbnailCache() const {
+    return _thumbnailCache;
 }

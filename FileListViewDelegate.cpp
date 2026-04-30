@@ -1,9 +1,11 @@
 #include "FileListViewDelegate.h"
 
+#include <QImage>
 #include <QPainter>
 #include "Theme.h"
 #include "FileFilterModel.h"
 #include "FileItem.h"
+#include "FileModel.h"
 
 #include <QDebug>
 
@@ -52,7 +54,17 @@ void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option
         p->setBrush(_backgroundBrush);
         p->drawRect(bgRect);
     }
-    _drawPixmap(p, fileItem->pixmap(), bgRect, fileItem->fileType() == FileType::Folder && !fileItem->pixmap()->isNull());
+
+    QImage thumbImage;
+    if (fileItem->fileType() == FileType::Image) {
+        thumbImage = index.data(FileModel::ThumbnailRole).value<QImage>();
+    }
+    if (!thumbImage.isNull()) {
+        QPixmap thumbPixmap = QPixmap::fromImage(thumbImage);
+        _drawPixmap(p, &thumbPixmap, bgRect, false);
+    } else {
+        _drawPixmap(p, fileItem->pixmap(), bgRect, fileItem->fileType() == FileType::Folder && !fileItem->pixmap()->isNull());
+    }
 
     // draw selection
     if (option.state & QStyle::State_Selected) {

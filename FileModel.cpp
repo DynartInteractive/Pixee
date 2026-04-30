@@ -1,17 +1,23 @@
 #include "FileModel.h"
 
+#include <QDateTime>
 #include <QDir>
 #include <QPainter>
 #include <QFileInfo>
 
 #include "Theme.h"
 #include "FileItem.h"
+#include "ThumbnailCache.h"
 
-FileModel::FileModel(Theme* theme, QObject* parent)
+FileModel::FileModel(Theme* theme, ThumbnailCache* cache, QObject* parent)
     : QAbstractItemModel(parent) {
     _theme = theme;
+    _cache = cache;
     _rootItem = new FileItem(QFileInfo(), FileType::Folder, _theme->pixmap("folder"));
-    appendFileItems("/home/gopher/Pictures", _rootItem);
+    if (_cache) {
+        connect(_cache, &ThumbnailCache::thumbnailReady, this, &FileModel::onThumbnailReady);
+    }
+    appendFileItems("c:/", _rootItem);
 }
 
 FileModel::~FileModel() {
@@ -23,6 +29,14 @@ QVariant FileModel::data(const QModelIndex& index, int role) const {
         return QVariant();
     }
     FileItem* item = static_cast<FileItem*>(index.internalPointer());
+    if (role == ThumbnailRole) {
+        const QString path = item->fileInfo().filePath();
+        auto it = _thumbnails.constFind(path);
+        if (it != _thumbnails.constEnd()) {
+            return it.value();
+        }
+        return QVariant();
+    }
     if (role == Qt::DecorationRole) {
         if (item->fileType() == FileType::Folder) {
             QIcon* icon = _theme->icon("folder");
@@ -154,11 +168,26 @@ void FileModel::appendFileItems(const QString& dirPath, FileItem* parent) {
         if (fileType == FileType::Folder) {
             FileItem* childItem = new FileItem(QFileInfo(), FileType::Loading, pixmap, newItem);
             newItem->appendChild(childItem);
+        } else if (fileType == FileType::Image) {
+            // Track the item by path so onThumbnailReady can route dataChanged.
+            // Subscriptions themselves are driven by FileListView based on viewport.
+            _itemsByPath.insert(fileInfo.filePath(), newItem);
         }
     }
 
     // End inserting rows
     endInsertRows();
+}
+
+void FileModel::onThumbnailReady(QString path, QImage image) {
+    auto it = _itemsByPath.constFind(path);
+    if (it == _itemsByPath.constEnd()) {
+        return;
+    }
+    _thumbnails.insert(path, image);
+    FileItem* item = it.value();
+    QModelIndex idx = createIndex(item->row(), 0, item);
+    emit dataChanged(idx, idx, { Qt::DecorationRole, ThumbnailRole });
 }
 
 FileItem* FileModel::rootItem() const {

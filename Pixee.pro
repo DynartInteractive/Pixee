@@ -1,4 +1,4 @@
-QT       += core gui
+QT       += core gui sql
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -19,6 +19,10 @@ SOURCES += \
     MainWindow.cpp \
     Pixee.cpp \
     Theme.cpp \
+    ThumbnailCache.cpp \
+    ThumbnailDatabase.cpp \
+    ThumbnailGenerator.cpp \
+    ThumbnailWorker.cpp \
     main.cpp
 
 HEADERS += \
@@ -32,7 +36,11 @@ HEADERS += \
     FolderTreeView.h \
     MainWindow.h \
     Pixee.h \
-    Theme.h
+    Theme.h \
+    ThumbnailCache.h \
+    ThumbnailDatabase.h \
+    ThumbnailGenerator.h \
+    ThumbnailWorker.h
 
 TRANSLATIONS += \
     Pixee_en_US.ts
@@ -42,6 +50,27 @@ CONFIG += embed_translations
 
 RESOURCES += \
     resources.qrc
+
+# Copy themes/ next to the built executable on every build.
+# Resolve the actual binary directory: explicit DESTDIR wins; otherwise
+# debug_and_release builds land in debug/ or release/ subdirs, while
+# single-config builds land flat in OUT_PWD.
+isEmpty(DESTDIR) {
+    debug_and_release {
+        CONFIG(debug, debug|release): TARGET_DIR = $$OUT_PWD/debug
+        else: TARGET_DIR = $$OUT_PWD/release
+    } else {
+        TARGET_DIR = $$OUT_PWD
+    }
+} else {
+    TARGET_DIR = $$DESTDIR
+}
+
+copy_themes.commands = $(COPY_DIR) $$shell_path($$PWD/themes) $$shell_path($$TARGET_DIR/themes)
+first.depends = $(first) copy_themes
+export(first.depends)
+export(copy_themes.commands)
+QMAKE_EXTRA_TARGETS += first copy_themes
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

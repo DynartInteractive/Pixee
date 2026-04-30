@@ -30,7 +30,8 @@ QString Theme::_basePath() {
 }
 
 QString Theme::realPath(QString path) {
-    QString realPath = path.replace(":/", _basePath());
+    QString realPath = path;
+    realPath.replace(":/", _basePath());
     QFileInfo info(realPath);
     QString result = info.exists() ? realPath : path;
     return result;

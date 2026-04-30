@@ -52,6 +52,10 @@ const QString Config::theme() {
     return _theme;
 }
 
+int Config::maxThreadCount() {
+    return 4;
+}
+
 void Config::_setUpImageExtensions() {
     foreach (auto format, QImageReader::supportedImageFormats()) {
         _imageExtensions << QString(format);
