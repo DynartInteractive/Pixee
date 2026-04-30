@@ -60,6 +60,9 @@ public:
     // Source image used to represent a folder's index thumbnail. Empty
     // if no image was found (or no index assigned).
     QString folderIndexSource(const QString& folderPath) const;
+    // Latest in-memory thumbnail for an image path (empty QImage if none).
+    // Used as a placeholder while the viewer's full-res load is in flight.
+    QImage thumbnailFor(const QString& path) const;
 
 signals:
     void folderPopulated(QString dirPath);

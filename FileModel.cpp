@@ -377,6 +377,10 @@ QString FileModel::folderIndexSource(const QString& folderPath) const {
     return _folderIndexes.value(folderPath);
 }
 
+QImage FileModel::thumbnailFor(const QString& path) const {
+    return _thumbnails.value(path);
+}
+
 void FileModel::requestEnumerate(FileItem* parent) {
     if (!parent || parent == _rootItem) return;
     // Already populated (no Loading placeholder) — nothing to do.

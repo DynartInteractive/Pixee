@@ -17,6 +17,7 @@ SOURCES += \
     FileModel.cpp \
     FolderEnumerator.cpp \
     FolderTreeView.cpp \
+    ImageLoader.cpp \
     MainWindow.cpp \
     Pixee.cpp \
     Theme.cpp \
@@ -37,6 +38,7 @@ HEADERS += \
     FileType.h \
     FolderEnumerator.h \
     FolderTreeView.h \
+    ImageLoader.h \
     MainWindow.h \
     Pixee.h \
     Theme.h \

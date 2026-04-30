@@ -1,11 +1,15 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <QAtomicInt>
 #include <QMainWindow>
 #include <QDockWidget>
+#include <QImage>
 #include <QLineEdit>
 #include <QListView>
 #include <QStackedWidget>
+#include <QStringList>
+#include <QThread>
 #include <QTreeView>
 
 #include "FileModel.h"
@@ -13,6 +17,7 @@
 #include "Pixee.h"
 
 class FileItem;
+class ImageLoader;
 class ViewerWidget;
 
 class MainWindow : public QMainWindow
@@ -33,6 +38,17 @@ private slots:
     void refreshCurrentFolder();
     void showAbout();
     void dismissViewer();
+    void viewerPrev();
+    void viewerNext();
+    void onImageLoaded(QString path, QImage image);
+    void onImageLoadFailed(QString path);
+    void onImageLoadAborted(QString path);
+    void toggleFullscreen();
+    void showViewerContextMenu(const QPoint& pos);
+    void pickAndCopyCurrentImage();
+
+signals:
+    void requestImageLoad(QString path, int taskVersion);
 
 private:
     void navigateTo(FileItem* item);
@@ -40,6 +56,13 @@ private:
     void createMenus();
     void updateStatusBar(FileItem* folder);
     void activateImage(FileItem* item);
+    void buildViewerImageList(const QString& currentPath);
+    void showViewerImageAt(int index);
+    void enterFullscreen();
+    void exitFullscreen();
+    void copyCurrentImageTo(const QString& destFolder);
+    void preloadViewerNeighbors(int currentIndex, int taskVersion);
+    void touchViewerCache(const QString& path);
     QString displayPath(const QString& storedPath) const;
     FileItem* currentFolder() const;
 
@@ -57,5 +80,22 @@ private:
     // activated, so dismissing the viewer doesn't unhide a dock the user
     // had explicitly closed.
     bool _dockWasVisible = true;
+    // Ordered list of image paths in the folder the viewer was opened
+    // from (in the file-list view's display order), and the index of the
+    // currently-shown image inside that list.
+    QStringList _viewerImagePaths;
+    int _viewerIndex = -1;
+    // Async full-res loader for the viewer.
+    QThread _imageLoaderThread;
+    ImageLoader* _imageLoader = nullptr;
+    QAtomicInt _imageAbortVersion;
+    // Full-res cache for the viewer (current image + preloaded neighbours).
+    // Bounded by count; LRU-evicted via _viewerCacheOrder.
+    QHash<QString, QImage> _viewerImageCache;
+    QStringList _viewerCacheOrder;
+    // Fullscreen restore state — remembered when entering, applied on exit.
+    bool _fsMenuBarVisible = true;
+    bool _fsStatusBarVisible = true;
+    bool _fsDockVisible = true;
 };
 #endif // MAINWINDOW_H
