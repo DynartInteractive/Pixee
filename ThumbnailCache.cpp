@@ -26,6 +26,10 @@ ThumbnailCache::ThumbnailCache(Config* config, QObject* parent)
     connect(this, &ThumbnailCache::requestAbandonAll, _generator, &ThumbnailGenerator::abandonAll);
     connect(_generator, &ThumbnailGenerator::generated, this, &ThumbnailCache::onGenerated);
     connect(_generator, &ThumbnailGenerator::failed, this, &ThumbnailCache::onGenerationFailed);
+    // Forward "decoding has started for this path" to the model. We tie the
+    // pending state to actual generator work, not to subscribe-time, so the
+    // queued placeholder reflects what the workers are actively chewing on.
+    connect(_generator, &ThumbnailGenerator::started, this, &ThumbnailCache::thumbnailPending);
 
     _dbThread.start();
     emit requestConnect();
@@ -44,8 +48,19 @@ void ThumbnailCache::subscribe(const QString& path, qint64 mtime, qint64 size, i
     ++count;
     _priorities[path] = distance;
 
+    // Negative cache: a path the generator has already failed on stays failed
+    // for the rest of the session. Counter still tracks subscribers so
+    // unsubscribe stays balanced, but we don't kick off a new pipeline.
+    if (_failures.contains(path)) {
+        return;
+    }
+
     if (count == 1) {
         // First subscriber. If not already in flight, start a DB lookup.
+        // We do not emit thumbnailPending here — that fires when the
+        // generator actually picks the path up for decoding (see the
+        // generator's "started" signal forwarded in the constructor),
+        // so the queued placeholder reflects active work, not just queueing.
         if (!_inDb.contains(path) && !_inGen.contains(path)) {
             _inDb.insert(path);
             _pendingMeta.insert(path, qMakePair(mtime, size));
@@ -131,6 +146,7 @@ void ThumbnailCache::onGenerationFailed(QString path) {
     _inGen.remove(path);
     _pendingMeta.remove(path);
     _priorities.remove(path);
+    _failures.insert(path);  // remember the failure for the rest of the session
     if (_subscribers.contains(path)) {
         emit thumbnailMiss(path);
     }

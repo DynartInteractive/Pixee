@@ -55,13 +55,24 @@ void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option
         p->drawRect(bgRect);
     }
 
-    QImage thumbImage;
     if (fileItem->fileType() == FileType::Image) {
-        thumbImage = index.data(FileModel::ThumbnailRole).value<QImage>();
-    }
-    if (!thumbImage.isNull()) {
-        QPixmap thumbPixmap = QPixmap::fromImage(thumbImage);
-        _drawPixmap(p, &thumbPixmap, bgRect, false);
+        const QImage thumbImage = index.data(FileModel::ThumbnailRole).value<QImage>();
+        if (!thumbImage.isNull()) {
+            QPixmap thumbPixmap = QPixmap::fromImage(thumbImage);
+            _drawPixmap(p, &thumbPixmap, bgRect, false);
+        } else {
+            // Pick the placeholder by thumbnail state.
+            const int state = index.data(FileModel::ThumbnailStateRole).toInt();
+            QPixmap* placeholder = fileItem->pixmap();  // default "image" pixmap
+            if (state == FileModel::StateFailed) {
+                QPixmap* err = _theme->pixmap("image-error");
+                if (err && !err->isNull()) placeholder = err;
+            } else if (state == FileModel::StatePending) {
+                QPixmap* q = _theme->pixmap("image-queued");
+                if (q && !q->isNull()) placeholder = q;
+            }
+            _drawPixmap(p, placeholder, bgRect, false);
+        }
     } else {
         _drawPixmap(p, fileItem->pixmap(), bgRect, fileItem->fileType() == FileType::Folder && !fileItem->pixmap()->isNull());
     }

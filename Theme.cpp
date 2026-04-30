@@ -102,6 +102,10 @@ void Theme::_loadImages() {
     _pixmaps["folder"] = _createPixmap(":/icons/folder-big.png");
     _pixmaps["image"] = _createPixmap(":/icons/image-big.png");
     _pixmaps["image-error"] = _createPixmap(":/icons/image-error-big.png");
+    // Optional asset — if image-in-queue-big.png isn't present in the theme
+    // folder or Qt resources, this stores a null QPixmap and the delegate
+    // falls back to the default "image" placeholder.
+    _pixmaps["image-queued"] = _createPixmap(":/icons/image-in-queue-big.png");
     _icons["folder"] = _createIcon(":/icons/folder.png");
 }
 

@@ -110,6 +110,7 @@ void ThumbnailGenerator::dispatch() {
         if (!found) return;
 
         idle->busy = true;
+        emit started(path);
         QMetaObject::invokeMethod(idle->worker, "process", Qt::QueuedConnection,
             Q_ARG(QString, path), Q_ARG(qint64, mtime), Q_ARG(qint64, size));
     }

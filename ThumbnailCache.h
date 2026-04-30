@@ -32,6 +32,7 @@ public:
 signals:
     void thumbnailReady(QString path, QImage image);
     void thumbnailMiss(QString path);
+    void thumbnailPending(QString path);
 
     // Internal — connected across worker threads.
     void requestConnect();
@@ -61,6 +62,10 @@ private:
     // Phase tracking: in DB lookup, or already handed to generator.
     QSet<QString> _inDb;
     QSet<QString> _inGen;
+    // Per-session negative cache: paths the generator has already failed on.
+    // Skipped on subsequent subscribe() calls so we don't keep retrying a
+    // corrupt or unreadable file every time the user revisits a folder.
+    QSet<QString> _failures;
 };
 
 #endif // THUMBNAILCACHE_H

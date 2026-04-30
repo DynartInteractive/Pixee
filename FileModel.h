@@ -4,6 +4,7 @@
 #include <QAbstractItemModel>
 #include <QHash>
 #include <QImage>
+#include <QSet>
 #include <QString>
 
 class Theme;
@@ -14,7 +15,14 @@ class FileModel : public QAbstractItemModel {
     Q_OBJECT
 public:
     enum Roles {
-        ThumbnailRole = Qt::UserRole + 1
+        ThumbnailRole = Qt::UserRole + 1,
+        ThumbnailStateRole
+    };
+    enum ThumbnailState {
+        StateIdle = 0,
+        StatePending,
+        StateReady,
+        StateFailed
     };
 
     explicit FileModel(Theme* theme, ThumbnailCache* cache, QObject* parent = nullptr);
@@ -33,13 +41,20 @@ public:
 
 private slots:
     void onThumbnailReady(QString path, QImage image);
+    void onThumbnailMiss(QString path);
+    void onThumbnailPending(QString path);
 
 private:
+    void populateDrives();
+    void emitDataChangedFor(const QString& path);
+
     FileItem* _rootItem;
     Theme* _theme;
     ThumbnailCache* _cache;
     QHash<QString, FileItem*> _itemsByPath;
     QHash<QString, QImage> _thumbnails;
+    QSet<QString> _pending;
+    QSet<QString> _failed;
 };
 
 #endif // FILEMODEL_H

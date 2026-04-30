@@ -42,6 +42,9 @@ public slots:
 signals:
     void generated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes);
     void failed(QString path);
+    // Emitted when a path is dispatched to a worker for decoding — i.e. the
+    // moment work on it actually begins, not when it was queued.
+    void started(QString path);
 
 private slots:
     void onWorkerGenerated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes);
