@@ -24,6 +24,7 @@ SOURCES += \
     ThumbnailDatabase.cpp \
     ThumbnailGenerator.cpp \
     ThumbnailWorker.cpp \
+    ViewerWidget.cpp \
     main.cpp
 
 HEADERS += \
@@ -42,7 +43,8 @@ HEADERS += \
     ThumbnailCache.h \
     ThumbnailDatabase.h \
     ThumbnailGenerator.h \
-    ThumbnailWorker.h
+    ThumbnailWorker.h \
+    ViewerWidget.h
 
 TRANSLATIONS += \
     Pixee_en_US.ts

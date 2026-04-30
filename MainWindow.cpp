@@ -1,4 +1,5 @@
 #include <QAction>
+#include <QImageReader>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenuBar>
@@ -16,6 +17,7 @@
 #include "FileModel.h"
 #include "FolderTreeView.h"
 #include "FileListView.h"
+#include "ViewerWidget.h"
 
 #include<QDebug>
 
@@ -61,6 +63,29 @@ void MainWindow::create() {
     _pathLineEdit->setObjectName("pathLineEdit");
     _pathLineEdit->setFocusPolicy(Qt::ClickFocus);
 
+    _viewerWidget = new ViewerWidget();
+    _viewerWidget->setObjectName("viewerWidget");
+    QObject::connect(_viewerWidget, &ViewerWidget::dismissed,
+                     this, &MainWindow::dismissViewer);
+
+    // Browser "page" — path edit + file grid in a vertical layout. This is
+    // the entire chrome that's visible in normal browsing. The viewer is a
+    // sibling page in the same stack, so swapping pages naturally hides the
+    // path edit. The folder-tree dock is separate (it's docked to the main
+    // window) and is hidden / restored explicitly in activateImage / dismiss.
+    auto browserPage = new QWidget();
+    browserPage->setObjectName("browserPage");
+    auto bv = new QVBoxLayout(browserPage);
+    bv->setContentsMargins(0, 0, 0, 0);
+    bv->setSpacing(4);
+    bv->addWidget(_pathLineEdit);
+    bv->addWidget(_fileListView);
+
+    _centerStack = new QStackedWidget();
+    _centerStack->setObjectName("centerStack");
+    _centerStack->addWidget(browserPage);      // index 0 — browser
+    _centerStack->addWidget(_viewerWidget);    // index 1 — viewer
+
     // Layout
 
     _dockWidget = new QDockWidget("Folders");
@@ -69,14 +94,7 @@ void MainWindow::create() {
     _dockWidget->setFeatures(QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
     addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
 
-    auto w = new QWidget();
-    w->setObjectName("centralWidget");
-    auto v = new QVBoxLayout(w);
-    v->setContentsMargins(0, 0, 0, 0);
-    v->setSpacing(4);
-    v->addWidget(_pathLineEdit);
-    v->addWidget(_fileListView);
-    setCentralWidget(w);
+    setCentralWidget(_centerStack);
 
     // Menu bar + status bar
     createMenus();
@@ -120,14 +138,19 @@ void MainWindow::create() {
         }
     );
 
-    // When double-clicked or Enter on a selected list item: go to folder.
-    // `activated` covers both: it's the standard "open this item" trigger.
+    // When double-clicked or Enter on a selected list item: navigate into
+    // the folder, or open the viewer for an image.
     QObject::connect(
         _fileListView, &QListView::activated,
         this, [=](const QModelIndex& fileFilterIndex) {
             const QModelIndex fileIndex = _fileFilterModel->mapToSource(fileFilterIndex);
-            if (fileIndex.isValid()) {
+            if (!fileIndex.isValid()) return;
+            FileItem* item = static_cast<FileItem*>(fileIndex.internalPointer());
+            if (!item) return;
+            if (item->fileType() == FileType::Folder) {
                 goToFolderByFileIndex(fileIndex);
+            } else if (item->fileType() == FileType::Image) {
+                activateImage(item);
             }
         }
     );
@@ -163,6 +186,12 @@ void MainWindow::goToFolderByFileIndex(const QModelIndex& fileIndex) {
 }
 
 void MainWindow::navigateTo(FileItem* item) {
+    // Folder navigation always pulls the user out of viewer mode.
+    if (_centerStack && _centerStack->currentIndex() != 0) {
+        _centerStack->setCurrentIndex(0);
+        _viewerWidget->clear();
+        if (_dockWasVisible) _dockWidget->show();
+    }
     _fileListView->selectionModel()->clear();
     if (!item || item == _fileModel->rootItem()) {
         // Drive list (synthetic root). Showing top-level needs an invalid root.
@@ -283,6 +312,38 @@ QString MainWindow::displayPath(const QString& storedPath) const {
     QString out = storedPath;
     out.replace('/', '\\');
     return out;
+}
+
+void MainWindow::activateImage(FileItem* item) {
+    if (!item || item->fileType() != FileType::Image) return;
+    const QString path = item->fileInfo().filePath();
+
+    // Phase 1: synchronous full-res load. Slow on SMB for big images;
+    // Phase 4 makes this async with a thumbnail placeholder while it streams.
+    QImageReader reader(path);
+    reader.setAutoTransform(true);
+    QImage image = reader.read();
+    if (image.isNull()) {
+        qWarning() << "Viewer: failed to load" << path << ":" << reader.errorString();
+        return;
+    }
+
+    _viewerWidget->setImage(image);
+    // Hide the folder-tree dock for the duration of the viewer; remember
+    // its visibility so dismiss restores it (or doesn't, if the user had
+    // already closed it).
+    _dockWasVisible = _dockWidget->isVisible();
+    if (_dockWasVisible) _dockWidget->hide();
+    _centerStack->setCurrentWidget(_viewerWidget);
+    _viewerWidget->setFocus();
+}
+
+void MainWindow::dismissViewer() {
+    if (!_centerStack) return;
+    _centerStack->setCurrentIndex(0);     // back to the browser page
+    _viewerWidget->clear();
+    if (_dockWasVisible) _dockWidget->show();
+    _fileListView->setFocus();
 }
 
 void MainWindow::goToPathFromLineEdit() {
