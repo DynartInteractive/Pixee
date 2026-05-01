@@ -5,6 +5,7 @@
 #include "Config.h"
 #include "Theme.h"
 #include "ThumbnailCache.h"
+#include "TaskManager.h"
 #include "MainWindow.h"
 
 Pixee::Pixee(int argc, char** argv) {
@@ -16,6 +17,7 @@ Pixee::Pixee(int argc, char** argv) {
     _config = new Config();
     _theme = new Theme(_config);
     _thumbnailCache = new ThumbnailCache(_config);
+    _taskManager = new TaskManager(_config->taskWorkerCount());
 
     _mainWindow = new MainWindow(this);
     _mainWindow->create();
@@ -43,7 +45,14 @@ int Pixee::run() {
 void Pixee::exit() {
     _mainWindow->exit();
     QApplication::quit();
+    // Drain the task manager BEFORE deleting the main window so any
+    // in-flight task signals (progress / state changes) don't fire onto
+    // a dangling dock widget.
+    if (_taskManager) {
+        _taskManager->shutdown();
+    }
     delete _mainWindow;
+    delete _taskManager;
     delete _thumbnailCache;
 }
 
@@ -57,4 +66,8 @@ Config* Pixee::config() const {
 
 ThumbnailCache* Pixee::thumbnailCache() const {
     return _thumbnailCache;
+}
+
+TaskManager* Pixee::taskManager() const {
+    return _taskManager;
 }

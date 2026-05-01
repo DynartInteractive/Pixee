@@ -10,6 +10,7 @@ CONFIG += c++17
 
 SOURCES += \
     Config.cpp \
+    CopyFileTask.cpp \
     FileFilterModel.cpp \
     FileItem.cpp \
     FileListView.cpp \
@@ -20,6 +21,10 @@ SOURCES += \
     ImageLoader.cpp \
     MainWindow.cpp \
     Pixee.cpp \
+    Task.cpp \
+    TaskGroup.cpp \
+    TaskManager.cpp \
+    TaskRunner.cpp \
     Theme.cpp \
     ThumbnailCache.cpp \
     ThumbnailDatabase.cpp \
@@ -30,6 +35,7 @@ SOURCES += \
 
 HEADERS += \
     Config.h \
+    CopyFileTask.h \
     FileFilterModel.h \
     FileItem.h \
     FileListView.h \
@@ -41,6 +47,10 @@ HEADERS += \
     ImageLoader.h \
     MainWindow.h \
     Pixee.h \
+    Task.h \
+    TaskGroup.h \
+    TaskManager.h \
+    TaskRunner.h \
     Theme.h \
     ThumbnailCache.h \
     ThumbnailDatabase.h \

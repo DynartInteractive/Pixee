@@ -13,6 +13,7 @@ public:
     const QString thumbnailsPath();
     bool useBackslash();
     int maxThreadCount();
+    int taskWorkerCount();
     const QString userFolder();
     const QString appFolder();
     const QString theme();

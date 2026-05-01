@@ -6,6 +6,7 @@
 #include "Config.h"
 
 class MainWindow;
+class TaskManager;
 class Theme;
 class ThumbnailCache;
 
@@ -18,10 +19,12 @@ public:
     Config* config() const;
     Theme* theme() const;
     ThumbnailCache* thumbnailCache() const;
+    TaskManager* taskManager() const;
 private:
     Config* _config;
     Theme* _theme;
     ThumbnailCache* _thumbnailCache;
+    TaskManager* _taskManager;
     QApplication* _app;
     MainWindow* _mainWindow;
 };

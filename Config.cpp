@@ -56,6 +56,12 @@ int Config::maxThreadCount() {
     return 4;
 }
 
+int Config::taskWorkerCount() {
+    // Two is enough to keep the queue moving even when one task is blocked
+    // on a conflict prompt. Bump if batch ops feel I/O-starved.
+    return 2;
+}
+
 void Config::_setUpImageExtensions() {
     foreach (auto format, QImageReader::supportedImageFormats()) {
         _imageExtensions << QString(format);
