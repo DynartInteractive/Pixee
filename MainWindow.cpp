@@ -24,8 +24,10 @@
 #include "FileModel.h"
 #include "FolderTreeView.h"
 #include "FileListView.h"
+#include "ConvertFormatTask.h"
 #include "ImageLoader.h"
 #include "MoveFileTask.h"
+#include "ScaleImageTask.h"
 #include "TaskDockWidget.h"
 #include "TaskGroup.h"
 #include "TaskManager.h"
@@ -734,6 +736,46 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
     QMenu menu(this);
     QAction* copyAct = menu.addAction(tr("Copy to..."));
     QAction* moveAct = menu.addAction(tr("Move to..."));
+    menu.addSeparator();
+
+    QMenu* scaleMenu = menu.addMenu(tr("Scale to..."));
+    const int scalePresets[] = { 1024, 1920, 2560, 4096 };
+    for (int edge : scalePresets) {
+        QAction* a = scaleMenu->addAction(tr("%1 px (longest edge)").arg(edge));
+        const int edgeCopy = edge;
+        connect(a, &QAction::triggered, this, [this, imagePaths, edgeCopy]() {
+            auto* group = new TaskGroup(
+                tr("Scale %1 file(s) to %2 px").arg(imagePaths.size()).arg(edgeCopy));
+            for (const QString& src : imagePaths) {
+                const QFileInfo info(src);
+                const QString dst = QDir(info.absolutePath()).filePath(
+                    info.completeBaseName() + "_scaled." + info.suffix());
+                group->addTask(new ScaleImageTask(src, dst, edgeCopy, 92, group));
+            }
+            _pixee->taskManager()->enqueueGroup(group);
+        });
+    }
+
+    QMenu* convertMenu = menu.addMenu(tr("Convert to..."));
+    const QList<QByteArray> formats = { "jpg", "png", "webp" };
+    for (const QByteArray& fmt : formats) {
+        QAction* a = convertMenu->addAction(QString::fromLatin1(fmt).toUpper());
+        const QByteArray fmtCopy = fmt;
+        connect(a, &QAction::triggered, this, [this, imagePaths, fmtCopy]() {
+            auto* group = new TaskGroup(
+                tr("Convert %1 file(s) to %2")
+                    .arg(imagePaths.size())
+                    .arg(QString::fromLatin1(fmtCopy).toUpper()));
+            for (const QString& src : imagePaths) {
+                const QFileInfo info(src);
+                const QString dst = QDir(info.absolutePath()).filePath(
+                    info.completeBaseName() + "." + QString::fromLatin1(fmtCopy));
+                group->addTask(new ConvertFormatTask(src, dst, fmtCopy, 92, group));
+            }
+            _pixee->taskManager()->enqueueGroup(group);
+        });
+    }
+
     menu.addSeparator();
     QAction* deleteAct = menu.addAction(tr("Delete"));
 

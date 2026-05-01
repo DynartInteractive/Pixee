@@ -10,6 +10,7 @@ CONFIG += c++17
 
 SOURCES += \
     Config.cpp \
+    ConvertFormatTask.cpp \
     CopyFileTask.cpp \
     DeleteFileTask.cpp \
     FileFilterModel.cpp \
@@ -23,6 +24,7 @@ SOURCES += \
     MainWindow.cpp \
     MoveFileTask.cpp \
     Pixee.cpp \
+    ScaleImageTask.cpp \
     Task.cpp \
     TaskDockWidget.cpp \
     TaskGroup.cpp \
@@ -40,6 +42,7 @@ SOURCES += \
 
 HEADERS += \
     Config.h \
+    ConvertFormatTask.h \
     CopyFileTask.h \
     DeleteFileTask.h \
     FileFilterModel.h \
@@ -54,6 +57,7 @@ HEADERS += \
     MainWindow.h \
     MoveFileTask.h \
     Pixee.h \
+    ScaleImageTask.h \
     Task.h \
     TaskDockWidget.h \
     TaskGroup.h \
