@@ -32,6 +32,13 @@ QString MoveFileTask::displayName() const {
     return QObject::tr("Moving %1").arg(QFileInfo(_src).fileName());
 }
 
+QStringList MoveFileTask::affectedDirs() const {
+    const QString srcDir = QFileInfo(_src).absolutePath();
+    const QString dstDir = QFileInfo(_dst).absolutePath();
+    if (srcDir == dstDir) return { srcDir };  // pure rename
+    return { srcDir, dstDir };
+}
+
 bool MoveFileTask::copyAndDelete() {
     QFile in(_src);
     if (!in.open(QIODevice::ReadOnly)) {

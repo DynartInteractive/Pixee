@@ -39,6 +39,10 @@ QString ConvertFormatTask::displayName() const {
             .arg(QFileInfo(_src).fileName(), QString::fromLatin1(_format));
 }
 
+QStringList ConvertFormatTask::affectedDirs() const {
+    return { QFileInfo(_dst).absolutePath() };
+}
+
 void ConvertFormatTask::run() {
     if (QFile::exists(_dst)) {
         QVariantMap ctx;

@@ -61,6 +61,9 @@ signals:
     void taskStateChanged(QUuid taskId, int state);
     void taskProgress(QUuid taskId, int pct);
     void taskQuestionPosed(QUuid taskId, int kind, QVariantMap context);
+    // Emitted once per directory the just-completed task says was affected.
+    // The UI debounces these and refreshes the corresponding folder.
+    void pathTouched(QString dir);
 
 private slots:
     void onRunnerIdle();

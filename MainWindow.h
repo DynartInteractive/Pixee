@@ -7,9 +7,12 @@
 #include <QImage>
 #include <QLineEdit>
 #include <QListView>
+#include <QSet>
 #include <QStackedWidget>
+#include <QString>
 #include <QStringList>
 #include <QThread>
+#include <QTimer>
 #include <QTreeView>
 
 #include "FileModel.h"
@@ -37,6 +40,8 @@ public:
 private slots:
     void goToPathFromLineEdit();
     void refreshCurrentFolder();
+    void onTaskPathTouched(QString dir);
+    void onTouchedDirsRefreshDue();
     void showAbout();
     void dismissViewer();
     void viewerPrev();
@@ -101,5 +106,10 @@ private:
     bool _fsMenuBarVisible = true;
     bool _fsStatusBarVisible = true;
     bool _fsDockVisible = true;
+    // Debounce buffer for task-driven folder refreshes. The timer restarts
+    // on each new pathTouched signal, so a batch of completions coalesces
+    // into a single refresh after a quiet interval.
+    QSet<QString> _touchedDirs;
+    QTimer _touchedDirsTimer;
 };
 #endif // MAINWINDOW_H

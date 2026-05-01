@@ -34,6 +34,10 @@ QString CopyFileTask::displayName() const {
     return QObject::tr("Copying %1").arg(QFileInfo(_src).fileName());
 }
 
+QStringList CopyFileTask::affectedDirs() const {
+    return { QFileInfo(_dst).absolutePath() };
+}
+
 void CopyFileTask::run() {
     QFile in(_src);
     if (!in.open(QIODevice::ReadOnly)) {

@@ -5,6 +5,7 @@
 #include <QMutex>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QUuid>
 #include <QVariantMap>
 #include <QWaitCondition>
@@ -58,6 +59,12 @@ public:
     TaskGroup* group() const { return _group; }
     State state() const { return static_cast<State>(_state.loadAcquire()); }
     virtual QString displayName() const = 0;
+
+    // Directories whose contents may have changed because this task ran.
+    // Returned to the manager on successful completion so the UI can know
+    // to refresh the affected folder. Default returns nothing so unknown
+    // subclasses don't trigger spurious refreshes.
+    virtual QStringList affectedDirs() const { return {}; }
 
     // Called from the GUI thread. All thread-safe.
     void requestPause();

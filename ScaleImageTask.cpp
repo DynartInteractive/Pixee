@@ -38,6 +38,10 @@ QString ScaleImageTask::displayName() const {
     return QObject::tr("Scaling %1").arg(QFileInfo(_src).fileName());
 }
 
+QStringList ScaleImageTask::affectedDirs() const {
+    return { QFileInfo(_dst).absolutePath() };
+}
+
 void ScaleImageTask::run() {
     if (QFile::exists(_dst)) {
         QVariantMap ctx;

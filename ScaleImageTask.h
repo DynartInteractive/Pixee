@@ -17,6 +17,7 @@ public:
                    TaskGroup* group, QObject* parent = nullptr);
 
     QString displayName() const override;
+    QStringList affectedDirs() const override;
 
 protected:
     void run() override;

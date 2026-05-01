@@ -10,6 +10,10 @@ QString DeleteFileTask::displayName() const {
     return QObject::tr("Deleting %1").arg(QFileInfo(_path).fileName());
 }
 
+QStringList DeleteFileTask::affectedDirs() const {
+    return { QFileInfo(_path).absolutePath() };
+}
+
 void DeleteFileTask::run() {
     if (!checkPauseStop()) return;
     if (!QFile::exists(_path)) {

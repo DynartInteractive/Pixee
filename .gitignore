@@ -27,3 +27,6 @@ ui_*.h
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Test images (Kling-generated samples used to exercise copy / move / etc.)
+kling_*

@@ -153,6 +153,17 @@ void MainWindow::create() {
     _taskDockWidget = new TaskDockWidget(_pixee->taskManager());
     addDockWidget(Qt::RightDockWidgetArea, _taskDockWidget);
 
+    // Folder auto-refresh after task completion. The timer is single-shot
+    // and gets restarted on each pathTouched, so a burst of completions
+    // (e.g. a 50-file move batch) coalesces into one refresh once the
+    // queue goes quiet for the configured interval.
+    _touchedDirsTimer.setSingleShot(true);
+    _touchedDirsTimer.setInterval(500);
+    connect(&_touchedDirsTimer, &QTimer::timeout,
+            this, &MainWindow::onTouchedDirsRefreshDue);
+    connect(_pixee->taskManager(), &TaskManager::pathTouched,
+            this, &MainWindow::onTaskPathTouched);
+
     setCentralWidget(_centerStack);
 
     // Menu bar + status bar
@@ -302,6 +313,30 @@ void MainWindow::refreshCurrentFolder() {
     if (!folder) return;
     _fileModel->refreshFolder(folder);
     updateStatusBar(folder);
+}
+
+void MainWindow::onTaskPathTouched(QString dir) {
+    _touchedDirs.insert(dir);
+    // (Re)start the debounce — keeps coalescing while a batch is still
+    // landing. Once the burst stops, the timer fires once, we refresh.
+    _touchedDirsTimer.start();
+}
+
+void MainWindow::onTouchedDirsRefreshDue() {
+    FileItem* folder = currentFolder();
+    if (folder && folder != _fileModel->rootItem()) {
+        const QString currentPath = folder->fileInfo().filePath();
+        // Compare normalised so D:/foo and D:\foo match.
+        const QString currentNorm = QDir::cleanPath(currentPath);
+        for (const QString& dir : _touchedDirs) {
+            if (QDir::cleanPath(dir) == currentNorm) {
+                _fileModel->refreshFolder(folder);
+                updateStatusBar(folder);
+                break;
+            }
+        }
+    }
+    _touchedDirs.clear();
 }
 
 void MainWindow::updateStatusBar(FileItem* folder) {

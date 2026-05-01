@@ -153,6 +153,13 @@ void TaskManager::onRunnerIdle() {
 }
 
 void TaskManager::onTaskFinished(QUuid taskId) {
+    Task* t = findTask(taskId);
+    // Only emit pathTouched on real completion, not on Skipped — a skipped
+    // task by definition didn't change anything on disk. finished() also
+    // fires for Skipped, so we have to filter here.
+    if (t && t->state() == Task::Completed) {
+        for (const QString& dir : t->affectedDirs()) emit pathTouched(dir);
+    }
     onTaskTerminal(taskId);
 }
 
