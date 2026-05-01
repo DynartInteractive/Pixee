@@ -57,7 +57,7 @@ void MainWindow::create() {
 
     _fileFilterModel = new FileFilterModel();
     _fileFilterModel->setSourceModel(_fileModel);
-    _fileFilterModel->setAcceptedFileTypes({ FileType::Folder, FileType::Image });
+    _fileFilterModel->setAcceptedFileTypes({ FileType::Folder, FileType::Image, FileType::File });
     _fileFilterModel->setShowDotDot(true);
     _fileFilterModel->sort(0, Qt::AscendingOrder);
 
@@ -778,21 +778,25 @@ MainWindow::~MainWindow() {}
 void MainWindow::showFileListContextMenu(const QPoint& pos) {
     if (!_fileListView->selectionModel()) return;
 
-    // Collect Image items from the current selection. Folders / ".." are
-    // ignored in v1; recursive folder ops are out of scope.
-    QStringList imagePaths;
+    // Collect operable items from the current selection. Folders / ".."
+    // are still skipped (recursive ops come in step 2). Image *and* File
+    // types are routed through the same builder — Copy / Move / Delete /
+    // Clipboard work for any file; Scale and Convert just fail on non-
+    // images via QImageReader, surfacing as a failed task in the dock.
+    QStringList paths;
     const QModelIndexList sel = _fileListView->selectionModel()->selectedIndexes();
     for (const QModelIndex& proxyIdx : sel) {
         const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
         if (!srcIdx.isValid()) continue;
         FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
         if (!item) continue;
-        if (item->fileType() != FileType::Image) continue;
-        imagePaths.append(item->fileInfo().filePath());
+        const FileType t = item->fileType();
+        if (t != FileType::Image && t != FileType::File) continue;
+        paths.append(item->fileInfo().filePath());
     }
-    if (imagePaths.isEmpty()) return;
+    if (paths.isEmpty()) return;
 
-    FileOpsMenuBuilder builder(imagePaths, _pixee->taskManager(), this);
+    FileOpsMenuBuilder builder(paths, _pixee->taskManager(), this);
     // No advance callback — the file list's selection clears naturally on
     // the post-task folder refresh.
 
