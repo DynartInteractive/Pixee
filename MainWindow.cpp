@@ -85,6 +85,14 @@ void MainWindow::create() {
     QObject::connect(fsShortcut, &QShortcut::activated,
                      this, &MainWindow::toggleFullscreen);
 
+    // Backspace navigates up one folder, but only when the file list has
+    // focus — that way it doesn't steal Backspace from the path edit while
+    // the user is typing.
+    auto* upShortcut = new QShortcut(QKeySequence(Qt::Key_Backspace), _fileListView);
+    upShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(upShortcut, &QShortcut::activated,
+                     this, &MainWindow::navigateUp);
+
     // Async image loader for the viewer. The atomic abort version is
     // bumped whenever we ask for a different image, so the previous
     // in-flight load aborts at the next chunk boundary instead of
@@ -318,8 +326,17 @@ void MainWindow::createMenus() {
         _dockWidget->setVisible(on);
         if (on) _dockWidget->raise();
     });
+    // Sync the action's check state from the dock — but block the action's
+    // toggled() signal while we do, otherwise minimising the window fires
+    // visibilityChanged(false), which would re-enter the toggled lambda and
+    // explicitly hide the dock. After restore the dock would then stay
+    // hidden because we'd flipped its *intent*, not just its transient
+    // on-screen state.
     connect(_dockWidget, &QDockWidget::visibilityChanged,
-            foldersToggle, &QAction::setChecked);
+            this, [foldersToggle](bool visible) {
+                const QSignalBlocker block(foldersToggle);
+                foldersToggle->setChecked(visible);
+            });
     viewMenu->addAction(foldersToggle);
 
     QMenu* helpMenu = mb->addMenu(tr("&Help"));
@@ -583,6 +600,12 @@ void MainWindow::copyCurrentImageTo(const QString& destFolder) {
 
 void MainWindow::viewerPrev() {
     if (_viewerIndex > 0) showViewerImageAt(_viewerIndex - 1);
+}
+
+void MainWindow::navigateUp() {
+    FileItem* cur = currentFolder();
+    if (!cur) return;                         // already at the drive list
+    navigateTo(cur->parent());                // parent == _rootItem → drive list
 }
 
 void MainWindow::viewerNext() {

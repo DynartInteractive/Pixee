@@ -40,6 +40,7 @@ private slots:
     void dismissViewer();
     void viewerPrev();
     void viewerNext();
+    void navigateUp();
     void onImageLoaded(QString path, QImage image);
     void onImageLoadFailed(QString path);
     void onImageLoadAborted(QString path);
