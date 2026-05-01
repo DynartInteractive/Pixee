@@ -35,6 +35,11 @@ public:
                        QObject* parent = nullptr);
 
     void setAdvanceCallback(AdvanceFn fn) { _advance = std::move(fn); }
+    // When false, the Scale / Convert submenus are added but disabled
+    // (greyed out) — the caller has decided the selection contains
+    // something Scale and Convert can't sensibly operate on (a folder,
+    // a non-image file, ...). Default true.
+    void setImageOpsEnabled(bool enabled) { _imageOpsEnabled = enabled; }
 
     // Appends the Copy / Move / Scale / Convert / Delete actions onto
     // `menu`. Caller still owns the menu and is responsible for exec().
@@ -65,6 +70,7 @@ private:
     TaskManager* _taskManager;
     QWidget* _dialogParent;
     AdvanceFn _advance;
+    bool _imageOpsEnabled = true;
 };
 
 #endif // FILEOPSMENUBUILDER_H

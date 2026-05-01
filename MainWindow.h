@@ -81,9 +81,15 @@ private:
     void advanceViewerAfterRemoval();
     // Collect the file paths the user has selected in the central list,
     // filtered to types we can act on (Image + File; Folders are skipped
-    // until the recursive-ops pass). Used by both the right-click menu
-    // and the Ctrl+C shortcut.
-    QStringList collectFileListSelectionPaths() const;
+    // until the recursive-ops pass). Also reports whether the selection
+    // is purely images, so the menu builder can disable Scale / Convert
+    // when a folder or non-image file is in the mix. Used by the right-
+    // click menu and the Ctrl+C shortcut.
+    struct FileListSelection {
+        QStringList paths;
+        bool imageOpsAllowed = true;
+    };
+    FileListSelection collectFileListSelection() const;
     void preloadViewerNeighbors(int currentIndex, int taskVersion);
     void touchViewerCache(const QString& path);
     QString displayPath(const QString& storedPath) const;

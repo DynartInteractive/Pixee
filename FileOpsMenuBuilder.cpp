@@ -108,6 +108,7 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
         const int edgeCopy = edge;
         connect(a, &QAction::triggered, this, [this, edgeCopy]() { doScale(edgeCopy); });
     }
+    scaleMenu->menuAction()->setEnabled(_imageOpsEnabled);
 
     // ---- Convert ----
     QMenu* convertMenu = menu->addMenu(tr("Convert to..."));
@@ -116,6 +117,7 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
         const QByteArray fmtCopy = fmt;
         connect(a, &QAction::triggered, this, [this, fmtCopy]() { doConvert(fmtCopy); });
     }
+    convertMenu->menuAction()->setEnabled(_imageOpsEnabled);
 
     menu->addSeparator();
 

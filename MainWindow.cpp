@@ -789,9 +789,9 @@ void MainWindow::exit() {
 
 MainWindow::~MainWindow() {}
 
-QStringList MainWindow::collectFileListSelectionPaths() const {
-    QStringList paths;
-    if (!_fileListView->selectionModel()) return paths;
+MainWindow::FileListSelection MainWindow::collectFileListSelection() const {
+    FileListSelection result;
+    if (!_fileListView->selectionModel()) return result;
     const QModelIndexList sel = _fileListView->selectionModel()->selectedIndexes();
     for (const QModelIndex& proxyIdx : sel) {
         const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
@@ -799,22 +799,35 @@ QStringList MainWindow::collectFileListSelectionPaths() const {
         FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
         if (!item) continue;
         const FileType t = item->fileType();
-        // Folders / ".." are skipped — recursive ops are step 2. Image
-        // *and* File are both routed through the same path: Copy / Move /
-        // Delete / Clipboard work for any file; Scale and Convert just
-        // fail on non-images via QImageReader, surfacing as a failed task
-        // in the dock.
-        if (t != FileType::Image && t != FileType::File) continue;
-        paths.append(item->fileInfo().filePath());
+        // ".." is a Folder-typed navigation aid, not a real folder — don't
+        // let it disable image ops or contribute to the operable paths.
+        const bool isDotDot = (t == FileType::Folder
+                               && item->fileInfo().fileName() == "..");
+        if (isDotDot) continue;
+        if (t == FileType::Folder) {
+            // A real folder in the selection means the user is mixing in
+            // something Scale / Convert can't handle. (Recursive folder
+            // ops come in step 2.) Don't add it to paths either — it's
+            // skipped from Copy / Move / Delete in v1.
+            result.imageOpsAllowed = false;
+            continue;
+        }
+        if (t == FileType::File) {
+            result.imageOpsAllowed = false;
+        }
+        if (t == FileType::Image || t == FileType::File) {
+            result.paths.append(item->fileInfo().filePath());
+        }
     }
-    return paths;
+    return result;
 }
 
 void MainWindow::showFileListContextMenu(const QPoint& pos) {
-    const QStringList paths = collectFileListSelectionPaths();
-    if (paths.isEmpty()) return;
+    const FileListSelection selection = collectFileListSelection();
+    if (selection.paths.isEmpty()) return;
 
-    FileOpsMenuBuilder builder(paths, _pixee->taskManager(), this);
+    FileOpsMenuBuilder builder(selection.paths, _pixee->taskManager(), this);
+    builder.setImageOpsEnabled(selection.imageOpsAllowed);
     // No advance callback — the file list's selection clears naturally on
     // the post-task folder refresh.
 
@@ -824,7 +837,7 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
 }
 
 void MainWindow::copyFileListSelectionToClipboard() {
-    FileOpsMenuBuilder::copyPathsToClipboard(collectFileListSelectionPaths());
+    FileOpsMenuBuilder::copyPathsToClipboard(collectFileListSelection().paths);
 }
 
 void MainWindow::copyViewedImageToClipboard() {
