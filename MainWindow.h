@@ -119,5 +119,10 @@ private:
     // into a single refresh after a quiet interval.
     QSet<QString> _touchedDirs;
     QTimer _touchedDirsTimer;
+    // Folders that were touched by a task while the user was looking at a
+    // different folder. Refreshed lazily the next time the user navigates
+    // back into one of them, so the model doesn't keep serving the stale
+    // pre-task contents.
+    QSet<QString> _staleDirs;
 };
 #endif // MAINWINDOW_H

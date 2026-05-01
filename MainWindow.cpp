@@ -305,6 +305,13 @@ void MainWindow::navigateTo(FileItem* item) {
         return;
     }
     _fileModel->appendFileItems(item->fileInfo().filePath(), item);
+    // If a task touched this folder while we were elsewhere, the model is
+    // serving stale cached children. Invalidate them now so the user sees
+    // the post-task state on entry, not just after F5.
+    const QString itemNorm = QDir::cleanPath(item->fileInfo().filePath());
+    if (_staleDirs.remove(itemNorm)) {
+        _fileModel->refreshFolder(item);
+    }
     const QModelIndex sourceIdx = _fileModel->indexFor(item);
     const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(sourceIdx);
     _fileListView->setRootIndex(proxyIdx);
@@ -337,16 +344,24 @@ void MainWindow::onTaskPathTouched(QString dir) {
 
 void MainWindow::onTouchedDirsRefreshDue() {
     FileItem* folder = currentFolder();
-    if (folder && folder != _fileModel->rootItem()) {
-        const QString currentPath = folder->fileInfo().filePath();
-        // Compare normalised so D:/foo and D:\foo match.
-        const QString currentNorm = QDir::cleanPath(currentPath);
-        for (const QString& dir : _touchedDirs) {
-            if (QDir::cleanPath(dir) == currentNorm) {
+    const QString currentNorm = (folder && folder != _fileModel->rootItem())
+            ? QDir::cleanPath(folder->fileInfo().filePath())
+            : QString();
+
+    bool refreshedCurrent = false;
+    for (const QString& dir : _touchedDirs) {
+        const QString dirNorm = QDir::cleanPath(dir);
+        if (!currentNorm.isEmpty() && dirNorm == currentNorm) {
+            if (!refreshedCurrent) {
                 _fileModel->refreshFolder(folder);
                 updateStatusBar(folder);
-                break;
+                refreshedCurrent = true;
             }
+        } else {
+            // The user isn't looking at this folder right now. Mark it
+            // stale so navigating back into it later forces a fresh read
+            // instead of showing the model's cached pre-task contents.
+            _staleDirs.insert(dirNorm);
         }
     }
     _touchedDirs.clear();
