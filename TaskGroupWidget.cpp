@@ -17,6 +17,17 @@ TaskGroupWidget::TaskGroupWidget(TaskGroup* group, QWidget* parent)
       _groupId(group->id()),
       _expanded(true),
       _groupPaused(false) {
+    _aggregateTimer.setSingleShot(true);
+    _aggregateTimer.setInterval(250);
+    connect(&_aggregateTimer, &QTimer::timeout, this, [this]() {
+        // Compute and apply on tick; updates land at most every 250 ms.
+        if (_progress.isEmpty()) { _aggregate->setValue(0); return; }
+        int total = 0;
+        for (auto it = _progress.constBegin(); it != _progress.constEnd(); ++it) {
+            total += it.value();
+        }
+        _aggregate->setValue(total / _progress.size());
+    });
     setObjectName("taskGroupWidget");
     setFrameShape(QFrame::StyledPanel);
 
@@ -128,17 +139,7 @@ void TaskGroupWidget::onTaskStateChanged(const QUuid& taskId, int state) {
 }
 
 void TaskGroupWidget::rebuildAggregateProgress() {
-    if (_progress.isEmpty()) {
-        _aggregate->setValue(0);
-        return;
-    }
-    int total = 0;
-    int count = 0;
-    for (auto it = _progress.constBegin(); it != _progress.constEnd(); ++it) {
-        total += it.value();
-        ++count;
-    }
-    _aggregate->setValue(count > 0 ? total / count : 0);
+    if (!_aggregateTimer.isActive()) _aggregateTimer.start();
 }
 
 void TaskGroupWidget::updateGroupPauseButton() {

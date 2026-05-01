@@ -4,6 +4,7 @@
 #include <QFrame>
 #include <QHash>
 #include <QString>
+#include <QTimer>
 #include <QUuid>
 
 class QLabel;
@@ -56,6 +57,10 @@ private:
     QHash<QUuid, int> _states;       // last-seen state per task
     bool _expanded;
     bool _groupPaused;
+    // Throttle aggregate progress updates so a tight chunked-IO loop
+    // (one progress emit per 64 KB on a fast disk = thousands per second)
+    // doesn't repaint the bar at every emit.
+    QTimer _aggregateTimer;
 };
 
 #endif // TASKGROUPWIDGET_H

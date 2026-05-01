@@ -19,6 +19,9 @@ ThumbnailGenerator::ThumbnailGenerator(int targetSize, int jpegQuality, int work
         connect(w, &ThumbnailWorker::failed, this, &ThumbnailGenerator::onWorkerFailed);
         connect(w, &ThumbnailWorker::aborted, this, &ThumbnailGenerator::onWorkerAborted);
         t->start();
+        // Soft scheduler hint — thumbnails are background work; viewer load
+        // and user-initiated tasks should preempt them when CPU is contested.
+        t->setPriority(QThread::LowPriority);
         _workers.append({ t, w, false });
     }
 }

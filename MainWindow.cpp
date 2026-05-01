@@ -119,6 +119,10 @@ void MainWindow::create() {
     QObject::connect(_imageLoader, &ImageLoader::aborted,
                      this, &MainWindow::onImageLoadAborted);
     _imageLoaderThread.start();
+    // Soft hint to the OS scheduler — the viewer load should beat tasks and
+    // thumbnails when there's contention. This is not enforcement; v1 does
+    // not gate any subsystem from any other.
+    _imageLoaderThread.setPriority(QThread::HighPriority);
 
     // Browser "page" — path edit + file grid in a vertical layout. This is
     // the entire chrome that's visible in normal browsing. The viewer is a
