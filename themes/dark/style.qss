@@ -68,6 +68,23 @@ QDockWidget::close-button:pressed, QDockWidget::float-button:pressed {
     padding: 1px -1px -1px 1px;
 }
 
+/* ---- Toast ---- */
+
+#toast {
+	background-color: #2a2a2a;
+	border: 1px solid #1a1a1a;
+	border-left-width: 4px;
+	border-radius: 3px;
+}
+#toast[level="info"]    { border-left-color: #2b4580; }
+#toast[level="warning"] { border-left-color: #d69e2e; }
+#toast[level="error"]   { border-left-color: #c53030; }
+#toastLabel {
+	color: #eee;
+	font-weight: normal;
+	background: transparent;
+}
+
 /* ---- Task dock ---- */
 
 #tasksDockContainer {
