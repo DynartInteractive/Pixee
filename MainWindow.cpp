@@ -650,7 +650,7 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
     // on the single visible image.
     const QString lastCopyDest = settings.value("viewerLastCopyToPath").toString();
     if (!lastCopyDest.isEmpty()) {
-        QAction* a = menu.addAction(tr("Copy to %1").arg(QFileInfo(lastCopyDest).fileName()));
+        QAction* a = menu.addAction(tr("Copy to \"%1\"").arg(QFileInfo(lastCopyDest).fileName()));
         connect(a, &QAction::triggered, this, [this, lastCopyDest]() {
             copyCurrentImageTo(lastCopyDest);
         });
@@ -660,7 +660,7 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
 
     const QString lastMoveDest = settings.value("viewerLastMoveToPath").toString();
     if (!lastMoveDest.isEmpty()) {
-        QAction* a = menu.addAction(tr("Move to %1").arg(QFileInfo(lastMoveDest).fileName()));
+        QAction* a = menu.addAction(tr("Move to \"%1\"").arg(QFileInfo(lastMoveDest).fileName()));
         connect(a, &QAction::triggered, this, [this, lastMoveDest]() {
             moveCurrentImageTo(lastMoveDest);
         });
