@@ -625,31 +625,81 @@ void MainWindow::exitFullscreen() {
 
 void MainWindow::showViewerContextMenu(const QPoint& pos) {
     if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+    const QString src = _viewerImagePaths.at(_viewerIndex);
 
     QMenu menu(this);
-
-    // "Copy to <last>" if we remember a previous destination.
     QSettings settings;
-    const QString lastDest = settings.value("viewerLastCopyToPath").toString();
-    if (!lastDest.isEmpty()) {
-        QFileInfo lastInfo(lastDest);
-        QAction* lastAct = menu.addAction(tr("Copy to %1").arg(lastInfo.fileName()));
-        connect(lastAct, &QAction::triggered, this, [this, lastDest]() {
-            copyCurrentImageTo(lastDest);
+
+    // Copy / Move with the previous-destination shortcut at the top, then
+    // the explicit picker. Same pattern as the file list, but operating
+    // on the single visible image.
+    const QString lastCopyDest = settings.value("viewerLastCopyToPath").toString();
+    if (!lastCopyDest.isEmpty()) {
+        QAction* a = menu.addAction(tr("Copy to %1").arg(QFileInfo(lastCopyDest).fileName()));
+        connect(a, &QAction::triggered, this, [this, lastCopyDest]() {
+            copyCurrentImageTo(lastCopyDest);
         });
     }
-    QAction* pickAct = menu.addAction(tr("Copy to..."));
-    connect(pickAct, &QAction::triggered, this, &MainWindow::pickAndCopyCurrentImage);
+    QAction* copyPickAct = menu.addAction(tr("Copy to..."));
+    connect(copyPickAct, &QAction::triggered, this, &MainWindow::pickAndCopyCurrentImage);
+
+    const QString lastMoveDest = settings.value("viewerLastMoveToPath").toString();
+    if (!lastMoveDest.isEmpty()) {
+        QAction* a = menu.addAction(tr("Move to %1").arg(QFileInfo(lastMoveDest).fileName()));
+        connect(a, &QAction::triggered, this, [this, lastMoveDest]() {
+            moveCurrentImageTo(lastMoveDest);
+        });
+    }
+    QAction* movePickAct = menu.addAction(tr("Move to..."));
+    connect(movePickAct, &QAction::triggered, this, &MainWindow::pickAndMoveCurrentImage);
 
     menu.addSeparator();
 
-    QAction* rotateLeftAct = menu.addAction(tr("Rotate left"));
-    rotateLeftAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
-    connect(rotateLeftAct, &QAction::triggered, _viewerWidget, &ViewerWidget::rotateLeft);
+    QMenu* scaleMenu = menu.addMenu(tr("Scale to..."));
+    const int scalePresets[] = { 1024, 1920, 2560, 4096 };
+    for (int edge : scalePresets) {
+        QAction* a = scaleMenu->addAction(tr("%1 px (longest edge)").arg(edge));
+        const int edgeCopy = edge;
+        connect(a, &QAction::triggered, this, [this, src, edgeCopy]() {
+            const QFileInfo info(src);
+            const QString dst = QDir(info.absolutePath()).filePath(
+                info.completeBaseName() + "_scaled." + info.suffix());
+            auto* group = new TaskGroup(tr("Scale %1 to %2 px")
+                .arg(info.fileName()).arg(edgeCopy));
+            group->addTask(new ScaleImageTask(src, dst, edgeCopy, 92, group));
+            _pixee->taskManager()->enqueueGroup(group);
+        });
+    }
 
-    QAction* rotateRightAct = menu.addAction(tr("Rotate right"));
-    rotateRightAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
-    connect(rotateRightAct, &QAction::triggered, _viewerWidget, &ViewerWidget::rotateRight);
+    QMenu* convertMenu = menu.addMenu(tr("Convert to..."));
+    const QList<QByteArray> formats = { "jpg", "png", "webp" };
+    for (const QByteArray& fmt : formats) {
+        QAction* a = convertMenu->addAction(QString::fromLatin1(fmt).toUpper());
+        const QByteArray fmtCopy = fmt;
+        connect(a, &QAction::triggered, this, [this, src, fmtCopy]() {
+            const QFileInfo info(src);
+            const QString dst = QDir(info.absolutePath()).filePath(
+                info.completeBaseName() + "." + QString::fromLatin1(fmtCopy));
+            auto* group = new TaskGroup(tr("Convert %1 to %2")
+                .arg(info.fileName(), QString::fromLatin1(fmtCopy).toUpper()));
+            group->addTask(new ConvertFormatTask(src, dst, fmtCopy, 92, group));
+            _pixee->taskManager()->enqueueGroup(group);
+        });
+    }
+
+    menu.addSeparator();
+
+    QAction* deleteAct = menu.addAction(tr("Delete"));
+    connect(deleteAct, &QAction::triggered, this, [this, src]() {
+        if (QMessageBox::question(this, tr("Delete"),
+                tr("Delete \"%1\"?").arg(QFileInfo(src).fileName()),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
+            return;
+        }
+        auto* group = new TaskGroup(tr("Delete %1").arg(QFileInfo(src).fileName()));
+        group->addTask(new DeleteFileTask(src, group));
+        _pixee->taskManager()->enqueueGroup(group);
+    });
 
     menu.exec(_viewerWidget->mapToGlobal(pos));
 }
@@ -662,6 +712,16 @@ void MainWindow::pickAndCopyCurrentImage() {
         QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
     if (picked.isEmpty()) return;
     copyCurrentImageTo(picked);
+}
+
+void MainWindow::pickAndMoveCurrentImage() {
+    QSettings settings;
+    const QString lastDest = settings.value("viewerLastMoveToPath").toString();
+    const QString picked = QFileDialog::getExistingDirectory(
+        this, tr("Move to..."), lastDest,
+        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    if (picked.isEmpty()) return;
+    moveCurrentImageTo(picked);
 }
 
 void MainWindow::copyCurrentImageTo(const QString& destFolder) {
@@ -680,6 +740,20 @@ void MainWindow::copyCurrentImageTo(const QString& destFolder) {
 
     QSettings settings;
     settings.setValue("viewerLastCopyToPath", destFolder);
+}
+
+void MainWindow::moveCurrentImageTo(const QString& destFolder) {
+    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+    const QString src = _viewerImagePaths.at(_viewerIndex);
+    const QFileInfo srcInfo(src);
+    const QString dst = QDir(destFolder).filePath(srcInfo.fileName());
+
+    auto* group = new TaskGroup(tr("Move to %1").arg(QDir(destFolder).dirName()));
+    group->addTask(new MoveFileTask(src, dst, group));
+    _pixee->taskManager()->enqueueGroup(group);
+
+    QSettings settings;
+    settings.setValue("viewerLastMoveToPath", destFolder);
 }
 
 void MainWindow::viewerPrev() {

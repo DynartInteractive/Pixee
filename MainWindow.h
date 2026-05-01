@@ -53,6 +53,7 @@ private slots:
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
     void pickAndCopyCurrentImage();
+    void pickAndMoveCurrentImage();
     void showFileListContextMenu(const QPoint& pos);
 
 signals:
@@ -69,6 +70,7 @@ private:
     void enterFullscreen();
     void exitFullscreen();
     void copyCurrentImageTo(const QString& destFolder);
+    void moveCurrentImageTo(const QString& destFolder);
     void preloadViewerNeighbors(int currentIndex, int taskVersion);
     void touchViewerCache(const QString& path);
     QString displayPath(const QString& storedPath) const;
