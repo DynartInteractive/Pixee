@@ -55,6 +55,11 @@ public:
     // Stops everything, drains workers, joins threads. Idempotent.
     void shutdown();
 
+    // True iff at least one group is still in the queue (not all tasks have
+    // reached a terminal state). Used by the UI to drive auto-show / auto-
+    // hide of the tasks dock.
+    bool hasGroups() const { return !_groups.isEmpty(); }
+
 signals:
     void groupAdded(TaskGroup* group);
     void groupRemoved(QUuid groupId);

@@ -164,6 +164,15 @@ void MainWindow::create() {
     connect(_pixee->taskManager(), &TaskManager::pathTouched,
             this, &MainWindow::onTaskPathTouched);
 
+    // Auto show / hide the tasks dock so it only takes up screen real
+    // estate while there's actually work to look at.
+    connect(_pixee->taskManager(), &TaskManager::groupAdded,
+            this, [this](TaskGroup*) { _taskDockWidget->show(); });
+    connect(_pixee->taskManager(), &TaskManager::groupRemoved,
+            this, [this](QUuid) {
+                if (!_pixee->taskManager()->hasGroups()) _taskDockWidget->hide();
+            });
+
     setCentralWidget(_centerStack);
 
     // Menu bar + status bar
@@ -188,6 +197,10 @@ void MainWindow::create() {
             && !_taskDockWidget->isFloating()) {
         addDockWidget(Qt::BottomDockWidgetArea, _taskDockWidget);
     }
+    // Always start hidden — the dock auto-shows when a task is enqueued
+    // and auto-hides when the last group finishes. Whatever the saved
+    // state had recorded for visibility is overridden.
+    _taskDockWidget->hide();
 
     // Path edit drives navigation on Enter.
     QObject::connect(_pathLineEdit, &QLineEdit::returnPressed,
