@@ -39,6 +39,20 @@ bool isDriveRoot(const QString& path) {
     return QFileInfo(path).isRoot();
 }
 
+// True if `dest` is the same folder as `source` or a folder under it.
+// Copying / moving / pasting into one of source's own descendants is a
+// recursion landmine: expandToFiles mkpath's destination subdirs as it
+// walks, and those new dirs land inside the source tree the iterator
+// is still enumerating. Refuse up-front. Comparison is case-sensitive
+// and uses cleanPath + absolutePath so 'D:/foo' matches 'D:\\foo' and
+// 'D:/foo/.' matches 'D:/foo'.
+bool destIsSourceOrDescendant(const QString& dest, const QString& source) {
+    const QString d = QDir::cleanPath(QDir(dest).absolutePath());
+    const QString s = QDir::cleanPath(QDir(source).absolutePath());
+    if (d == s) return true;
+    return d.startsWith(s + QLatin1Char('/'));
+}
+
 // Windows clipboard: 'Preferred DropEffect' is a 4-byte little-endian
 // DWORD. 2 = DROPEFFECT_MOVE (Cut); 5 = DROPEFFECT_COPY. Qt surfaces it
 // as a custom mime format. Other platforms have analogues (gnome-copied-
@@ -249,25 +263,33 @@ void FileOpsMenuBuilder::pasteFromClipboardToFolder(const QString& destFolder,
     }
     if (sourcePaths.isEmpty()) return;
 
-    // Reject drive roots up-front — same protection as direct Copy / Move.
+    // Reject drive roots and descendant-pastes up-front — same protection
+    // as direct Copy / Move. (Pasting a folder into itself or one of its
+    // own subfolders would have expandToFiles mkpath new dirs inside the
+    // tree it's still walking — a recursion landmine.)
     QStringList rejectedRoots;
+    QStringList rejectedDescendants;
     QStringList accepted;
     for (const QString& s : sourcePaths) {
-        if (isDriveRoot(s)) rejectedRoots.append(s);
-        else                accepted.append(s);
+        if (isDriveRoot(s)) { rejectedRoots.append(s); continue; }
+        if (QFileInfo(s).isDir() && destIsSourceOrDescendant(destFolder, s)) {
+            rejectedDescendants.append(QFileInfo(s).fileName());
+            continue;
+        }
+        accepted.append(s);
     }
     if (!rejectedRoots.isEmpty()) {
         Toast::show(dialogParent,
             QObject::tr("Refusing to paste a drive root: %1").arg(rejectedRoots.join(", ")),
             Toast::Error);
     }
+    if (!rejectedDescendants.isEmpty()) {
+        Toast::show(dialogParent,
+            QObject::tr("Cannot paste %1 into itself or a subfolder")
+                .arg(rejectedDescendants.join(", ")),
+            Toast::Error);
+    }
     if (accepted.isEmpty()) return;
-
-    // Pasting onto / into the same source folder is fine for Copy
-    // (per-file conflict prompt handles it) but a Cut/Move into one of
-    // its own ancestors would loop. We don't currently detect that —
-    // tasks would simply fail at runtime. Worth flagging as a known
-    // edge case if it bites in practice.
 
     QList<Pair> pairs;
     QStringList folderRoots;
@@ -332,14 +354,27 @@ void FileOpsMenuBuilder::doCopy(const QString& destFolder) {
     QList<Pair> pairs;
     bool sawFolder = false;
     QStringList rejectedRoots;
+    QStringList rejectedDescendants;
     for (const QString& src : _paths) {
         if (isDriveRoot(src)) { rejectedRoots.append(src); continue; }
-        if (QFileInfo(src).isDir()) sawFolder = true;
+        if (QFileInfo(src).isDir()) {
+            if (destIsSourceOrDescendant(destFolder, src)) {
+                rejectedDescendants.append(QFileInfo(src).fileName());
+                continue;
+            }
+            sawFolder = true;
+        }
         pairs.append(expandToFiles(src, destFolder));
     }
     if (!rejectedRoots.isEmpty()) {
         Toast::show(_dialogParent,
             tr("Refusing to copy a drive root: %1").arg(rejectedRoots.join(", ")),
+            Toast::Error);
+    }
+    if (!rejectedDescendants.isEmpty()) {
+        Toast::show(_dialogParent,
+            tr("Cannot copy %1 into itself or a subfolder")
+                .arg(rejectedDescendants.join(", ")),
             Toast::Error);
     }
     if (pairs.isEmpty()) return;
@@ -364,14 +399,27 @@ void FileOpsMenuBuilder::doMove(const QString& destFolder) {
     QList<Pair> pairs;
     QStringList folderRoots;
     QStringList rejectedRoots;
+    QStringList rejectedDescendants;
     for (const QString& src : _paths) {
         if (isDriveRoot(src)) { rejectedRoots.append(src); continue; }
-        if (QFileInfo(src).isDir()) folderRoots.append(src);
+        if (QFileInfo(src).isDir()) {
+            if (destIsSourceOrDescendant(destFolder, src)) {
+                rejectedDescendants.append(QFileInfo(src).fileName());
+                continue;
+            }
+            folderRoots.append(src);
+        }
         pairs.append(expandToFiles(src, destFolder));
     }
     if (!rejectedRoots.isEmpty()) {
         Toast::show(_dialogParent,
             tr("Refusing to move a drive root: %1").arg(rejectedRoots.join(", ")),
+            Toast::Error);
+    }
+    if (!rejectedDescendants.isEmpty()) {
+        Toast::show(_dialogParent,
+            tr("Cannot move %1 into itself or a subfolder")
+                .arg(rejectedDescendants.join(", ")),
             Toast::Error);
     }
     if (pairs.isEmpty()) return;
