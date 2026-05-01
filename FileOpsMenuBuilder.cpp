@@ -122,10 +122,19 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
 
 void FileOpsMenuBuilder::doCopyToClipboard() {
     QList<QUrl> urls;
+    QStringList textPaths;
     urls.reserve(_paths.size());
-    for (const QString& p : _paths) urls.append(QUrl::fromLocalFile(p));
+    textPaths.reserve(_paths.size());
+    for (const QString& p : _paths) {
+        urls.append(QUrl::fromLocalFile(p));
+        textPaths.append(QDir::toNativeSeparators(p));
+    }
     auto* mime = new QMimeData();
     mime->setUrls(urls);
+    // setUrls alone leaves text/plain empty — text editors that paste-as-text
+    // (Sublime, VS Code, etc.) end up with nothing. Set the path(s) as
+    // newline-separated native paths so Ctrl-V in those apps gives the path.
+    mime->setText(textPaths.join('\n'));
     QApplication::clipboard()->setMimeData(mime);
 }
 
