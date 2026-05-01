@@ -18,6 +18,7 @@
 
 class FileItem;
 class ImageLoader;
+class TaskDockWidget;
 class ViewerWidget;
 
 class MainWindow : public QMainWindow
@@ -72,6 +73,7 @@ private:
     FileFilterModel* _folderFilterModel;
     FileFilterModel* _fileFilterModel;
     QDockWidget* _dockWidget;
+    TaskDockWidget* _taskDockWidget;
     QListView* _fileListView;
     QTreeView* _folderTreeView;
     QLineEdit* _pathLineEdit;

@@ -17,12 +17,16 @@
 
 #include "MainWindow.h"
 #include "Config.h"
+#include "CopyFileTask.h"
 #include "FileFilterModel.h"
 #include "FileItem.h"
 #include "FileModel.h"
 #include "FolderTreeView.h"
 #include "FileListView.h"
 #include "ImageLoader.h"
+#include "TaskDockWidget.h"
+#include "TaskGroup.h"
+#include "TaskManager.h"
 #include "ViewerWidget.h"
 
 #include<QDebug>
@@ -138,6 +142,9 @@ void MainWindow::create() {
     _dockWidget->setFeatures(QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
     addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
 
+    _taskDockWidget = new TaskDockWidget(_pixee->taskManager());
+    addDockWidget(Qt::RightDockWidgetArea, _taskDockWidget);
+
     setCentralWidget(_centerStack);
 
     // Menu bar + status bar
@@ -156,6 +163,11 @@ void MainWindow::create() {
     if (dockWidgetArea(_dockWidget) == Qt::NoDockWidgetArea
             && !_dockWidget->isFloating()) {
         addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
+    }
+    // Same for the tasks dock — re-anchor on the right.
+    if (dockWidgetArea(_taskDockWidget) == Qt::NoDockWidgetArea
+            && !_taskDockWidget->isFloating()) {
+        addDockWidget(Qt::RightDockWidgetArea, _taskDockWidget);
     }
 
     // Path edit drives navigation on Enter.
@@ -338,6 +350,20 @@ void MainWindow::createMenus() {
                 foldersToggle->setChecked(visible);
             });
     viewMenu->addAction(foldersToggle);
+
+    QAction* tasksToggle = new QAction(tr("&Tasks"), this);
+    tasksToggle->setCheckable(true);
+    tasksToggle->setChecked(_taskDockWidget->isVisible());
+    connect(tasksToggle, &QAction::toggled, this, [this](bool on) {
+        _taskDockWidget->setVisible(on);
+        if (on) _taskDockWidget->raise();
+    });
+    connect(_taskDockWidget, &QDockWidget::visibilityChanged,
+            this, [tasksToggle](bool visible) {
+                const QSignalBlocker block(tasksToggle);
+                tasksToggle->setChecked(visible);
+            });
+    viewMenu->addAction(tasksToggle);
 
     QMenu* helpMenu = mb->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About"));
@@ -583,17 +609,15 @@ void MainWindow::copyCurrentImageTo(const QString& destFolder) {
     const QString src = _viewerImagePaths.at(_viewerIndex);
     const QFileInfo srcInfo(src);
     const QString dst = QDir(destFolder).filePath(srcInfo.fileName());
-    if (QFile::exists(dst)) {
-        QMessageBox::warning(this, tr("Copy to..."),
-            tr("A file named \"%1\" already exists in that folder.")
-                .arg(srcInfo.fileName()));
-        return;
-    }
-    if (!QFile::copy(src, dst)) {
-        QMessageBox::warning(this, tr("Copy to..."),
-            tr("Failed to copy %1 to %2.").arg(src, destFolder));
-        return;
-    }
+
+    // Build a one-task group and hand it to the manager. Phase 3 adds the
+    // dest-exists conflict prompt; until then a clobber-fails fast and
+    // surfaces in the dock as a failed task — better than the old modal.
+    auto* group = new TaskGroup(tr("Copy to %1").arg(QDir(destFolder).dirName()));
+    auto* task = new CopyFileTask(src, dst, group);
+    group->addTask(task);
+    _pixee->taskManager()->enqueueGroup(group);
+
     QSettings settings;
     settings.setValue("viewerLastCopyToPath", destFolder);
 }

@@ -22,7 +22,10 @@ SOURCES += \
     MainWindow.cpp \
     Pixee.cpp \
     Task.cpp \
+    TaskDockWidget.cpp \
     TaskGroup.cpp \
+    TaskGroupWidget.cpp \
+    TaskItemWidget.cpp \
     TaskManager.cpp \
     TaskRunner.cpp \
     Theme.cpp \
@@ -48,7 +51,10 @@ HEADERS += \
     MainWindow.h \
     Pixee.h \
     Task.h \
+    TaskDockWidget.h \
     TaskGroup.h \
+    TaskGroupWidget.h \
+    TaskItemWidget.h \
     TaskManager.h \
     TaskRunner.h \
     Theme.h \
