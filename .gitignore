@@ -30,3 +30,6 @@ Thumbs.db
 
 # Test images (Kling-generated samples used to exercise copy / move / etc.)
 kling_*
+
+# Local scratch folder used to exercise paste / move flows.
+themes/new/
