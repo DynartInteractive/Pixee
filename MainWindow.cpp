@@ -18,12 +18,14 @@
 #include "MainWindow.h"
 #include "Config.h"
 #include "CopyFileTask.h"
+#include "DeleteFileTask.h"
 #include "FileFilterModel.h"
 #include "FileItem.h"
 #include "FileModel.h"
 #include "FolderTreeView.h"
 #include "FileListView.h"
 #include "ImageLoader.h"
+#include "MoveFileTask.h"
 #include "TaskDockWidget.h"
 #include "TaskGroup.h"
 #include "TaskManager.h"
@@ -218,6 +220,10 @@ void MainWindow::create() {
             }
         }
     );
+
+    // Right-click on the central file list — copy / move / delete.
+    QObject::connect(_fileListView, &QListView::customContextMenuRequested,
+                     this, &MainWindow::showFileListContextMenu);
 
     // Restore the last path the user was viewing. expandPath does the
     // multi-step lazy load synchronously — fine on local disk, can stutter
@@ -707,3 +713,78 @@ void MainWindow::exit() {
 }
 
 MainWindow::~MainWindow() {}
+
+void MainWindow::showFileListContextMenu(const QPoint& pos) {
+    if (!_fileListView->selectionModel()) return;
+
+    // Collect Image items from the current selection. Folders / ".." are
+    // ignored in v1; Phase 4 doesn't do recursive folder ops.
+    QStringList imagePaths;
+    const QModelIndexList sel = _fileListView->selectionModel()->selectedIndexes();
+    for (const QModelIndex& proxyIdx : sel) {
+        const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
+        if (!srcIdx.isValid()) continue;
+        FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+        if (!item) continue;
+        if (item->fileType() != FileType::Image) continue;
+        imagePaths.append(item->fileInfo().filePath());
+    }
+    if (imagePaths.isEmpty()) return;
+
+    QMenu menu(this);
+    QAction* copyAct = menu.addAction(tr("Copy to..."));
+    QAction* moveAct = menu.addAction(tr("Move to..."));
+    menu.addSeparator();
+    QAction* deleteAct = menu.addAction(tr("Delete"));
+
+    QSettings settings;
+    auto pickFolder = [&](const QString& settingsKey, const QString& title) -> QString {
+        const QString last = settings.value(settingsKey).toString();
+        const QString picked = QFileDialog::getExistingDirectory(
+            this, title, last,
+            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+        if (!picked.isEmpty()) settings.setValue(settingsKey, picked);
+        return picked;
+    };
+
+    connect(copyAct, &QAction::triggered, this, [this, imagePaths, &pickFolder]() {
+        const QString dest = pickFolder("fileListLastCopyToPath", tr("Copy to..."));
+        if (dest.isEmpty()) return;
+        auto* group = new TaskGroup(
+            tr("Copy %1 file(s) to %2").arg(imagePaths.size()).arg(QDir(dest).dirName()));
+        for (const QString& src : imagePaths) {
+            const QString dst = QDir(dest).filePath(QFileInfo(src).fileName());
+            group->addTask(new CopyFileTask(src, dst, group));
+        }
+        _pixee->taskManager()->enqueueGroup(group);
+    });
+
+    connect(moveAct, &QAction::triggered, this, [this, imagePaths, &pickFolder]() {
+        const QString dest = pickFolder("fileListLastMoveToPath", tr("Move to..."));
+        if (dest.isEmpty()) return;
+        auto* group = new TaskGroup(
+            tr("Move %1 file(s) to %2").arg(imagePaths.size()).arg(QDir(dest).dirName()));
+        for (const QString& src : imagePaths) {
+            const QString dst = QDir(dest).filePath(QFileInfo(src).fileName());
+            group->addTask(new MoveFileTask(src, dst, group));
+        }
+        _pixee->taskManager()->enqueueGroup(group);
+    });
+
+    connect(deleteAct, &QAction::triggered, this, [this, imagePaths]() {
+        const QString question = imagePaths.size() == 1
+            ? tr("Delete \"%1\"?").arg(QFileInfo(imagePaths.first()).fileName())
+            : tr("Delete %1 selected files?").arg(imagePaths.size());
+        if (QMessageBox::question(this, tr("Delete"), question,
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
+            return;
+        }
+        auto* group = new TaskGroup(tr("Delete %1 file(s)").arg(imagePaths.size()));
+        for (const QString& p : imagePaths) {
+            group->addTask(new DeleteFileTask(p, group));
+        }
+        _pixee->taskManager()->enqueueGroup(group);
+    });
+
+    menu.exec(_fileListView->viewport()->mapToGlobal(pos));
+}

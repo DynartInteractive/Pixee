@@ -11,6 +11,7 @@ CONFIG += c++17
 SOURCES += \
     Config.cpp \
     CopyFileTask.cpp \
+    DeleteFileTask.cpp \
     FileFilterModel.cpp \
     FileItem.cpp \
     FileListView.cpp \
@@ -20,6 +21,7 @@ SOURCES += \
     FolderTreeView.cpp \
     ImageLoader.cpp \
     MainWindow.cpp \
+    MoveFileTask.cpp \
     Pixee.cpp \
     Task.cpp \
     TaskDockWidget.cpp \
@@ -39,6 +41,7 @@ SOURCES += \
 HEADERS += \
     Config.h \
     CopyFileTask.h \
+    DeleteFileTask.h \
     FileFilterModel.h \
     FileItem.h \
     FileListView.h \
@@ -49,6 +52,7 @@ HEADERS += \
     FolderTreeView.h \
     ImageLoader.h \
     MainWindow.h \
+    MoveFileTask.h \
     Pixee.h \
     Task.h \
     TaskDockWidget.h \

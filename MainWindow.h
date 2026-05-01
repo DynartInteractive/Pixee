@@ -48,6 +48,7 @@ private slots:
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
     void pickAndCopyCurrentImage();
+    void showFileListContextMenu(const QPoint& pos);
 
 signals:
     void requestImageLoad(QString path, int taskVersion);

@@ -35,6 +35,7 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
     setResizeMode(QListView::Adjust);
     setMovement(QListView::Static);
     setSelectionMode(QAbstractItemView::ExtendedSelection);
+    setContextMenuPolicy(Qt::CustomContextMenu);
     setUniformItemSizes(true);
     setVerticalScrollMode(QAbstractItemView::ScrollPerItem);
 
