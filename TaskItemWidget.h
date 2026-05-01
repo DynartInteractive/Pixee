@@ -8,11 +8,14 @@
 
 class QLabel;
 class QProgressBar;
+class QStackedWidget;
 class QToolButton;
+class QWidget;
 
 // One row in the task dock — name + progress bar, with pause / stop buttons
-// that appear on hover. Phase 3 will swap the progress strip for a question
-// button strip when the task is awaiting an answer.
+// that appear on hover. When the task is awaiting an answer (Phase 3) the
+// progress strip is swapped for a question strip with six buttons:
+// Skip / Skip All / Overwrite / Overwrite All / Rename / Rename All.
 class TaskItemWidget : public QFrame
 {
     Q_OBJECT
@@ -24,10 +27,16 @@ public:
     // state matches Task::State.
     void setTaskState(int state);
 
+    // Show the inline question strip; restored to the progress strip on
+    // any non-AwaitingAnswer state change.
+    void showQuestion(int kind, const QVariantMap& context);
+
 signals:
     void pauseRequested(QUuid taskId);
     void resumeRequested(QUuid taskId);
     void stopRequested(QUuid taskId);
+    // answer is Task::ConflictAnswer cast to int; kind is Task::QuestionKind.
+    void answerProvided(QUuid taskId, int kind, int answer, bool applyToGroup);
 
 protected:
     bool event(QEvent* e) override;
@@ -35,13 +44,19 @@ protected:
 private:
     void updateButtonsForHover(bool hovered);
     void updatePauseButtonForState();
+    void buildQuestionStrip();
+    void hideQuestion();
 
     QUuid _taskId;
     QLabel* _nameLabel;
+    QStackedWidget* _stack;
+    QWidget* _progressPage;
+    QWidget* _questionPage;
     QProgressBar* _progressBar;
     QToolButton* _pauseButton;
     QToolButton* _stopButton;
     int _state;
+    int _currentQuestionKind;
     bool _hovered;
 };
 

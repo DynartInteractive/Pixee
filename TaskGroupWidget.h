@@ -27,6 +27,7 @@ public:
     // Manager forwards updates here for member tasks.
     void onTaskProgress(const QUuid& taskId, int pct);
     void onTaskStateChanged(const QUuid& taskId, int state);
+    void onTaskQuestionPosed(const QUuid& taskId, int kind, const QVariantMap& ctx);
 
 signals:
     void pauseGroupRequested(QUuid groupId);
@@ -35,6 +36,7 @@ signals:
     void pauseTaskRequested(QUuid taskId);
     void resumeTaskRequested(QUuid taskId);
     void stopTaskRequested(QUuid taskId);
+    void answerProvided(QUuid taskId, int kind, int answer, bool applyToGroup);
 
 private:
     void rebuildAggregateProgress();

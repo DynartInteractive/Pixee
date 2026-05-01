@@ -25,6 +25,7 @@ private slots:
     void onGroupRemoved(QUuid groupId);
     void onTaskStateChanged(QUuid taskId, int state);
     void onTaskProgress(QUuid taskId, int pct);
+    void onTaskQuestionPosed(QUuid taskId, int kind, QVariantMap ctx);
 
 private:
     TaskGroupWidget* groupWidgetForTask(const QUuid& taskId) const;

@@ -1,10 +1,29 @@
 #include "CopyFileTask.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 
 namespace {
 constexpr qint64 kChunkSize = 64 * 1024;  // matches ImageLoader's chunk size
+
+// Pick a non-clobbering "name (N).ext" for `path` if it already exists.
+// Returns the original path when nothing was needed.
+QString uniqueRenamedPath(const QString& path) {
+    if (!QFile::exists(path)) return path;
+    const QFileInfo info(path);
+    const QString stem = info.completeBaseName();
+    const QString ext = info.suffix();
+    const QString dir = info.absolutePath();
+    for (int n = 1; n < 10000; ++n) {
+        QString candidate = ext.isEmpty()
+                ? QStringLiteral("%1 (%2)").arg(stem).arg(n)
+                : QStringLiteral("%1 (%2).%3").arg(stem).arg(n).arg(ext);
+        QString full = QDir(dir).filePath(candidate);
+        if (!QFile::exists(full)) return full;
+    }
+    return path;  // give up after 10000 collisions; let the open fail downstream
+}
 }
 
 CopyFileTask::CopyFileTask(const QString& sourcePath, const QString& destPath,
@@ -22,11 +41,26 @@ void CopyFileTask::run() {
         return;
     }
 
-    // Phase 3 will replace this hard fail with resolveOrAsk() on
-    // DestinationExists. Until then, refuse to clobber.
     if (QFile::exists(_dst)) {
-        setFailed(tr("Destination already exists: %1").arg(_dst));
-        return;
+        QVariantMap ctx;
+        ctx.insert("src", _src);
+        ctx.insert("dst", _dst);
+        const ConflictAnswer answer = resolveOrAsk(DestinationExists, ctx);
+        if (isStopRequested()) return;
+        switch (answer) {
+        case Skip:
+            setSkipped();
+            return;
+        case Overwrite:
+            if (!QFile::remove(_dst)) {
+                setFailed(tr("Cannot remove existing destination: %1").arg(_dst));
+                return;
+            }
+            break;
+        case Rename:
+            _dst = uniqueRenamedPath(_dst);
+            break;
+        }
     }
 
     QFile out(_dst);

@@ -39,6 +39,8 @@ TaskDockWidget::TaskDockWidget(TaskManager* manager, QWidget* parent)
             this, &TaskDockWidget::onTaskStateChanged);
     connect(_manager, &TaskManager::taskProgress,
             this, &TaskDockWidget::onTaskProgress);
+    connect(_manager, &TaskManager::taskQuestionPosed,
+            this, &TaskDockWidget::onTaskQuestionPosed);
 }
 
 void TaskDockWidget::onGroupAdded(TaskGroup* group) {
@@ -59,6 +61,8 @@ void TaskDockWidget::onGroupAdded(TaskGroup* group) {
             _manager, &TaskManager::resumeTask);
     connect(gw, &TaskGroupWidget::stopTaskRequested,
             _manager, &TaskManager::stopTask);
+    connect(gw, &TaskGroupWidget::answerProvided,
+            _manager, &TaskManager::provideAnswer);
 
     // Insert before the trailing stretch so groups stack at the top.
     const int insertAt = qMax(0, _containerLayout->count() - 1);
@@ -86,4 +90,8 @@ void TaskDockWidget::onTaskStateChanged(QUuid taskId, int state) {
 
 void TaskDockWidget::onTaskProgress(QUuid taskId, int pct) {
     if (auto* gw = groupWidgetForTask(taskId)) gw->onTaskProgress(taskId, pct);
+}
+
+void TaskDockWidget::onTaskQuestionPosed(QUuid taskId, int kind, QVariantMap ctx) {
+    if (auto* gw = groupWidgetForTask(taskId)) gw->onTaskQuestionPosed(taskId, kind, ctx);
 }

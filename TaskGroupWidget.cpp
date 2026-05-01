@@ -94,10 +94,18 @@ TaskGroupWidget::TaskGroupWidget(TaskGroup* group, QWidget* parent)
                 this, &TaskGroupWidget::resumeTaskRequested);
         connect(row, &TaskItemWidget::stopRequested,
                 this, &TaskGroupWidget::stopTaskRequested);
+        connect(row, &TaskItemWidget::answerProvided,
+                this, &TaskGroupWidget::answerProvided);
         _bodyLayout->addWidget(row);
         _items.insert(t->id(), row);
         _progress.insert(t->id(), 0);
         _states.insert(t->id(), static_cast<int>(Task::Queued));
+    }
+}
+
+void TaskGroupWidget::onTaskQuestionPosed(const QUuid& taskId, int kind, const QVariantMap& ctx) {
+    if (auto* row = _items.value(taskId, nullptr)) {
+        row->showQuestion(kind, ctx);
     }
 }
 
