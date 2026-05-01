@@ -1,13 +1,17 @@
 #include "FileOpsMenuBuilder.h"
 
 #include <QAction>
+#include <QApplication>
+#include <QClipboard>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QSettings>
 #include <QString>
+#include <QUrl>
 
 #include "ConvertFormatTask.h"
 #include "CopyFileTask.h"
@@ -58,6 +62,15 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
 
     QSettings settings;
 
+    // ---- Copy to system clipboard ----
+    // Pasting in Explorer creates a copy of the file at the destination
+    // (CF_HDROP semantics on Windows); pasting in a text editor gives the
+    // path(s) as text — Qt's setUrls populates both representations.
+    QAction* clipCopy = menu->addAction(tr("Copy"));
+    connect(clipCopy, &QAction::triggered, this, [this]() { doCopyToClipboard(); });
+
+    menu->addSeparator();
+
     // ---- Copy ----
     const QString lastCopy = settings.value(kLastCopyKey).toString();
     if (!lastCopy.isEmpty()) {
@@ -105,6 +118,15 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     // ---- Delete ----
     QAction* deleteAct = menu->addAction(tr("Delete"));
     connect(deleteAct, &QAction::triggered, this, [this]() { doDelete(); });
+}
+
+void FileOpsMenuBuilder::doCopyToClipboard() {
+    QList<QUrl> urls;
+    urls.reserve(_paths.size());
+    for (const QString& p : _paths) urls.append(QUrl::fromLocalFile(p));
+    auto* mime = new QMimeData();
+    mime->setUrls(urls);
+    QApplication::clipboard()->setMimeData(mime);
 }
 
 void FileOpsMenuBuilder::doCopy(const QString& destFolder) {

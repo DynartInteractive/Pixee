@@ -42,6 +42,7 @@ public:
     void populate(QMenu* menu);
 
 private:
+    void doCopyToClipboard();
     void doCopy(const QString& destFolder);
     void doMove(const QString& destFolder);
     void doScale(int longestEdge);
