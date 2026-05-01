@@ -183,15 +183,6 @@ void MainWindow::create() {
             && !_dockWidget->isFloating()) {
         addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
     }
-    // One-time migration: the tasks dock used to default to the right area
-    // in early builds. The new default is bottom; apply once for users
-    // whose saved state predates this. After the flag is set, the user
-    // owns the position.
-    if (!settings.value("tasksDockBottomMigrated", false).toBool()) {
-        addDockWidget(Qt::BottomDockWidgetArea, _taskDockWidget);
-        settings.setValue("tasksDockBottomMigrated", true);
-    }
-
     // Same NoDockWidgetArea fallback as the folders dock.
     if (dockWidgetArea(_taskDockWidget) == Qt::NoDockWidgetArea
             && !_taskDockWidget->isFloating()) {
