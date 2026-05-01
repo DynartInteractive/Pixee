@@ -52,8 +52,6 @@ private slots:
     void onImageLoadAborted(QString path);
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
-    void pickAndCopyCurrentImage();
-    void pickAndMoveCurrentImage();
     void showFileListContextMenu(const QPoint& pos);
 
 signals:
@@ -73,8 +71,6 @@ private:
     void showViewerImageAt(int index);
     void enterFullscreen();
     void exitFullscreen();
-    void copyCurrentImageTo(const QString& destFolder);
-    void moveCurrentImageTo(const QString& destFolder);
     // Drop the currently-viewed image from the viewer's local path list
     // and either advance to the next (preferred), fall back to the previous
     // when we were on the tail, or dismiss the viewer if it was the only

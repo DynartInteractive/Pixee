@@ -25,6 +25,7 @@
 #include "FolderTreeView.h"
 #include "FileListView.h"
 #include "ConvertFormatTask.h"
+#include "FileOpsMenuBuilder.h"
 #include "ImageLoader.h"
 #include "MoveFileTask.h"
 #include "ScaleImageTask.h"
@@ -656,139 +657,12 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
     if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
     const QString src = _viewerImagePaths.at(_viewerIndex);
 
+    FileOpsMenuBuilder builder({src}, _pixee->taskManager(), this);
+    builder.setAdvanceCallback([this]() { advanceViewerAfterRemoval(); });
+
     QMenu menu(this);
-    QSettings settings;
-
-    // Copy / Move with the previous-destination shortcut at the top, then
-    // the explicit picker. Same pattern as the file list, but operating
-    // on the single visible image.
-    const QString lastCopyDest = settings.value("viewerLastCopyToPath").toString();
-    if (!lastCopyDest.isEmpty()) {
-        QAction* a = menu.addAction(tr("Copy to \"%1\"").arg(QFileInfo(lastCopyDest).fileName()));
-        connect(a, &QAction::triggered, this, [this, lastCopyDest]() {
-            copyCurrentImageTo(lastCopyDest);
-        });
-    }
-    QAction* copyPickAct = menu.addAction(tr("Copy to..."));
-    connect(copyPickAct, &QAction::triggered, this, &MainWindow::pickAndCopyCurrentImage);
-
-    const QString lastMoveDest = settings.value("viewerLastMoveToPath").toString();
-    if (!lastMoveDest.isEmpty()) {
-        QAction* a = menu.addAction(tr("Move to \"%1\"").arg(QFileInfo(lastMoveDest).fileName()));
-        connect(a, &QAction::triggered, this, [this, lastMoveDest]() {
-            moveCurrentImageTo(lastMoveDest);
-        });
-    }
-    QAction* movePickAct = menu.addAction(tr("Move to..."));
-    connect(movePickAct, &QAction::triggered, this, &MainWindow::pickAndMoveCurrentImage);
-
-    menu.addSeparator();
-
-    QMenu* scaleMenu = menu.addMenu(tr("Scale to..."));
-    const int scalePresets[] = { 1024, 1920, 2560, 4096 };
-    for (int edge : scalePresets) {
-        QAction* a = scaleMenu->addAction(tr("%1 px (longest edge)").arg(edge));
-        const int edgeCopy = edge;
-        connect(a, &QAction::triggered, this, [this, src, edgeCopy]() {
-            const QFileInfo info(src);
-            const QString dst = QDir(info.absolutePath()).filePath(
-                info.completeBaseName() + "_scaled." + info.suffix());
-            auto* group = new TaskGroup(tr("Scale %1 to %2 px")
-                .arg(info.fileName()).arg(edgeCopy));
-            group->addTask(new ScaleImageTask(src, dst, edgeCopy, 92, group));
-            _pixee->taskManager()->enqueueGroup(group);
-        });
-    }
-
-    QMenu* convertMenu = menu.addMenu(tr("Convert to..."));
-    const QList<QByteArray> formats = { "jpg", "png", "webp" };
-    for (const QByteArray& fmt : formats) {
-        QAction* a = convertMenu->addAction(QString::fromLatin1(fmt).toUpper());
-        const QByteArray fmtCopy = fmt;
-        connect(a, &QAction::triggered, this, [this, src, fmtCopy]() {
-            const QFileInfo info(src);
-            const QString dst = QDir(info.absolutePath()).filePath(
-                info.completeBaseName() + "." + QString::fromLatin1(fmtCopy));
-            auto* group = new TaskGroup(tr("Convert %1 to %2")
-                .arg(info.fileName(), QString::fromLatin1(fmtCopy).toUpper()));
-            group->addTask(new ConvertFormatTask(src, dst, fmtCopy, 92, group));
-            _pixee->taskManager()->enqueueGroup(group);
-        });
-    }
-
-    menu.addSeparator();
-
-    QAction* deleteAct = menu.addAction(tr("Delete"));
-    connect(deleteAct, &QAction::triggered, this, [this, src]() {
-        if (QMessageBox::question(this, tr("Delete"),
-                tr("Delete \"%1\"?").arg(QFileInfo(src).fileName()),
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
-            return;
-        }
-        advanceViewerAfterRemoval();
-        auto* group = new TaskGroup(tr("Delete %1").arg(QFileInfo(src).fileName()));
-        group->addTask(new DeleteFileTask(src, group));
-        _pixee->taskManager()->enqueueGroup(group);
-    });
-
+    builder.populate(&menu);
     menu.exec(_viewerWidget->mapToGlobal(pos));
-}
-
-void MainWindow::pickAndCopyCurrentImage() {
-    QSettings settings;
-    const QString lastDest = settings.value("viewerLastCopyToPath").toString();
-    const QString picked = QFileDialog::getExistingDirectory(
-        this, tr("Copy to..."), lastDest,
-        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-    if (picked.isEmpty()) return;
-    copyCurrentImageTo(picked);
-}
-
-void MainWindow::pickAndMoveCurrentImage() {
-    QSettings settings;
-    const QString lastDest = settings.value("viewerLastMoveToPath").toString();
-    const QString picked = QFileDialog::getExistingDirectory(
-        this, tr("Move to..."), lastDest,
-        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-    if (picked.isEmpty()) return;
-    moveCurrentImageTo(picked);
-}
-
-void MainWindow::copyCurrentImageTo(const QString& destFolder) {
-    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
-    const QString src = _viewerImagePaths.at(_viewerIndex);
-    const QFileInfo srcInfo(src);
-    const QString dst = QDir(destFolder).filePath(srcInfo.fileName());
-
-    // Build a one-task group and hand it to the manager. Phase 3 adds the
-    // dest-exists conflict prompt; until then a clobber-fails fast and
-    // surfaces in the dock as a failed task — better than the old modal.
-    auto* group = new TaskGroup(tr("Copy to %1").arg(QDir(destFolder).dirName()));
-    auto* task = new CopyFileTask(src, dst, group);
-    group->addTask(task);
-    _pixee->taskManager()->enqueueGroup(group);
-
-    QSettings settings;
-    settings.setValue("viewerLastCopyToPath", destFolder);
-}
-
-void MainWindow::moveCurrentImageTo(const QString& destFolder) {
-    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
-    const QString src = _viewerImagePaths.at(_viewerIndex);
-    const QFileInfo srcInfo(src);
-    const QString dst = QDir(destFolder).filePath(srcInfo.fileName());
-
-    // Advance first so the viewer is already on the next image while the
-    // move runs in the background. If this was the only image, the viewer
-    // dismisses itself and the task still runs.
-    advanceViewerAfterRemoval();
-
-    auto* group = new TaskGroup(tr("Move to %1").arg(QDir(destFolder).dirName()));
-    group->addTask(new MoveFileTask(src, dst, group));
-    _pixee->taskManager()->enqueueGroup(group);
-
-    QSettings settings;
-    settings.setValue("viewerLastMoveToPath", destFolder);
 }
 
 void MainWindow::advanceViewerAfterRemoval() {
@@ -905,7 +779,7 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
     if (!_fileListView->selectionModel()) return;
 
     // Collect Image items from the current selection. Folders / ".." are
-    // ignored in v1; Phase 4 doesn't do recursive folder ops.
+    // ignored in v1; recursive folder ops are out of scope.
     QStringList imagePaths;
     const QModelIndexList sel = _fileListView->selectionModel()->selectedIndexes();
     for (const QModelIndex& proxyIdx : sel) {
@@ -918,100 +792,11 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
     }
     if (imagePaths.isEmpty()) return;
 
+    FileOpsMenuBuilder builder(imagePaths, _pixee->taskManager(), this);
+    // No advance callback — the file list's selection clears naturally on
+    // the post-task folder refresh.
+
     QMenu menu(this);
-    QAction* copyAct = menu.addAction(tr("Copy to..."));
-    QAction* moveAct = menu.addAction(tr("Move to..."));
-    menu.addSeparator();
-
-    QMenu* scaleMenu = menu.addMenu(tr("Scale to..."));
-    const int scalePresets[] = { 1024, 1920, 2560, 4096 };
-    for (int edge : scalePresets) {
-        QAction* a = scaleMenu->addAction(tr("%1 px (longest edge)").arg(edge));
-        const int edgeCopy = edge;
-        connect(a, &QAction::triggered, this, [this, imagePaths, edgeCopy]() {
-            auto* group = new TaskGroup(
-                tr("Scale %1 file(s) to %2 px").arg(imagePaths.size()).arg(edgeCopy));
-            for (const QString& src : imagePaths) {
-                const QFileInfo info(src);
-                const QString dst = QDir(info.absolutePath()).filePath(
-                    info.completeBaseName() + "_scaled." + info.suffix());
-                group->addTask(new ScaleImageTask(src, dst, edgeCopy, 92, group));
-            }
-            _pixee->taskManager()->enqueueGroup(group);
-        });
-    }
-
-    QMenu* convertMenu = menu.addMenu(tr("Convert to..."));
-    const QList<QByteArray> formats = { "jpg", "png", "webp" };
-    for (const QByteArray& fmt : formats) {
-        QAction* a = convertMenu->addAction(QString::fromLatin1(fmt).toUpper());
-        const QByteArray fmtCopy = fmt;
-        connect(a, &QAction::triggered, this, [this, imagePaths, fmtCopy]() {
-            auto* group = new TaskGroup(
-                tr("Convert %1 file(s) to %2")
-                    .arg(imagePaths.size())
-                    .arg(QString::fromLatin1(fmtCopy).toUpper()));
-            for (const QString& src : imagePaths) {
-                const QFileInfo info(src);
-                const QString dst = QDir(info.absolutePath()).filePath(
-                    info.completeBaseName() + "." + QString::fromLatin1(fmtCopy));
-                group->addTask(new ConvertFormatTask(src, dst, fmtCopy, 92, group));
-            }
-            _pixee->taskManager()->enqueueGroup(group);
-        });
-    }
-
-    menu.addSeparator();
-    QAction* deleteAct = menu.addAction(tr("Delete"));
-
-    QSettings settings;
-    auto pickFolder = [&](const QString& settingsKey, const QString& title) -> QString {
-        const QString last = settings.value(settingsKey).toString();
-        const QString picked = QFileDialog::getExistingDirectory(
-            this, title, last,
-            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-        if (!picked.isEmpty()) settings.setValue(settingsKey, picked);
-        return picked;
-    };
-
-    connect(copyAct, &QAction::triggered, this, [this, imagePaths, &pickFolder]() {
-        const QString dest = pickFolder("fileListLastCopyToPath", tr("Copy to..."));
-        if (dest.isEmpty()) return;
-        auto* group = new TaskGroup(
-            tr("Copy %1 file(s) to %2").arg(imagePaths.size()).arg(QDir(dest).dirName()));
-        for (const QString& src : imagePaths) {
-            const QString dst = QDir(dest).filePath(QFileInfo(src).fileName());
-            group->addTask(new CopyFileTask(src, dst, group));
-        }
-        _pixee->taskManager()->enqueueGroup(group);
-    });
-
-    connect(moveAct, &QAction::triggered, this, [this, imagePaths, &pickFolder]() {
-        const QString dest = pickFolder("fileListLastMoveToPath", tr("Move to..."));
-        if (dest.isEmpty()) return;
-        auto* group = new TaskGroup(
-            tr("Move %1 file(s) to %2").arg(imagePaths.size()).arg(QDir(dest).dirName()));
-        for (const QString& src : imagePaths) {
-            const QString dst = QDir(dest).filePath(QFileInfo(src).fileName());
-            group->addTask(new MoveFileTask(src, dst, group));
-        }
-        _pixee->taskManager()->enqueueGroup(group);
-    });
-
-    connect(deleteAct, &QAction::triggered, this, [this, imagePaths]() {
-        const QString question = imagePaths.size() == 1
-            ? tr("Delete \"%1\"?").arg(QFileInfo(imagePaths.first()).fileName())
-            : tr("Delete %1 selected files?").arg(imagePaths.size());
-        if (QMessageBox::question(this, tr("Delete"), question,
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
-            return;
-        }
-        auto* group = new TaskGroup(tr("Delete %1 file(s)").arg(imagePaths.size()));
-        for (const QString& p : imagePaths) {
-            group->addTask(new DeleteFileTask(p, group));
-        }
-        _pixee->taskManager()->enqueueGroup(group);
-    });
-
+    builder.populate(&menu);
     menu.exec(_fileListView->viewport()->mapToGlobal(pos));
 }
