@@ -45,6 +45,11 @@ void CopyFileTask::run() {
         return;
     }
 
+    // Ensure the destination's parent directory exists. mkpath is
+    // idempotent — cheap when the dir already exists, and lets recursive
+    // folder copy work without a separate up-front folder-creation pass.
+    QDir().mkpath(QFileInfo(_dst).absolutePath());
+
     if (QFile::exists(_dst)) {
         QVariantMap ctx;
         ctx.insert("src", _src);

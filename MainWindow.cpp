@@ -804,18 +804,13 @@ MainWindow::FileListSelection MainWindow::collectFileListSelection() const {
         const bool isDotDot = (t == FileType::Folder
                                && item->fileInfo().fileName() == "..");
         if (isDotDot) continue;
-        if (t == FileType::Folder) {
-            // A real folder in the selection means the user is mixing in
-            // something Scale / Convert can't handle. (Recursive folder
-            // ops come in step 2.) Don't add it to paths either — it's
-            // skipped from Copy / Move / Delete in v1.
-            result.imageOpsAllowed = false;
-            continue;
-        }
-        if (t == FileType::File) {
+        if (t == FileType::Folder || t == FileType::File) {
+            // Either disables image ops (Scale / Convert have nothing to
+            // do with folders or arbitrary files). Folders flow through
+            // Copy / Move / Delete via recursive expansion in the builder.
             result.imageOpsAllowed = false;
         }
-        if (t == FileType::Image || t == FileType::File) {
+        if (t == FileType::Folder || t == FileType::Image || t == FileType::File) {
             result.paths.append(item->fileInfo().filePath());
         }
     }

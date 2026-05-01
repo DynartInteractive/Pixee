@@ -92,6 +92,10 @@ bool MoveFileTask::copyAndDelete() {
 }
 
 void MoveFileTask::run() {
+    // Ensure the destination's parent directory exists so recursive
+    // folder moves don't trip on a missing nested target. Idempotent.
+    QDir().mkpath(QFileInfo(_dst).absolutePath());
+
     if (QFile::exists(_dst)) {
         QVariantMap ctx;
         ctx.insert("src", _src);

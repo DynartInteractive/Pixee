@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDir>
+#include <QDirIterator>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMenu>
@@ -16,10 +17,12 @@
 #include "ConvertFormatTask.h"
 #include "CopyFileTask.h"
 #include "DeleteFileTask.h"
+#include "FolderCleanupTask.h"
 #include "MoveFileTask.h"
 #include "ScaleImageTask.h"
 #include "TaskGroup.h"
 #include "TaskManager.h"
+#include "Toast.h"
 
 namespace {
 constexpr const char* kLastCopyKey = "lastCopyToPath";
@@ -27,6 +30,62 @@ constexpr const char* kLastMoveKey = "lastMoveToPath";
 
 const int kScalePresets[] = { 1024, 1920, 2560, 4096 };
 const QList<QByteArray> kConvertFormats = { "jpg", "png", "webp" };
+
+// True if `path` is a filesystem root (a drive root on Windows, '/' on
+// posix). We refuse to recursively copy / move / delete drive roots —
+// the user almost certainly didn't intend to operate on the entire
+// drive, and the cost of a mistake is too high.
+bool isDriveRoot(const QString& path) {
+    return QFileInfo(path).isRoot();
+}
+
+// A (source file, destination file) pair. Recursive expansion produces
+// many of these from a single folder source.
+struct Pair {
+    QString src;
+    QString dst;
+};
+
+// Expand `src` (a file or folder) into a list of file-level (src, dst)
+// pairs under `destBase`. For folders, replicates the directory tree at
+// `destBase / <folderName> / ...`, mkpath'ing empty subdirectories so
+// they survive the operation. Symlinks are skipped.
+QList<Pair> expandToFiles(const QString& src, const QString& destBase) {
+    QList<Pair> out;
+    const QFileInfo info(src);
+    if (!info.exists()) return out;
+
+    if (info.isFile()) {
+        out.append({ src, QDir(destBase).filePath(info.fileName()) });
+        return out;
+    }
+    if (!info.isDir()) return out;
+
+    const QString folderName = info.fileName();
+    const QString folderDest = QDir(destBase).filePath(folderName);
+    QDir().mkpath(folderDest);
+
+    // Replicate the directory structure first so empty subfolders are
+    // preserved at the destination.
+    QDirIterator dirIt(src,
+        QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot | QDir::NoSymLinks,
+        QDirIterator::Subdirectories);
+    while (dirIt.hasNext()) {
+        const QString d = dirIt.next();
+        const QString rel = QDir(src).relativeFilePath(d);
+        QDir().mkpath(QDir(folderDest).filePath(rel));
+    }
+
+    QDirIterator fileIt(src,
+        QDir::Files | QDir::Hidden | QDir::NoSymLinks,
+        QDirIterator::Subdirectories);
+    while (fileIt.hasNext()) {
+        const QString f = fileIt.next();
+        const QString rel = QDir(src).relativeFilePath(f);
+        out.append({ f, QDir(folderDest).filePath(rel) });
+    }
+    return out;
+}
 }
 
 FileOpsMenuBuilder::FileOpsMenuBuilder(QStringList sourcePaths,
@@ -150,26 +209,68 @@ void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
 }
 
 void FileOpsMenuBuilder::doCopy(const QString& destFolder) {
+    QList<Pair> pairs;
+    bool sawFolder = false;
+    QStringList rejectedRoots;
+    for (const QString& src : _paths) {
+        if (isDriveRoot(src)) { rejectedRoots.append(src); continue; }
+        if (QFileInfo(src).isDir()) sawFolder = true;
+        pairs.append(expandToFiles(src, destFolder));
+    }
+    if (!rejectedRoots.isEmpty()) {
+        Toast::show(_dialogParent,
+            tr("Refusing to copy a drive root: %1").arg(rejectedRoots.join(", ")),
+            Toast::Error);
+    }
+    if (pairs.isEmpty()) return;
+
     auto* group = new TaskGroup(summary(
         tr("Copy %1 to \"%2\""),
         tr("Copy %1 file(s) to \"%2\""),
         QDir(destFolder).dirName()));
-    for (const QString& src : _paths) {
-        const QString dst = QDir(destFolder).filePath(QFileInfo(src).fileName());
-        group->addTask(new CopyFileTask(src, dst, group));
+    for (const Pair& p : pairs) {
+        group->addTask(new CopyFileTask(p.src, p.dst, group));
+    }
+    if (sawFolder) {
+        // Refresh the user-visible destination once the batch finishes —
+        // the per-file tasks only report deeply-nested dest dirs, so the
+        // top-level dest wouldn't refresh on its own.
+        group->addTask(new FolderCleanupTask(QString(), { destFolder }, group));
     }
     _taskManager->enqueueGroup(group);
 }
 
 void FileOpsMenuBuilder::doMove(const QString& destFolder) {
+    QList<Pair> pairs;
+    QStringList folderRoots;
+    QStringList rejectedRoots;
+    for (const QString& src : _paths) {
+        if (isDriveRoot(src)) { rejectedRoots.append(src); continue; }
+        if (QFileInfo(src).isDir()) folderRoots.append(src);
+        pairs.append(expandToFiles(src, destFolder));
+    }
+    if (!rejectedRoots.isEmpty()) {
+        Toast::show(_dialogParent,
+            tr("Refusing to move a drive root: %1").arg(rejectedRoots.join(", ")),
+            Toast::Error);
+    }
+    if (pairs.isEmpty()) return;
+
     if (_advance) _advance();
     auto* group = new TaskGroup(summary(
         tr("Move %1 to \"%2\""),
         tr("Move %1 file(s) to \"%2\""),
         QDir(destFolder).dirName()));
-    for (const QString& src : _paths) {
-        const QString dst = QDir(destFolder).filePath(QFileInfo(src).fileName());
-        group->addTask(new MoveFileTask(src, dst, group));
+    for (const Pair& p : pairs) {
+        group->addTask(new MoveFileTask(p.src, p.dst, group));
+    }
+    // For each source folder, append a cleanup task that bottom-up
+    // rmdirs empties (files the user chose 'Skip' on stay behind, since
+    // their parent dir won't be empty). Plus refresh the destination
+    // root once the batch finishes — it won't auto-refresh from the
+    // deeply-nested per-file tasks alone.
+    for (const QString& root : folderRoots) {
+        group->addTask(new FolderCleanupTask(root, { destFolder }, group));
     }
     _taskManager->enqueueGroup(group);
 }
@@ -204,19 +305,53 @@ void FileOpsMenuBuilder::doConvert(const QByteArray& format) {
 }
 
 void FileOpsMenuBuilder::doDelete() {
-    const QString question = _paths.size() == 1
-        ? tr("Delete \"%1\"?").arg(QFileInfo(_paths.first()).fileName())
-        : tr("Delete %1 selected files?").arg(_paths.size());
+    QStringList rejectedRoots;
+    for (const QString& src : _paths) {
+        if (isDriveRoot(src)) rejectedRoots.append(src);
+    }
+    if (!rejectedRoots.isEmpty()) {
+        Toast::show(_dialogParent,
+            tr("Refusing to delete a drive root: %1").arg(rejectedRoots.join(", ")),
+            Toast::Error);
+    }
+
+    QStringList paths;
+    QStringList folderRoots;
+    for (const QString& src : _paths) {
+        if (isDriveRoot(src)) continue;
+        if (QFileInfo(src).isDir()) folderRoots.append(src);
+        paths.append(src);
+    }
+    if (paths.isEmpty()) return;
+
+    const QString question = paths.size() == 1
+        ? tr("Delete \"%1\"?").arg(QFileInfo(paths.first()).fileName())
+        : tr("Delete %1 selected items?").arg(paths.size());
     if (QMessageBox::question(_dialogParent, tr("Delete"), question,
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
         return;
     }
     if (_advance) _advance();
-    auto* group = new TaskGroup(_paths.size() == 1
-        ? tr("Delete \"%1\"").arg(QFileInfo(_paths.first()).fileName())
-        : tr("Delete %1 file(s)").arg(_paths.size()));
-    for (const QString& p : _paths) {
-        group->addTask(new DeleteFileTask(p, group));
+    auto* group = new TaskGroup(paths.size() == 1
+        ? tr("Delete \"%1\"").arg(QFileInfo(paths.first()).fileName())
+        : tr("Delete %1 item(s)").arg(paths.size()));
+    // Expand folders into per-file delete tasks. For a plain file source,
+    // expandToFiles returns a single (src, src) pair — we just need the
+    // src side.
+    for (const QString& src : paths) {
+        if (QFileInfo(src).isFile()) {
+            group->addTask(new DeleteFileTask(src, group));
+        } else {
+            QDirIterator it(src,
+                QDir::Files | QDir::Hidden | QDir::NoSymLinks,
+                QDirIterator::Subdirectories);
+            while (it.hasNext()) {
+                group->addTask(new DeleteFileTask(it.next(), group));
+            }
+        }
+    }
+    for (const QString& root : folderRoots) {
+        group->addTask(new FolderCleanupTask(root, {}, group));
     }
     _taskManager->enqueueGroup(group);
 }

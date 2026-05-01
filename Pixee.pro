@@ -19,6 +19,7 @@ SOURCES += \
     FileListViewDelegate.cpp \
     FileModel.cpp \
     FileOpsMenuBuilder.cpp \
+    FolderCleanupTask.cpp \
     FolderEnumerator.cpp \
     FolderTreeView.cpp \
     ImageLoader.cpp \
@@ -54,6 +55,7 @@ HEADERS += \
     FileModel.h \
     FileOpsMenuBuilder.h \
     FileType.h \
+    FolderCleanupTask.h \
     FolderEnumerator.h \
     FolderTreeView.h \
     ImageLoader.h \
