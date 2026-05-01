@@ -367,6 +367,15 @@ void MainWindow::onTouchedDirsRefreshDue() {
     _touchedDirs.clear();
 }
 
+void MainWindow::updateViewerStatusBar(const QSize& size) {
+    if (!size.isValid()) {
+        statusBar()->clearMessage();
+        return;
+    }
+    statusBar()->showMessage(tr("Width: %1 | Height: %2")
+        .arg(size.width()).arg(size.height()));
+}
+
 void MainWindow::updateStatusBar(FileItem* folder) {
     if (!folder || folder == _fileModel->rootItem()) {
         statusBar()->clearMessage();
@@ -549,6 +558,7 @@ void MainWindow::showViewerImageAt(int index) {
     if (cachedIt != _viewerImageCache.constEnd()) {
         _viewerWidget->setImage(cachedIt.value());
         touchViewerCache(path);
+        updateViewerStatusBar(cachedIt.value().size());
     } else {
         // Show whatever placeholder we have so the user sees something
         // immediately. Thumbnail first; otherwise the dark canvas.
@@ -558,6 +568,9 @@ void MainWindow::showViewerImageAt(int index) {
         } else {
             _viewerWidget->clear();
         }
+        // Don't set dimensions yet — the placeholder is a thumbnail, not the
+        // real image. onImageLoaded fills it in once the full-res arrives.
+        updateViewerStatusBar(QSize());
         emit requestImageLoad(path, taskVersion);
     }
 
@@ -600,6 +613,7 @@ void MainWindow::onImageLoaded(QString path, QImage image) {
     if (_viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size()
             && path == _viewerImagePaths.at(_viewerIndex)) {
         _viewerWidget->updateImage(image);
+        updateViewerStatusBar(image.size());
     }
 }
 
@@ -831,6 +845,8 @@ void MainWindow::dismissViewer() {
     _viewerCacheOrder.clear();
     if (_dockWasVisible) _dockWidget->show();
     setWindowTitle("Pixee");
+    // Restore the folder counts now that we're back in browse mode.
+    updateStatusBar(currentFolder());
     _fileListView->setFocus();
 }
 

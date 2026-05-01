@@ -64,6 +64,10 @@ private:
     void expandFolderTreeTo(FileItem* item);
     void createMenus();
     void updateStatusBar(FileItem* folder);
+    // Shows "Width: w | Height: h" in the status bar while the viewer is
+    // active. Pass an invalid QSize() to clear (e.g. while the full-res
+    // image is still loading and we have nothing accurate to report).
+    void updateViewerStatusBar(const QSize& size);
     void activateImage(FileItem* item);
     void buildViewerImageList(const QString& currentPath);
     void showViewerImageAt(int index);
