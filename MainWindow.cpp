@@ -696,6 +696,7 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
             return;
         }
+        advanceViewerAfterRemoval();
         auto* group = new TaskGroup(tr("Delete %1").arg(QFileInfo(src).fileName()));
         group->addTask(new DeleteFileTask(src, group));
         _pixee->taskManager()->enqueueGroup(group);
@@ -748,12 +749,39 @@ void MainWindow::moveCurrentImageTo(const QString& destFolder) {
     const QFileInfo srcInfo(src);
     const QString dst = QDir(destFolder).filePath(srcInfo.fileName());
 
+    // Advance first so the viewer is already on the next image while the
+    // move runs in the background. If this was the only image, the viewer
+    // dismisses itself and the task still runs.
+    advanceViewerAfterRemoval();
+
     auto* group = new TaskGroup(tr("Move to %1").arg(QDir(destFolder).dirName()));
     group->addTask(new MoveFileTask(src, dst, group));
     _pixee->taskManager()->enqueueGroup(group);
 
     QSettings settings;
     settings.setValue("viewerLastMoveToPath", destFolder);
+}
+
+void MainWindow::advanceViewerAfterRemoval() {
+    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+
+    const int removedIdx = _viewerIndex;
+    const QString removedPath = _viewerImagePaths.at(removedIdx);
+    _viewerImagePaths.removeAt(removedIdx);
+
+    // Drop the cached image and its LRU entry — the file is gone (or about
+    // to be), no point keeping it around.
+    _viewerImageCache.remove(removedPath);
+    _viewerCacheOrder.removeAll(removedPath);
+
+    if (_viewerImagePaths.isEmpty()) {
+        dismissViewer();
+        return;
+    }
+    // Show what's now at the same index; if we were on the tail, the new
+    // tail is one shorter so clamp.
+    const int newIdx = qMin(removedIdx, _viewerImagePaths.size() - 1);
+    showViewerImageAt(newIdx);
 }
 
 void MainWindow::viewerPrev() {

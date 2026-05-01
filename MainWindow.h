@@ -71,6 +71,12 @@ private:
     void exitFullscreen();
     void copyCurrentImageTo(const QString& destFolder);
     void moveCurrentImageTo(const QString& destFolder);
+    // Drop the currently-viewed image from the viewer's local path list
+    // and either advance to the next (preferred), fall back to the previous
+    // when we were on the tail, or dismiss the viewer if it was the only
+    // image. Called *before* the move / delete task is enqueued so the
+    // user is already looking at the next image while the task runs.
+    void advanceViewerAfterRemoval();
     void preloadViewerNeighbors(int currentIndex, int taskVersion);
     void touchViewerCache(const QString& path);
     QString displayPath(const QString& storedPath) const;
