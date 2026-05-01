@@ -55,6 +55,8 @@ private slots:
     void showFileListContextMenu(const QPoint& pos);
     void copyFileListSelectionToClipboard();
     void copyViewedImageToClipboard();
+    void pasteIntoCurrentFolder();
+    void pasteIntoViewerImageFolder();
 
 signals:
     void requestImageLoad(QString path, int taskVersion);

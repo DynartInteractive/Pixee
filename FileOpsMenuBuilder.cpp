@@ -39,6 +39,32 @@ bool isDriveRoot(const QString& path) {
     return QFileInfo(path).isRoot();
 }
 
+// Windows clipboard: 'Preferred DropEffect' is a 4-byte little-endian
+// DWORD. 2 = DROPEFFECT_MOVE (Cut); 5 = DROPEFFECT_COPY. Qt surfaces it
+// as a custom mime format. Other platforms have analogues (gnome-copied-
+// files on Linux); we only handle the Windows one for now.
+constexpr const char* kDropEffectMime = "application/x-qt-windows-mime;value=\"Preferred DropEffect\"";
+
+bool clipboardSaysCut(const QMimeData* mime) {
+    if (!mime || !mime->hasFormat(kDropEffectMime)) return false;
+    const QByteArray data = mime->data(kDropEffectMime);
+    if (data.size() < 4) return false;
+    const quint32 effect = static_cast<quint8>(data.at(0))
+                         | (static_cast<quint8>(data.at(1)) << 8)
+                         | (static_cast<quint8>(data.at(2)) << 16)
+                         | (static_cast<quint8>(data.at(3)) << 24);
+    return effect == 2;
+}
+
+QByteArray dropEffectBytes(quint32 effect) {
+    QByteArray b(4, '\0');
+    b[0] = static_cast<char>(effect & 0xFF);
+    b[1] = static_cast<char>((effect >> 8) & 0xFF);
+    b[2] = static_cast<char>((effect >> 16) & 0xFF);
+    b[3] = static_cast<char>((effect >> 24) & 0xFF);
+    return b;
+}
+
 // A (source file, destination file) pair. Recursive expansion produces
 // many of these from a single folder source.
 struct Pair {
@@ -117,9 +143,23 @@ QString FileOpsMenuBuilder::pickFolder(const QString& settingsKey, const QString
 }
 
 void FileOpsMenuBuilder::populate(QMenu* menu) {
-    if (!menu || _paths.isEmpty() || !_taskManager) return;
+    if (!menu || !_taskManager) return;
+    if (_paths.isEmpty() && _pasteDestination.isEmpty()) return;
 
     QSettings settings;
+
+    // ---- Paste (clipboard → current folder) ----
+    if (!_pasteDestination.isEmpty()) {
+        const QMimeData* clip = QApplication::clipboard()->mimeData();
+        QAction* pasteAct = menu->addAction(
+            clipboardSaysCut(clip) ? tr("Paste (Move)") : tr("Paste"));
+        pasteAct->setShortcut(QKeySequence::Paste);
+        pasteAct->setEnabled(clip && clip->hasUrls());
+        connect(pasteAct, &QAction::triggered, this, [this]() { doPaste(); });
+        if (!_paths.isEmpty()) menu->addSeparator();
+    }
+
+    if (_paths.isEmpty()) return;
 
     // ---- Copy to system clipboard ----
     // Pasting in Explorer creates a copy of the file at the destination
@@ -189,6 +229,82 @@ void FileOpsMenuBuilder::doCopyToClipboard() {
     copyPathsToClipboard(_paths);
 }
 
+void FileOpsMenuBuilder::doPaste() {
+    pasteFromClipboardToFolder(_pasteDestination, _taskManager, _dialogParent);
+}
+
+void FileOpsMenuBuilder::pasteFromClipboardToFolder(const QString& destFolder,
+                                                    TaskManager* taskManager,
+                                                    QWidget* dialogParent) {
+    if (destFolder.isEmpty() || !taskManager) return;
+    const QMimeData* clip = QApplication::clipboard()->mimeData();
+    if (!clip || !clip->hasUrls()) return;
+
+    const bool isCut = clipboardSaysCut(clip);
+
+    QStringList sourcePaths;
+    for (const QUrl& url : clip->urls()) {
+        if (!url.isLocalFile()) continue;  // skip http/data/etc. URLs
+        sourcePaths.append(url.toLocalFile());
+    }
+    if (sourcePaths.isEmpty()) return;
+
+    // Reject drive roots up-front — same protection as direct Copy / Move.
+    QStringList rejectedRoots;
+    QStringList accepted;
+    for (const QString& s : sourcePaths) {
+        if (isDriveRoot(s)) rejectedRoots.append(s);
+        else                accepted.append(s);
+    }
+    if (!rejectedRoots.isEmpty()) {
+        Toast::show(dialogParent,
+            QObject::tr("Refusing to paste a drive root: %1").arg(rejectedRoots.join(", ")),
+            Toast::Error);
+    }
+    if (accepted.isEmpty()) return;
+
+    // Pasting onto / into the same source folder is fine for Copy
+    // (per-file conflict prompt handles it) but a Cut/Move into one of
+    // its own ancestors would loop. We don't currently detect that —
+    // tasks would simply fail at runtime. Worth flagging as a known
+    // edge case if it bites in practice.
+
+    QList<Pair> pairs;
+    QStringList folderRoots;
+    for (const QString& src : accepted) {
+        if (QFileInfo(src).isDir()) folderRoots.append(src);
+        pairs.append(expandToFiles(src, destFolder));
+    }
+    if (pairs.isEmpty() && folderRoots.isEmpty()) return;
+
+    auto* group = new TaskGroup(isCut
+        ? QObject::tr("Move %1 file(s) to \"%2\"")
+              .arg(pairs.size()).arg(QDir(destFolder).dirName())
+        : QObject::tr("Paste %1 file(s) to \"%2\"")
+              .arg(pairs.size()).arg(QDir(destFolder).dirName()));
+
+    for (const Pair& p : pairs) {
+        if (isCut) group->addTask(new MoveFileTask(p.src, p.dst, group));
+        else       group->addTask(new CopyFileTask(p.src, p.dst, group));
+    }
+    if (isCut) {
+        for (const QString& root : folderRoots) {
+            group->addTask(new FolderCleanupTask(root, { destFolder }, group));
+        }
+    } else if (!folderRoots.isEmpty()) {
+        group->addTask(new FolderCleanupTask(QString(), { destFolder }, group));
+    }
+
+    taskManager->enqueueGroup(group);
+
+    // After a Cut+Paste, the clipboard's source paths are stale. Mirror
+    // Explorer behaviour and clear it so a second paste doesn't try to
+    // move-from-already-gone.
+    if (isCut) {
+        QApplication::clipboard()->clear();
+    }
+}
+
 void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
     if (paths.isEmpty()) return;
     QList<QUrl> urls;
@@ -205,6 +321,10 @@ void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
     // (Sublime, VS Code, etc.) end up with nothing. Set the path(s) as
     // newline-separated native paths so Ctrl-V in those apps gives the path.
     mime->setText(textPaths.join('\n'));
+    // Tag as DROPEFFECT_COPY explicitly so other apps that key off this
+    // (Explorer, etc.) treat the payload unambiguously — symmetrical with
+    // how we read the same flag in pasteFromClipboardToFolder for Cut.
+    mime->setData(kDropEffectMime, dropEffectBytes(5));
     QApplication::clipboard()->setMimeData(mime);
 }
 

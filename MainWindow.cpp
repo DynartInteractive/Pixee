@@ -116,6 +116,17 @@ void MainWindow::create() {
     QObject::connect(viewerCopyShortcut, &QShortcut::activated,
                      this, &MainWindow::copyViewedImageToClipboard);
 
+    // Ctrl+V — paste clipboard contents into the relevant folder.
+    auto* listPasteShortcut = new QShortcut(QKeySequence::Paste, _fileListView);
+    listPasteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listPasteShortcut, &QShortcut::activated,
+                     this, &MainWindow::pasteIntoCurrentFolder);
+
+    auto* viewerPasteShortcut = new QShortcut(QKeySequence::Paste, _viewerWidget);
+    viewerPasteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerPasteShortcut, &QShortcut::activated,
+                     this, &MainWindow::pasteIntoViewerImageFolder);
+
     // Async image loader for the viewer. The atomic abort version is
     // bumped whenever we ask for a different image, so the previous
     // in-flight load aborts at the next chunk boundary instead of
@@ -673,6 +684,7 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
 
     FileOpsMenuBuilder builder({src}, _pixee->taskManager(), this);
     builder.setAdvanceCallback([this]() { advanceViewerAfterRemoval(); });
+    builder.setPasteDestination(QFileInfo(src).absolutePath());
 
     QMenu menu(this);
     builder.populate(&menu);
@@ -819,15 +831,23 @@ MainWindow::FileListSelection MainWindow::collectFileListSelection() const {
 
 void MainWindow::showFileListContextMenu(const QPoint& pos) {
     const FileListSelection selection = collectFileListSelection();
-    if (selection.paths.isEmpty()) return;
 
     FileOpsMenuBuilder builder(selection.paths, _pixee->taskManager(), this);
     builder.setImageOpsEnabled(selection.imageOpsAllowed);
+    // The drive list (synthetic root) isn't a real folder and shouldn't
+    // accept a paste. currentFolder() returns the drive list as the
+    // model's rootItem, which we filter out here.
+    if (FileItem* folder = currentFolder()) {
+        if (folder != _fileModel->rootItem()) {
+            builder.setPasteDestination(folder->fileInfo().filePath());
+        }
+    }
     // No advance callback — the file list's selection clears naturally on
     // the post-task folder refresh.
 
     QMenu menu(this);
     builder.populate(&menu);
+    if (menu.isEmpty()) return;
     menu.exec(_fileListView->viewport()->mapToGlobal(pos));
 }
 
@@ -838,4 +858,18 @@ void MainWindow::copyFileListSelectionToClipboard() {
 void MainWindow::copyViewedImageToClipboard() {
     if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
     FileOpsMenuBuilder::copyPathsToClipboard({_viewerImagePaths.at(_viewerIndex)});
+}
+
+void MainWindow::pasteIntoCurrentFolder() {
+    FileItem* folder = currentFolder();
+    if (!folder || folder == _fileModel->rootItem()) return;
+    FileOpsMenuBuilder::pasteFromClipboardToFolder(
+        folder->fileInfo().filePath(), _pixee->taskManager(), this);
+}
+
+void MainWindow::pasteIntoViewerImageFolder() {
+    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+    const QString dest = QFileInfo(_viewerImagePaths.at(_viewerIndex)).absolutePath();
+    FileOpsMenuBuilder::pasteFromClipboardToFolder(
+        dest, _pixee->taskManager(), this);
 }

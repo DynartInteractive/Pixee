@@ -40,6 +40,11 @@ public:
     // something Scale and Convert can't sensibly operate on (a folder,
     // a non-image file, ...). Default true.
     void setImageOpsEnabled(bool enabled) { _imageOpsEnabled = enabled; }
+    // If non-empty, populate() prepends a 'Paste' action that targets
+    // this directory (caller's responsibility to make sure it's a real
+    // folder the user can write to). Action is disabled when there's
+    // nothing pasteable on the clipboard.
+    void setPasteDestination(const QString& dir) { _pasteDestination = dir; }
 
     // Appends the Copy / Move / Scale / Convert / Delete actions onto
     // `menu`. Caller still owns the menu and is responsible for exec().
@@ -51,8 +56,19 @@ public:
     // (CF_HDROP via setUrls + plain-text path list via setText).
     static void copyPathsToClipboard(const QStringList& paths);
 
+    // Static helper so Ctrl+V handlers can paste without going through
+    // the menu builder. Reads the system clipboard, detects Cut vs Copy
+    // semantics (Windows 'Preferred DropEffect'), expands folder URLs
+    // recursively, and enqueues one TaskGroup of CopyFileTask /
+    // MoveFileTask. Drive-root URLs are refused with a Toast::Error.
+    // No-op if the clipboard has no usable URLs.
+    static void pasteFromClipboardToFolder(const QString& destFolder,
+                                           TaskManager* taskManager,
+                                           QWidget* dialogParent);
+
 private:
     void doCopyToClipboard();
+    void doPaste();
     void doCopy(const QString& destFolder);
     void doMove(const QString& destFolder);
     void doScale(int longestEdge);
@@ -71,6 +87,7 @@ private:
     QWidget* _dialogParent;
     AdvanceFn _advance;
     bool _imageOpsEnabled = true;
+    QString _pasteDestination;
 };
 
 #endif // FILEOPSMENUBUILDER_H
