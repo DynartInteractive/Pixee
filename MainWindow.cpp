@@ -151,7 +151,7 @@ void MainWindow::create() {
     addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
 
     _taskDockWidget = new TaskDockWidget(_pixee->taskManager());
-    addDockWidget(Qt::RightDockWidgetArea, _taskDockWidget);
+    addDockWidget(Qt::BottomDockWidgetArea, _taskDockWidget);
 
     // Folder auto-refresh after task completion. The timer is single-shot
     // and gets restarted on each pathTouched, so a burst of completions
@@ -183,10 +183,19 @@ void MainWindow::create() {
             && !_dockWidget->isFloating()) {
         addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
     }
-    // Same for the tasks dock — re-anchor on the right.
+    // One-time migration: the tasks dock used to default to the right area
+    // in early builds. The new default is bottom; apply once for users
+    // whose saved state predates this. After the flag is set, the user
+    // owns the position.
+    if (!settings.value("tasksDockBottomMigrated", false).toBool()) {
+        addDockWidget(Qt::BottomDockWidgetArea, _taskDockWidget);
+        settings.setValue("tasksDockBottomMigrated", true);
+    }
+
+    // Same NoDockWidgetArea fallback as the folders dock.
     if (dockWidgetArea(_taskDockWidget) == Qt::NoDockWidgetArea
             && !_taskDockWidget->isFloating()) {
-        addDockWidget(Qt::RightDockWidgetArea, _taskDockWidget);
+        addDockWidget(Qt::BottomDockWidgetArea, _taskDockWidget);
     }
 
     // Path edit drives navigation on Enter.

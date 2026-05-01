@@ -68,6 +68,68 @@ QDockWidget::close-button:pressed, QDockWidget::float-button:pressed {
     padding: 1px -1px -1px 1px;
 }
 
+/* ---- Task dock ---- */
+
+#tasksDockContainer {
+	background-color: #333;
+}
+#taskGroupWidget {
+	background-color: #3a3a3a;
+	border: 1px solid #2a2a2a;
+	border-radius: 3px;
+	margin: 0px;
+}
+#taskGroupHeader {
+	background-color: #444;
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	border-bottom: 1px solid #2a2a2a;
+}
+#taskGroupName {
+	color: #fff;
+	font-weight: bold;
+}
+#taskGroupBody {
+	background-color: #3a3a3a;
+}
+#taskGroupBody QToolButton {
+	color: #ccc;
+}
+#taskGroupHeader QToolButton {
+	color: #ccc;
+}
+#taskItemWidget {
+	background-color: transparent;
+}
+#taskItemWidget:hover {
+	background-color: #404040;
+}
+#taskItemName {
+	color: #ccc;
+}
+QProgressBar#taskItemProgress, QProgressBar#taskGroupAggregate {
+	background-color: #2a2a2a;
+	border: 1px solid #1f1f1f;
+	border-radius: 2px;
+}
+QProgressBar#taskItemProgress::chunk, QProgressBar#taskGroupAggregate::chunk {
+	background-color: #2b4580;
+	border-radius: 2px;
+}
+QPushButton#taskQuestionButton {
+	color: #ccc;
+	background-color: #444;
+	border: 1px solid #2a2a2a;
+	padding: 2px 6px;
+}
+QPushButton#taskQuestionButton:hover {
+	background-color: #2b4580;
+	color: #fff;
+}
+QPushButton#taskQuestionButton:pressed {
+	background-color: #1f3460;
+}
+
 QScrollBar:vertical {
 	background-color: #333;
 	min-height: 16px;
