@@ -41,6 +41,11 @@ public:
     // No-op if there are no source paths.
     void populate(QMenu* menu);
 
+    // Static helper so window-wide Ctrl+C handlers can put paths on the
+    // clipboard with the same payload format the context menu uses
+    // (CF_HDROP via setUrls + plain-text path list via setText).
+    static void copyPathsToClipboard(const QStringList& paths);
+
 private:
     void doCopyToClipboard();
     void doCopy(const QString& destFolder);

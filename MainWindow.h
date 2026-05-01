@@ -53,6 +53,8 @@ private slots:
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
     void showFileListContextMenu(const QPoint& pos);
+    void copyFileListSelectionToClipboard();
+    void copyViewedImageToClipboard();
 
 signals:
     void requestImageLoad(QString path, int taskVersion);
@@ -77,6 +79,11 @@ private:
     // image. Called *before* the move / delete task is enqueued so the
     // user is already looking at the next image while the task runs.
     void advanceViewerAfterRemoval();
+    // Collect the file paths the user has selected in the central list,
+    // filtered to types we can act on (Image + File; Folders are skipped
+    // until the recursive-ops pass). Used by both the right-click menu
+    // and the Ctrl+C shortcut.
+    QStringList collectFileListSelectionPaths() const;
     void preloadViewerNeighbors(int currentIndex, int taskVersion);
     void touchViewerCache(const QString& path);
     QString displayPath(const QString& storedPath) const;

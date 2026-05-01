@@ -102,6 +102,20 @@ void MainWindow::create() {
     QObject::connect(upShortcut, &QShortcut::activated,
                      this, &MainWindow::navigateUp);
 
+    // Ctrl+C — copy paths to the system clipboard. Two shortcuts, one
+    // per widget context, both Qt::WidgetShortcut so the path edit
+    // (which has its own native Ctrl+C for text) isn't intercepted when
+    // the user is typing.
+    auto* listCopyShortcut = new QShortcut(QKeySequence::Copy, _fileListView);
+    listCopyShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listCopyShortcut, &QShortcut::activated,
+                     this, &MainWindow::copyFileListSelectionToClipboard);
+
+    auto* viewerCopyShortcut = new QShortcut(QKeySequence::Copy, _viewerWidget);
+    viewerCopyShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerCopyShortcut, &QShortcut::activated,
+                     this, &MainWindow::copyViewedImageToClipboard);
+
     // Async image loader for the viewer. The atomic abort version is
     // bumped whenever we ask for a different image, so the previous
     // in-flight load aborts at the next chunk boundary instead of
@@ -775,15 +789,9 @@ void MainWindow::exit() {
 
 MainWindow::~MainWindow() {}
 
-void MainWindow::showFileListContextMenu(const QPoint& pos) {
-    if (!_fileListView->selectionModel()) return;
-
-    // Collect operable items from the current selection. Folders / ".."
-    // are still skipped (recursive ops come in step 2). Image *and* File
-    // types are routed through the same builder — Copy / Move / Delete /
-    // Clipboard work for any file; Scale and Convert just fail on non-
-    // images via QImageReader, surfacing as a failed task in the dock.
+QStringList MainWindow::collectFileListSelectionPaths() const {
     QStringList paths;
+    if (!_fileListView->selectionModel()) return paths;
     const QModelIndexList sel = _fileListView->selectionModel()->selectedIndexes();
     for (const QModelIndex& proxyIdx : sel) {
         const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
@@ -791,9 +799,19 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
         FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
         if (!item) continue;
         const FileType t = item->fileType();
+        // Folders / ".." are skipped — recursive ops are step 2. Image
+        // *and* File are both routed through the same path: Copy / Move /
+        // Delete / Clipboard work for any file; Scale and Convert just
+        // fail on non-images via QImageReader, surfacing as a failed task
+        // in the dock.
         if (t != FileType::Image && t != FileType::File) continue;
         paths.append(item->fileInfo().filePath());
     }
+    return paths;
+}
+
+void MainWindow::showFileListContextMenu(const QPoint& pos) {
+    const QStringList paths = collectFileListSelectionPaths();
     if (paths.isEmpty()) return;
 
     FileOpsMenuBuilder builder(paths, _pixee->taskManager(), this);
@@ -803,4 +821,13 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
     QMenu menu(this);
     builder.populate(&menu);
     menu.exec(_fileListView->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::copyFileListSelectionToClipboard() {
+    FileOpsMenuBuilder::copyPathsToClipboard(collectFileListSelectionPaths());
+}
+
+void MainWindow::copyViewedImageToClipboard() {
+    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+    FileOpsMenuBuilder::copyPathsToClipboard({_viewerImagePaths.at(_viewerIndex)});
 }

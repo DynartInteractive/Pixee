@@ -67,6 +67,10 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     // (CF_HDROP semantics on Windows); pasting in a text editor gives the
     // path(s) as text — Qt's setUrls populates both representations.
     QAction* clipCopy = menu->addAction(tr("Copy"));
+    clipCopy->setShortcut(QKeySequence::Copy);  // visual hint; the real
+    // window-wide handling lives on QShortcuts attached to the file list
+    // and the viewer in MainWindow — actions inside an exec'd context menu
+    // only have their shortcut active while the menu is open.
     connect(clipCopy, &QAction::triggered, this, [this]() { doCopyToClipboard(); });
 
     menu->addSeparator();
@@ -121,11 +125,16 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
 }
 
 void FileOpsMenuBuilder::doCopyToClipboard() {
+    copyPathsToClipboard(_paths);
+}
+
+void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
+    if (paths.isEmpty()) return;
     QList<QUrl> urls;
     QStringList textPaths;
-    urls.reserve(_paths.size());
-    textPaths.reserve(_paths.size());
-    for (const QString& p : _paths) {
+    urls.reserve(paths.size());
+    textPaths.reserve(paths.size());
+    for (const QString& p : paths) {
         urls.append(QUrl::fromLocalFile(p));
         textPaths.append(QDir::toNativeSeparators(p));
     }
