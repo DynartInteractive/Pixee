@@ -7,4 +7,5 @@ SUBDIRS = \
     CopyFileTask \
     MoveFileTask \
     DeleteFileTask \
-    FolderCleanupTask
+    FolderCleanupTask \
+    TaskGroup

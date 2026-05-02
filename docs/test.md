@@ -181,7 +181,21 @@ Three new binaries, ~90 ms combined. Trash branch deliberately untested; documen
 
 **Trash tests are explicitly out of scope.** Document at the top of `tst_DeleteFileTask.cpp` why: "Recycle Bin pollution. Trash path is exercised manually."
 
-## Phase 5 — TaskGroup + sticky answers + manager dispatch
+## Phase 5 — TaskGroup + sticky answers + manager dispatch ✅ shipped
+
+8 tests in one binary, ~1.3 s. Covers the cross-task plumbing — sticky answers, dispatch policy, shutdown.
+
+**Coverage**:
+- Sticky `Overwrite` with `applyToGroup=true` short-circuits the next two conflicting tasks (only one `taskQuestionPosed` fires for the whole group).
+- Sticky map does NOT cross groups: a fresh group with the same conflict shape asks again.
+- `stopGroup` aborts in-flight + queued tasks; all three end in `Aborted`.
+- Sequential per-group dispatch: pause first task; second remains `Queued` for the full event-loop spin even with a free worker.
+- Parallel across groups: two single-task groups, both reach `Paused` concurrently → proves both got dispatched onto separate workers.
+- `pathTouched` fires for `Completed` tasks (verified via `affectedDirs()` on a Copy → dest folder appears in the spy).
+- `shutdown()` is idempotent (explicit + dtor's call, no double-quit crash).
+- `shutdown()` mid-run returns within 3 s — the pause CV wakes via `stopAll` and the runner thread exits cleanly.
+
+**Implementation note**: timing-sensitive checks use *pause-then-verify-Paused* rather than polling for `Running`. `Running` is racy on small files (the chunked loop completes between 50 ms poll ticks); pause is durable because `_pauseRequested` is captured at the next `checkPauseStop` boundary regardless of progress speed.
 
 **`tst_TaskGroup.cpp`** — covers the bits that span multiple tasks:
 
@@ -196,7 +210,16 @@ Three new binaries, ~90 ms combined. Trash branch deliberately untested; documen
 - Shutdown mid-run: enqueue a long copy, call `shutdown()` while it's running — assert it returns within ~1 s and no thread is left.
 - `pathTouched` emits per affected dir on completion.
 
-## Phase 6 — Image format tasks + folder-expand integration
+## Phase 6 — Image format tasks + folder-expand integration ✅ shipped
+
+Two binaries totalling ~210 ms.
+
+**Coverage**:
+- `ScaleImageTask` (3): downscale 2000×1000 → 1024×512 (aspect preserved), no upscale when source is smaller than target, `Skip` conflict leaves dest untouched.
+- `ConvertFormatTask` (2): PNG → JPG produces a valid JPEG with preserved dimensions (verified via `QImageReader`), `Skip` conflict leaves dest untouched.
+- `FolderExpand` (2): recursive folder copy mirrors the source structure (incl. empty subfolders), mixed file + folder selection lands under the same destBase with the loose file at top level and the folder mirrored.
+
+**EXIF orientation test deliberately skipped** — Qt doesn't expose a clean way to write a JPEG with an EXIF orientation tag, and hand-crafting one is more complex than the test would be worth. Manual exercise with a real phone photo is documented at the top of `tst_ImageTasks.cpp`.
 
 **`tst_ImageTasks.cpp`**:
 - **ScaleImageTask happy**: write a 2000×1000 PNG via `writeImage`, scale to longest-edge 1024 → output exists, `QImageReader::size()` reports 1024×512 (aspect preserved).
