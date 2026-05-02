@@ -21,6 +21,7 @@
 
 class FileItem;
 class FileListView;
+class FolderTreeView;
 class ImageLoader;
 class TaskDockWidget;
 class ViewerWidget;
@@ -105,7 +106,7 @@ private:
     QDockWidget* _dockWidget;
     TaskDockWidget* _taskDockWidget;
     FileListView* _fileListView;
-    QTreeView* _folderTreeView;
+    FolderTreeView* _folderTreeView;
     QLineEdit* _pathLineEdit;
     QStackedWidget* _centerStack;
     ViewerWidget* _viewerWidget;

@@ -66,6 +66,9 @@ void MainWindow::create() {
     _folderTreeView = new FolderTreeView(
         _folderFilterModel
     );
+    // Drop handler routes external drops onto a tree folder through the
+    // same TaskManager pipeline as the file list and Ctrl+V.
+    _folderTreeView->setDropContext(_pixee->taskManager(), this);
 
     _fileListView = new FileListView(
         _pixee->config(),
