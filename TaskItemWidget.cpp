@@ -15,6 +15,16 @@
 
 #include "Task.h"
 
+void TaskItemWidget::flashAttention() {
+    if (_flashTimer.isActive()) return;
+    _flashStep = 0;
+    setProperty("blinking", true);
+    style()->unpolish(this);
+    style()->polish(this);
+    update();
+    _flashTimer.start();
+}
+
 TaskItemWidget::TaskItemWidget(const QUuid& taskId, const QString& name, QWidget* parent)
     : QFrame(parent),
       _taskId(taskId),
@@ -24,6 +34,25 @@ TaskItemWidget::TaskItemWidget(const QUuid& taskId, const QString& name, QWidget
     setObjectName("taskItemWidget");
     setFrameShape(QFrame::NoFrame);
     setAttribute(Qt::WA_Hover, true);  // fires HoverEnter/Leave even when child buttons get the mouse
+
+    _flashTimer.setInterval(150);
+    connect(&_flashTimer, &QTimer::timeout, this, [this]() {
+        // 4 ticks = on/off/on/off → two visible flashes ending dark.
+        ++_flashStep;
+        if (_flashStep >= 4) {
+            setProperty("blinking", false);
+            style()->unpolish(this);
+            style()->polish(this);
+            update();
+            _flashTimer.stop();
+            return;
+        }
+        const bool on = (_flashStep % 2 == 0);
+        setProperty("blinking", on);
+        style()->unpolish(this);
+        style()->polish(this);
+        update();
+    });
 
     auto* lay = new QHBoxLayout(this);
     lay->setContentsMargins(8, 2, 4, 2);

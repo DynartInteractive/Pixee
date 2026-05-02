@@ -139,6 +139,13 @@ void TaskGroupWidget::onTaskQuestionPosed(const QUuid& taskId, int kind, const Q
     }
 }
 
+void TaskGroupWidget::expand() {
+    if (_expanded) return;
+    _expanded = true;
+    _body->setVisible(true);
+    _toggleButton->setArrowType(Qt::DownArrow);
+}
+
 void TaskGroupWidget::onTaskProgress(const QUuid& taskId, int pct) {
     if (auto* row = _items.value(taskId, nullptr)) {
         row->setProgress(pct);

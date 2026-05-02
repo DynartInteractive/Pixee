@@ -29,7 +29,9 @@ TaskDockWidget::TaskDockWidget(TaskManager* manager, QWidget* parent)
     // top of the scroll container; new group widgets are inserted below
     // it (above the trailing stretch).
     _clearAllFinishedButton = new QPushButton(tr("Clear all finished"));
+    _clearAllFinishedButton->setObjectName("clearAllFinishedButton");
     _clearAllFinishedButton->setFlat(true);
+    _clearAllFinishedButton->setCursor(Qt::PointingHandCursor);
     _clearAllFinishedButton->setEnabled(false);
     connect(_clearAllFinishedButton, &QPushButton::clicked,
             _manager, &TaskManager::clearAllFinished);
@@ -124,5 +126,11 @@ void TaskDockWidget::onTaskProgress(QUuid taskId, int pct) {
 }
 
 void TaskDockWidget::onTaskQuestionPosed(QUuid taskId, int kind, QVariantMap ctx) {
-    if (auto* gw = groupWidgetForTask(taskId)) gw->onTaskQuestionPosed(taskId, kind, ctx);
+    auto* gw = groupWidgetForTask(taskId);
+    if (!gw) return;
+    gw->expand();                            // pop the group open
+    gw->onTaskQuestionPosed(taskId, kind, ctx);
+    if (auto* row = gw->itemFor(taskId)) {   // and pulse the row twice
+        row->flashAttention();
+    }
 }

@@ -165,6 +165,29 @@ QProgressBar#taskStatusBar::chunk {
 	border-radius: 2px;
 }
 
+/* ---- Clear all finished button ---- */
+
+QPushButton#clearAllFinishedButton {
+	color: #ccc;
+	background: transparent;
+	border: none;
+	padding: 4px 8px;
+	text-align: left;
+}
+QPushButton#clearAllFinishedButton:hover:enabled {
+	background-color: #444;
+	color: #fff;
+}
+QPushButton#clearAllFinishedButton:disabled {
+	color: #555;
+}
+
+/* ---- Conflict-question attention pulse on a task row ---- */
+
+#taskItemWidget[blinking="true"] {
+	background-color: #2b4580;
+}
+
 QScrollBar:vertical {
 	background-color: #333;
 	min-height: 16px;

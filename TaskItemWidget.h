@@ -3,6 +3,7 @@
 
 #include <QFrame>
 #include <QString>
+#include <QTimer>
 #include <QUuid>
 #include <QVariantMap>
 
@@ -31,6 +32,11 @@ public:
     // any non-AwaitingAnswer state change.
     void showQuestion(int kind, const QVariantMap& context);
 
+    // Briefly flashes the row's background twice to draw the user's eye
+    // — used when the task posts a conflict question and the dock has
+    // just been popped open. No-op if a flash is already in flight.
+    void flashAttention();
+
 signals:
     void pauseRequested(QUuid taskId);
     void resumeRequested(QUuid taskId);
@@ -58,6 +64,10 @@ private:
     int _state;
     int _currentQuestionKind;
     bool _hovered;
+    // Drives the two-flash attention pulse: ticks every 150 ms,
+    // toggles the QSS-driven `blinking` property, stops after 4 ticks.
+    QTimer _flashTimer;
+    int _flashStep = 0;
 };
 
 #endif // TASKITEMWIDGET_H

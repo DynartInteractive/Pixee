@@ -260,8 +260,18 @@ void MainWindow::create() {
     //   - Status-bar widget click = transient toggle (does NOT touch the
     //     menu).
     //   - Dock X-close = sets persistent intent off (syncs menu).
+    //   - Conflict question posed = force-show the dock so the user can
+    //     answer; doesn't touch the menu, so it's still treated as a
+    //     transient open (subject to the auto-hide-on-finish rule).
     //   - When all tasks finish AND menu is unchecked AND dock is open,
     //     auto-hide the dock so the status-bar peek doesn't linger.
+    connect(_pixee->taskManager(), &TaskManager::taskQuestionPosed,
+            this, [this](QUuid, int, QVariantMap) {
+                if (_taskDockWidget->isVisible()) return;
+                _suppressDockVisibilitySync = true;
+                _taskDockWidget->setVisible(true);
+                _taskDockWidget->raise();
+            });
     connect(_pixee->taskManager(), &TaskManager::groupFinished,
             this, [this](QUuid) {
                 if (_pixee->taskManager()->hasActiveTasks()) return;

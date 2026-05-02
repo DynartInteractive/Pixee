@@ -25,6 +25,11 @@ public:
     QUuid groupId() const { return _groupId; }
     TaskItemWidget* itemFor(const QUuid& taskId) const { return _items.value(taskId, nullptr); }
 
+    // Force the group body open. No-op if already expanded. Used when a
+    // member task posts a conflict question — the dock pops the group
+    // open so the user can see what's being asked.
+    void expand();
+
     // Manager forwards updates here for member tasks.
     void onTaskProgress(const QUuid& taskId, int pct);
     void onTaskStateChanged(const QUuid& taskId, int state);
