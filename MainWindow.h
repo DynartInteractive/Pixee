@@ -131,10 +131,5 @@ private:
     // back into one of them, so the model doesn't keep serving the stale
     // pre-task contents.
     QSet<QString> _staleDirs;
-    // True once the window has been deactivated at least once. Used to
-    // suppress the focus-in stale refresh on Pixee's very first
-    // activation at startup (the folder is freshly loaded then; refresh
-    // would just re-enumerate for nothing — costly on slow shares).
-    bool _everDeactivated = false;
 };
 #endif // MAINWINDOW_H

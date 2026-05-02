@@ -68,6 +68,13 @@ private slots:
     void onCacheReady(QString path, QImage image);
     void onCacheMiss(QString path);
     void onRowsAboutToBeRemoved(const QModelIndex& parent, int first, int last);
+    // FileModel signals this when a refresh diff detected an in-place
+    // file modification (same path, new mtime/size). dataChanged alone
+    // doesn't make the cache re-fetch — only rowsInserted / layoutChanged
+    // / modelReset trigger updateSubscriptions. Drop the per-path entry
+    // from our local sets and re-tick the debounce so the next
+    // subscription pass re-subscribes with the new mtime/size.
+    void onThumbnailInvalidated(QString path);
 
 private:
     void onCacheJobDone(const QString& path);

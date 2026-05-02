@@ -235,6 +235,23 @@ void MainWindow::create() {
     connect(_pixee->taskManager(), &TaskManager::pathTouched,
             this, &MainWindow::onTaskPathTouched);
 
+    // Status bar reflects the post-refresh contents. Fires for every
+    // resolved refresh (changed or not — we skip the FileItem walk when
+    // we know the count didn't shift, but the 'changed=false' case
+    // doesn't need to repaint either since the displayed counts
+    // already match disk). Path-match filter so a refresh for some
+    // other folder (e.g. a non-current folder that a task touched)
+    // doesn't overwrite the current-folder counts.
+    connect(_fileModel, &FileModel::folderRefreshed, this,
+            [this](const QString& path, bool changed) {
+                if (!changed) return;
+                FileItem* folder = currentFolder();
+                if (!folder || folder == _fileModel->rootItem()) return;
+                if (QDir::cleanPath(folder->fileInfo().filePath())
+                        != QDir::cleanPath(path)) return;
+                updateStatusBar(folder);
+            });
+
     // Auto show / hide the tasks dock so it only takes up screen real
     // estate while there's actually work to look at.
     connect(_pixee->taskManager(), &TaskManager::groupAdded,
@@ -402,8 +419,12 @@ FileItem* MainWindow::currentFolder() const {
 void MainWindow::refreshCurrentFolder() {
     FileItem* folder = currentFolder();
     if (!folder) return;
-    _fileModel->refreshFolder(folder);
-    updateStatusBar(folder);
+    // Async path: queues a background re-enumeration. The status bar
+    // updates via the folderRefreshed signal once the result is applied
+    // (Phase 5 wires that — Phase 1 leaves the bar momentarily stale on
+    // the post-refresh tick, which is harmless since the count rarely
+    // changes between F5 presses).
+    _fileModel->requestRefreshFolder(folder);
 }
 
 void MainWindow::onTaskPathTouched(QString dir) {
@@ -424,8 +445,11 @@ void MainWindow::onTouchedDirsRefreshDue() {
         const QString dirNorm = QDir::cleanPath(dir);
         if (!currentNorm.isEmpty() && dirNorm == currentNorm) {
             if (!refreshedCurrent) {
-                _fileModel->refreshFolder(folder);
-                updateStatusBar(folder);
+                // Async — same reasoning as refreshCurrentFolder. The
+                // user is already looking at this folder, so we want a
+                // refresh, but not at the cost of blocking the GUI on a
+                // slow share for a refresh that often produces no diff.
+                _fileModel->requestRefreshFolder(folder);
                 refreshedCurrent = true;
             }
         } else {
@@ -822,22 +846,18 @@ void MainWindow::closeEvent(QCloseEvent* event __attribute__((unused))) {
 void MainWindow::changeEvent(QEvent* event) {
     QMainWindow::changeEvent(event);
     if (event->type() != QEvent::ActivationChange) return;
+    if (!isActiveWindow()) return;
 
-    if (!isActiveWindow()) {
-        _everDeactivated = true;
-        return;
-    }
-    // Active. Skip the very first activation (Pixee opening) — refresh
-    // would just re-enumerate the freshly-loaded folder for nothing,
-    // costly on slow shares. Only refresh when we're regaining focus
-    // after being away — that's the case where external apps (Explorer
-    // and friends) might have changed the current folder behind our back.
-    if (!_everDeactivated) return;
+    // Refresh the current folder on every activation. Cheap by
+    // construction now: requestRefreshFolder hands off to a background
+    // worker, and onRefreshed short-circuits with no model signals when
+    // the diff is empty (the common case for alt-tab returns). The
+    // earlier "skip first activation" workaround and the singleShot
+    // defer are no longer needed — both were just compensating for the
+    // synchronous refresh that this codepath now bypasses.
     FileItem* folder = currentFolder();
     if (!folder || folder == _fileModel->rootItem()) return;
-    // Defer to the next event-loop tick so we don't refresh inside the
-    // activation handler itself.
-    QTimer::singleShot(0, this, &MainWindow::refreshCurrentFolder);
+    _fileModel->requestRefreshFolder(folder);
 }
 
 void MainWindow::exit() {

@@ -97,6 +97,8 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
         connect(fm, &FileModel::folderPopulated, this, [this](const QString&) {
             _updateTimer.start();
         });
+        connect(fm, &FileModel::thumbnailInvalidated,
+                this, &FileListView::onThumbnailInvalidated);
     }
 }
 
@@ -328,6 +330,21 @@ void FileListView::onRowsAboutToBeRemoved(const QModelIndex& parent, int first, 
             _activeJobs.remove(path);
         }
     }
+}
+
+void FileListView::onThumbnailInvalidated(QString path) {
+    if (!_cache) return;
+    // Unsubscribe to clear the cache's per-path subscriber state, then
+    // drop our local bookkeeping so the next updateSubscriptions tick
+    // sees this path as a fresh subscription target — and passes the
+    // new mtime/size to the cache, which will miss in the DB and kick
+    // the generator. Without the unsubscribe, the cache treats it as a
+    // priority bump on an existing subscription and won't re-decode.
+    if (_lastSubscribed.remove(path)) {
+        _cache->unsubscribe(path);
+    }
+    _activeJobs.remove(path);
+    _updateTimer.start();
 }
 
 void FileListView::onCacheReady(QString path, QImage) {
