@@ -63,6 +63,8 @@ void TaskDockWidget::onGroupAdded(TaskGroup* group) {
             _manager, &TaskManager::stopTask);
     connect(gw, &TaskGroupWidget::answerProvided,
             _manager, &TaskManager::provideAnswer);
+    connect(gw, &TaskGroupWidget::clearGroupRequested,
+            _manager, &TaskManager::clearGroup);
 
     // Insert before the trailing stretch so groups stack at the top.
     const int insertAt = qMax(0, _containerLayout->count() - 1);
