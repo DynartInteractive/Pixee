@@ -8,4 +8,6 @@ SUBDIRS = \
     MoveFileTask \
     DeleteFileTask \
     FolderCleanupTask \
-    TaskGroup
+    TaskGroup \
+    ImageTasks \
+    FolderExpand
