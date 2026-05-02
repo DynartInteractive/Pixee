@@ -4,4 +4,7 @@ TEMPLATE = subdirs
 # others down. Add a new entry for each tst_*.cpp suite.
 SUBDIRS = \
     FileOpsHelpers \
-    CopyFileTask
+    CopyFileTask \
+    MoveFileTask \
+    DeleteFileTask \
+    FolderCleanupTask

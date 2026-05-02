@@ -152,7 +152,14 @@ void harnessSmoke() {
 
 **Pattern**: every test spins up a fresh `TaskTestFixture` in the test method body. No `init()` / `cleanup()` — easier to read, slight duplication is fine.
 
-## Phase 4 — Move + Delete + Cleanup
+## Phase 4 — Move + Delete + Cleanup ✅ shipped
+
+Three new binaries, ~90 ms combined. Trash branch deliberately untested; documented at the top of `tst_DeleteFileTask.cpp`.
+
+**Coverage**:
+- `MoveFileTask` (5 tests): same-volume rename, all three conflict answers (Skip / Overwrite / Rename — verifies source is removed only on success and the original dest is preserved on Rename), cross-volume copy+delete fallback (auto-detects a second writable volume via `QStorageInfo`; `QSKIP` if none).
+- `DeleteFileTask` (4 tests, all `toTrash=false`): single file gone, recursive folder removal, missing path is a successful no-op (matches the documented behaviour in `DeleteFileTask::run`), `affectedDirs()` returns the parent.
+- `FolderCleanupTask` (5 tests): empty folder removed bottom-up, non-empty folder left in place (best-effort, task still completes), refresh-marker mode (empty `_root`), missing root succeeds via the "not a dir" short-circuit, `affectedDirs()` returns parent + root + extras in declared order.
 
 **`tst_MoveFileTask.cpp`**:
 - **Same-volume rename**: source and dest on same `QTemporaryDir` → `QFile::rename` succeeds, source gone, dest exists, assert quickly (≤10 ms).
