@@ -37,6 +37,7 @@ SOURCES += \
     TaskItemWidget.cpp \
     TaskManager.cpp \
     TaskRunner.cpp \
+    TaskStatusWidget.cpp \
     Toast.cpp \
     Theme.cpp \
     ThumbnailCache.cpp \
@@ -76,6 +77,7 @@ HEADERS += \
     TaskItemWidget.h \
     TaskManager.h \
     TaskRunner.h \
+    TaskStatusWidget.h \
     Toast.h \
     Theme.h \
     ThumbnailCache.h \

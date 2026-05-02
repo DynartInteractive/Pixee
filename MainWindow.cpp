@@ -34,6 +34,7 @@
 #include "TaskDockWidget.h"
 #include "TaskGroup.h"
 #include "TaskManager.h"
+#include "TaskStatusWidget.h"
 #include "ViewerWidget.h"
 
 #include<QDebug>
@@ -254,20 +255,46 @@ void MainWindow::create() {
                 updateStatusBar(folder);
             });
 
-    // Auto show / hide the tasks dock so it only takes up screen real
-    // estate while there's actually work to look at.
-    connect(_pixee->taskManager(), &TaskManager::groupAdded,
-            this, [this](TaskGroup*) { _taskDockWidget->show(); });
-    connect(_pixee->taskManager(), &TaskManager::groupRemoved,
+    // Tasks dock visibility model:
+    //   - View → Tasks menu = persistent intent (sticky across runs).
+    //   - Status-bar widget click = transient toggle (does NOT touch the
+    //     menu).
+    //   - Dock X-close = sets persistent intent off (syncs menu).
+    //   - When all tasks finish AND menu is unchecked AND dock is open,
+    //     auto-hide the dock so the status-bar peek doesn't linger.
+    connect(_pixee->taskManager(), &TaskManager::groupFinished,
             this, [this](QUuid) {
-                if (!_pixee->taskManager()->hasGroups()) _taskDockWidget->hide();
+                if (_pixee->taskManager()->hasActiveTasks()) return;
+                if (_userTasksDockEnabled) return;
+                if (!_taskDockWidget->isVisible()) return;
+                _suppressDockVisibilitySync = true;
+                _taskDockWidget->hide();
             });
 
     setCentralWidget(_centerStack);
 
+    // Read persistent intent BEFORE createMenus so the View → Tasks
+    // checkbox initialises correctly.
+    {
+        QSettings s;
+        _userTasksDockEnabled = s.value("tasksDockEnabled", false).toBool();
+    }
+
     // Menu bar + status bar
     createMenus();
     statusBar();  // force-create so it appears even when empty
+
+    // Status-bar progress widget — right-aligned permanent. Click toggles
+    // the dock without touching the menu (transient peek).
+    _taskStatusWidget = new TaskStatusWidget(_pixee->taskManager(), this);
+    statusBar()->addPermanentWidget(_taskStatusWidget);
+    connect(_taskStatusWidget, &TaskStatusWidget::toggleDockRequested,
+            this, [this]() {
+                _suppressDockVisibilitySync = true;
+                const bool target = !_taskDockWidget->isVisible();
+                _taskDockWidget->setVisible(target);
+                if (target) _taskDockWidget->raise();
+            });
 
     // Read settings
 
@@ -287,10 +314,11 @@ void MainWindow::create() {
             && !_taskDockWidget->isFloating()) {
         addDockWidget(Qt::BottomDockWidgetArea, _taskDockWidget);
     }
-    // Always start hidden — the dock auto-shows when a task is enqueued
-    // and auto-hides when the last group finishes. Whatever the saved
-    // state had recorded for visibility is overridden.
-    _taskDockWidget->hide();
+    // Override Qt's restored visibility with our persistent intent —
+    // the source of truth lives in tasksDockEnabled, not the saved
+    // QMainWindow state blob.
+    _suppressDockVisibilitySync = true;
+    _taskDockWidget->setVisible(_userTasksDockEnabled);
 
     // Path edit drives navigation on Enter.
     QObject::connect(_pathLineEdit, &QLineEdit::returnPressed,
@@ -537,19 +565,31 @@ void MainWindow::createMenus() {
             });
     viewMenu->addAction(foldersToggle);
 
-    QAction* tasksToggle = new QAction(tr("&Tasks"), this);
-    tasksToggle->setCheckable(true);
-    tasksToggle->setChecked(_taskDockWidget->isVisible());
-    connect(tasksToggle, &QAction::toggled, this, [this](bool on) {
+    _tasksToggleAction = new QAction(tr("&Tasks"), this);
+    _tasksToggleAction->setCheckable(true);
+    _tasksToggleAction->setChecked(_userTasksDockEnabled);
+    connect(_tasksToggleAction, &QAction::toggled, this, [this](bool on) {
+        _userTasksDockEnabled = on;
+        QSettings().setValue("tasksDockEnabled", on);
+        _suppressDockVisibilitySync = true;
         _taskDockWidget->setVisible(on);
         if (on) _taskDockWidget->raise();
     });
+    // Dock close via X — treat as a persistent intent flip. Status-bar
+    // and auto-hide paths set _suppressDockVisibilitySync first so this
+    // handler only runs for genuine user-driven changes.
     connect(_taskDockWidget, &QDockWidget::visibilityChanged,
-            this, [tasksToggle](bool visible) {
-                const QSignalBlocker block(tasksToggle);
-                tasksToggle->setChecked(visible);
+            this, [this](bool visible) {
+                if (_suppressDockVisibilitySync) {
+                    _suppressDockVisibilitySync = false;
+                    return;
+                }
+                _userTasksDockEnabled = visible;
+                QSettings().setValue("tasksDockEnabled", visible);
+                const QSignalBlocker block(_tasksToggleAction);
+                _tasksToggleAction->setChecked(visible);
             });
-    viewMenu->addAction(tasksToggle);
+    viewMenu->addAction(_tasksToggleAction);
 
     QMenu* helpMenu = mb->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About"));

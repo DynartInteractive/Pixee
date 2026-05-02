@@ -23,7 +23,9 @@ class FileItem;
 class FileListView;
 class FolderTreeView;
 class ImageLoader;
+class QAction;
 class TaskDockWidget;
+class TaskStatusWidget;
 class ViewerWidget;
 
 class MainWindow : public QMainWindow
@@ -95,11 +97,24 @@ private:
     FileFilterModel* _fileFilterModel;
     QDockWidget* _dockWidget;
     TaskDockWidget* _taskDockWidget;
+    TaskStatusWidget* _taskStatusWidget = nullptr;
+    QAction* _tasksToggleAction = nullptr;
     FileListView* _fileListView;
     FolderTreeView* _folderTreeView;
     QLineEdit* _pathLineEdit;
     QStackedWidget* _centerStack;
     ViewerWidget* _viewerWidget;
+    // Persistent user intent for the tasks dock — what the View → Tasks
+    // menu represents. Sticky across program runs (saved in QSettings).
+    // Status-bar clicks toggle visibility WITHOUT touching this; menu
+    // toggles and the dock's X-close DO update it.
+    bool _userTasksDockEnabled = false;
+    // Set true around programmatic show/hide() calls (status-bar click,
+    // auto-hide-on-finish) so the dock's visibilityChanged handler
+    // doesn't mistake them for user-driven X-close events and clobber
+    // _userTasksDockEnabled. Reset to false in the handler after the
+    // first ignored callback.
+    bool _suppressDockVisibilitySync = false;
     // Visibility of the folder-tree dock at the moment the viewer was
     // activated, so dismissing the viewer doesn't unhide a dock the user
     // had explicitly closed.
