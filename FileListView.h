@@ -2,6 +2,7 @@
 #define FILELISTVIEW_H
 
 #include <QListView>
+#include <QPersistentModelIndex>
 #include <QSet>
 #include <QString>
 #include <QTimer>
@@ -13,6 +14,7 @@ class TaskManager;
 class ThumbnailCache;
 class QDragEnterEvent;
 class QDragMoveEvent;
+class QDragLeaveEvent;
 class QDropEvent;
 
 class FileListView : public QListView
@@ -42,10 +44,23 @@ public:
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
     void dropEvent(QDropEvent* event) override;
     void startDrag(Qt::DropActions supportedActions) override;
+
+private:
+    // Toggles the dropTarget dynamic Qt property and re-polishes so the
+    // QSS rule for the drop-zone highlight border picks up the change.
+    // Cheap; safe to call on every dragMove tick (no-op if unchanged).
+    void setDropTargetActive(bool active);
+
+    // Folder item under the cursor during a drag, if any. When valid the
+    // drop targets that folder (drop INTO sub-folder); when invalid the
+    // drop targets the currently-viewed folder (full-view highlight).
+    QPersistentModelIndex _dropHoverIndex;
 
 private slots:
     void scheduleSubscriptionUpdate();

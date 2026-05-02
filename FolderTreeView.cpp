@@ -2,10 +2,13 @@
 
 #include <QDrag>
 #include <QDragEnterEvent>
+#include <QDragLeaveEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileInfo>
 #include <QMimeData>
+#include <QPainter>
+#include <QPaintEvent>
 #include <QUrl>
 
 #include "FileFilterModel.h"
@@ -22,13 +25,11 @@ bool dropHasLocalFile(const QMimeData* mime) {
     return false;
 }
 
-// Pixee policy: drop = copy by default; Shift forces move. Honour an
-// already-set MoveAction (internal Qt drags signal Move that way).
+// Pixee policy: drop = copy by default; Shift forces move. Modifiers
+// read fresh each tick — see FileListView for why event->dropAction()
+// can't be used as a secondary signal (feedback loop).
 Qt::DropAction pickDropAction(const QDropEvent* event) {
     if (event->modifiers().testFlag(Qt::ShiftModifier)) {
-        return Qt::MoveAction;
-    }
-    if (event->dropAction() == Qt::MoveAction) {
         return Qt::MoveAction;
     }
     return Qt::CopyAction;
@@ -71,6 +72,27 @@ void FolderTreeView::dragEnterEvent(QDragEnterEvent* event) {
     event->accept();
 }
 
+void FolderTreeView::dragLeaveEvent(QDragLeaveEvent* event) {
+    if (_dropHoverIndex.isValid()) {
+        _dropHoverIndex = QPersistentModelIndex();
+        viewport()->update();
+    }
+    QTreeView::dragLeaveEvent(event);
+}
+
+void FolderTreeView::paintEvent(QPaintEvent* event) {
+    QTreeView::paintEvent(event);
+    if (!_dropHoverIndex.isValid()) return;
+    QRect r = visualRect(_dropHoverIndex);
+    if (!r.isValid()) return;
+    QPainter p(viewport());
+    QPen pen(QColor("#5a8dee"));
+    pen.setWidth(2);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    p.drawRect(r.adjusted(1, 1, -2, -2));
+}
+
 void FolderTreeView::dragMoveEvent(QDragMoveEvent* event) {
     if (!dropHasLocalFile(event->mimeData())) {
         event->ignore();
@@ -80,18 +102,22 @@ void FolderTreeView::dragMoveEvent(QDragMoveEvent* event) {
     // folder row. Empty area / between-rows / past-end → ignore, which
     // gives the OS the "no-drop" cursor for that exact spot. Qt's auto-
     // expand timer keys off this same accept/ignore state.
+    QPersistentModelIndex newHover;
     const QModelIndex proxyIdx = indexAt(event->position().toPoint());
-    if (!proxyIdx.isValid()) {
-        event->ignore();
-        return;
+    if (proxyIdx.isValid()) {
+        const QModelIndex srcIdx = _folderFilterModel->mapToSource(proxyIdx);
+        if (srcIdx.isValid()) {
+            FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+            if (item && item->fileType() == FileType::Folder) {
+                newHover = QPersistentModelIndex(proxyIdx);
+            }
+        }
     }
-    const QModelIndex srcIdx = _folderFilterModel->mapToSource(proxyIdx);
-    if (!srcIdx.isValid()) {
-        event->ignore();
-        return;
+    if (newHover != _dropHoverIndex) {
+        _dropHoverIndex = newHover;
+        viewport()->update();
     }
-    FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
-    if (!item || item->fileType() != FileType::Folder) {
+    if (!_dropHoverIndex.isValid()) {
         event->ignore();
         return;
     }
@@ -142,13 +168,21 @@ void FolderTreeView::startDrag(Qt::DropActions supportedActions) {
 }
 
 void FolderTreeView::dropEvent(QDropEvent* event) {
+    const QPersistentModelIndex hovered = _dropHoverIndex;
+    _dropHoverIndex = QPersistentModelIndex();
+    viewport()->update();
+
     if (!dropHasLocalFile(event->mimeData()) || !_taskManager) {
         event->ignore();
         return;
     }
     // Re-resolve the index under the cursor at drop time — a slow drag
     // may have settled on a different row than the last dragMove tick.
-    const QModelIndex proxyIdx = indexAt(event->position().toPoint());
+    // Prefer the hover index if it's still valid; otherwise re-hit-test.
+    QModelIndex proxyIdx = hovered;
+    if (!proxyIdx.isValid()) {
+        proxyIdx = indexAt(event->position().toPoint());
+    }
     if (!proxyIdx.isValid()) {
         event->ignore();
         return;

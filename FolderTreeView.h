@@ -1,12 +1,14 @@
 #ifndef FOLDERTREEVIEW_H
 #define FOLDERTREEVIEW_H
 
+#include <QPersistentModelIndex>
 #include <QTreeView>
 
 class FileFilterModel;
 class TaskManager;
 class QDragEnterEvent;
 class QDragMoveEvent;
+class QDragLeaveEvent;
 class QDropEvent;
 
 class FolderTreeView : public QTreeView
@@ -23,13 +25,18 @@ public:
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
     void dropEvent(QDropEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
     void startDrag(Qt::DropActions supportedActions) override;
 
 private:
     FileFilterModel* _folderFilterModel;
     TaskManager* _taskManager = nullptr;
     QWidget* _dialogParent = nullptr;
+    // Folder row under the cursor during a drag. Highlighted in
+    // paintEvent and used as the drop target in dropEvent.
+    QPersistentModelIndex _dropHoverIndex;
 };
 
 #endif // FOLDERTREEVIEW_H

@@ -4,12 +4,16 @@
 #include <QDateTime>
 #include <QDrag>
 #include <QDragEnterEvent>
+#include <QDragLeaveEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileInfo>
 #include <QMimeData>
+#include <QPainter>
+#include <QPaintEvent>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QStyle>
 #include <QUrl>
 #include <QWheelEvent>
 
@@ -410,17 +414,24 @@ bool dropHasLocalFile(const QMimeData* mime) {
 }
 
 // Pixee policy: drop = copy by default (Windows convention); Shift forces
-// move. We also honour an already-set MoveAction on the event — that's
-// how internal Qt drags signal Move (Phase 4).
+// move. Read modifiers fresh each tick — using event->dropAction() as a
+// secondary signal would create a feedback loop, since our own setDropAction
+// from a previous tick gets remembered and would stick on Move even after
+// the user releases Shift.
 Qt::DropAction pickDropAction(const QDropEvent* event) {
     if (event->modifiers().testFlag(Qt::ShiftModifier)) {
         return Qt::MoveAction;
     }
-    if (event->dropAction() == Qt::MoveAction) {
-        return Qt::MoveAction;
-    }
     return Qt::CopyAction;
 }
+}
+
+void FileListView::setDropTargetActive(bool active) {
+    if (property("dropTarget").toBool() == active) return;
+    setProperty("dropTarget", active);
+    style()->unpolish(this);
+    style()->polish(this);
+    update();
 }
 
 void FileListView::dragEnterEvent(QDragEnterEvent* event) {
@@ -428,6 +439,7 @@ void FileListView::dragEnterEvent(QDragEnterEvent* event) {
         event->ignore();
         return;
     }
+    setDropTargetActive(true);
     event->setDropAction(pickDropAction(event));
     event->accept();
 }
@@ -437,46 +449,110 @@ void FileListView::dragMoveEvent(QDragMoveEvent* event) {
         event->ignore();
         return;
     }
+    // Detect folder item under cursor — that becomes the drop target
+    // (drop INTO that sub-folder), and the per-item highlight replaces
+    // the full-view border. Otherwise drop targets the current folder
+    // and the full-view border applies.
+    QPersistentModelIndex newHover;
+    const QModelIndex proxyIdx = indexAt(event->position().toPoint());
+    if (proxyIdx.isValid()) {
+        const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
+        if (srcIdx.isValid()) {
+            FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+            // ".." is a Folder-typed navigation aid; don't accept drops on it.
+            if (item && item->fileType() == FileType::Folder
+                    && item->fileInfo().fileName() != "..") {
+                newHover = QPersistentModelIndex(proxyIdx);
+            }
+        }
+    }
+    if (newHover != _dropHoverIndex) {
+        _dropHoverIndex = newHover;
+        viewport()->update();
+    }
+    setDropTargetActive(!_dropHoverIndex.isValid());
+
     event->setDropAction(pickDropAction(event));
     event->accept();
 }
 
+void FileListView::dragLeaveEvent(QDragLeaveEvent* event) {
+    setDropTargetActive(false);
+    if (_dropHoverIndex.isValid()) {
+        _dropHoverIndex = QPersistentModelIndex();
+        viewport()->update();
+    }
+    QListView::dragLeaveEvent(event);
+}
+
 void FileListView::dropEvent(QDropEvent* event) {
+    setDropTargetActive(false);
+    const QPersistentModelIndex hovered = _dropHoverIndex;
+    _dropHoverIndex = QPersistentModelIndex();
+    viewport()->update();
+
     if (!dropHasLocalFile(event->mimeData()) || !_taskManager) {
         event->ignore();
         return;
     }
 
-    // Resolve the target folder from rootIndex — same walk as
-    // MainWindow::currentFolder(). When the view is showing the synthetic
-    // drive list (no rootIndex), there's nowhere to drop to.
-    const QModelIndex proxyRoot = rootIndex();
-    if (!proxyRoot.isValid()) {
-        Toast::show(_dialogParent,
-            tr("Cannot drop here — pick a folder first"), Toast::Error);
-        event->ignore();
-        return;
+    // Pick the target folder. If a folder item was under the cursor at
+    // drop time, drop INTO that sub-folder. Otherwise fall back to the
+    // currently-viewed folder (which doesn't exist for the drive list,
+    // so reject with a Toast).
+    QString destPath;
+    if (hovered.isValid()) {
+        const QModelIndex srcIdx = _fileFilterModel->mapToSource(hovered);
+        if (srcIdx.isValid()) {
+            FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+            if (item && item->fileType() == FileType::Folder) {
+                destPath = item->fileInfo().filePath();
+            }
+        }
     }
-    const QModelIndex srcRoot = _fileFilterModel->mapToSource(proxyRoot);
-    if (!srcRoot.isValid()) {
-        event->ignore();
-        return;
-    }
-    FileItem* folder = static_cast<FileItem*>(srcRoot.internalPointer());
-    if (!folder) {
-        event->ignore();
-        return;
+    if (destPath.isEmpty()) {
+        const QModelIndex proxyRoot = rootIndex();
+        if (!proxyRoot.isValid()) {
+            Toast::show(_dialogParent,
+                tr("Cannot drop here — pick a folder first"), Toast::Error);
+            event->ignore();
+            return;
+        }
+        const QModelIndex srcRoot = _fileFilterModel->mapToSource(proxyRoot);
+        if (!srcRoot.isValid()) {
+            event->ignore();
+            return;
+        }
+        FileItem* folder = static_cast<FileItem*>(srcRoot.internalPointer());
+        if (!folder) {
+            event->ignore();
+            return;
+        }
+        destPath = folder->fileInfo().filePath();
     }
 
     const Qt::DropAction action = pickDropAction(event);
     const bool isMove = (action == Qt::MoveAction);
 
     FileOpsMenuBuilder::handleDropOrPaste(
-        event->mimeData(), folder->fileInfo().filePath(), isMove,
-        _taskManager, _dialogParent);
+        event->mimeData(), destPath, isMove, _taskManager, _dialogParent);
 
     event->setDropAction(action);
     event->acceptProposedAction();
+}
+
+void FileListView::paintEvent(QPaintEvent* event) {
+    QListView::paintEvent(event);
+    if (!_dropHoverIndex.isValid()) return;
+    QRect r = visualRect(_dropHoverIndex);
+    if (!r.isValid()) return;
+    QPainter p(viewport());
+    QPen pen(QColor("#5a8dee"));
+    pen.setWidth(2);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    // Inset by 1 so the 2px stroke stays inside the cell rect.
+    p.drawRect(r.adjusted(1, 1, -2, -2));
 }
 
 void FileListView::tryExpandWindow() {
