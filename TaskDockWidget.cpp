@@ -1,8 +1,10 @@
 #include "TaskDockWidget.h"
 
 #include <QFrame>
+#include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -38,8 +40,9 @@ TaskDockWidget::TaskDockWidget(TaskManager* manager, QWidget* parent)
     _containerLayout->addWidget(_clearAllFinishedButton);
 
     auto* headerSep = new QFrame();
-    headerSep->setFrameShape(QFrame::HLine);
-    headerSep->setFrameShadow(QFrame::Sunken);
+    headerSep->setObjectName("tasksDockHeaderSep");
+    headerSep->setFrameShape(QFrame::NoFrame);
+    headerSep->setFixedHeight(1);
     _containerLayout->addWidget(headerSep);
 
     _containerLayout->addStretch(1);  // pushes group widgets toward the top
@@ -130,7 +133,21 @@ void TaskDockWidget::onTaskQuestionPosed(QUuid taskId, int kind, QVariantMap ctx
     if (!gw) return;
     gw->expand();                            // pop the group open
     gw->onTaskQuestionPosed(taskId, kind, ctx);
-    if (auto* row = gw->itemFor(taskId)) {   // and pulse the row twice
-        row->flashAttention();
+
+    // Defer scroll + flash by one event-loop tick. Two reasons:
+    //  1. expand() just changed the layout — the row's geometry isn't
+    //     valid until the layout pass runs, so ensureWidgetVisible
+    //     would scroll to the wrong place.
+    //  2. The very first 'blinking=true' QSS polish on a freshly-shown
+    //     dock can land before the row has had a chance to render its
+    //     baseline state, eating one of the two flashes.
+    if (auto* row = gw->itemFor(taskId)) {
+        QPointer<TaskItemWidget> rowPtr(row);
+        QPointer<QScrollArea> areaPtr(_scrollArea);
+        QTimer::singleShot(0, this, [rowPtr, areaPtr]() {
+            if (!rowPtr) return;
+            if (areaPtr) areaPtr->ensureWidgetVisible(rowPtr, 0, 32);
+            rowPtr->flashAttention();
+        });
     }
 }

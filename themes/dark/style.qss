@@ -181,6 +181,9 @@ QPushButton#clearAllFinishedButton:hover:enabled {
 QPushButton#clearAllFinishedButton:disabled {
 	color: #555;
 }
+#tasksDockHeaderSep {
+	background-color: #2a2a2a;
+}
 
 /* ---- Conflict-question attention pulse on a task row ---- */
 

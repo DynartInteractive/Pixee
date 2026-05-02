@@ -293,6 +293,10 @@ void MainWindow::create() {
     // Menu bar + status bar
     createMenus();
     statusBar();  // force-create so it appears even when empty
+    // Disable the bottom-right resize grip — the main window resizes
+    // fine via its frame, and the grip shows up as a stray light line
+    // at the right end of permanent widgets in the dark theme.
+    statusBar()->setSizeGripEnabled(false);
 
     // Status-bar progress widget — right-aligned permanent. Click toggles
     // the dock without touching the menu (transient peek).
