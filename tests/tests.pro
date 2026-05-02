@@ -10,4 +10,5 @@ SUBDIRS = \
     FolderCleanupTask \
     TaskGroup \
     ImageTasks \
-    FolderExpand
+    FolderExpand \
+    TaskManagerClear

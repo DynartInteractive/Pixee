@@ -53,13 +53,18 @@ void TaskManager::shutdown() {
     // Delete remaining groups (groups own their tasks via QObject parent).
     qDeleteAll(_groups);
     _groups.clear();
+    _finishedGroups.clear();
+    _taskProgress.clear();
 }
 
 void TaskManager::wireTask(Task* task) {
     connect(task, &Task::stateChanged, this,
             [this](QUuid id, int state) { emit taskStateChanged(id, state); });
     connect(task, &Task::progress, this,
-            [this](QUuid id, int pct) { emit taskProgress(id, pct); });
+            [this](QUuid id, int pct) {
+                _taskProgress.insert(id, pct);
+                emit taskProgress(id, pct);
+            });
     connect(task, &Task::needsAnswer, this,
             [this](QUuid id, int kind, QVariantMap ctx) { emit taskQuestionPosed(id, kind, ctx); });
     connect(task, &Task::finished, this, &TaskManager::onTaskFinished);
@@ -174,19 +179,90 @@ void TaskManager::onTaskAborted(QUuid taskId) {
 void TaskManager::onTaskTerminal(const QUuid& taskId) {
     // The task itself signaled its terminal state. The runner-idle slot
     // independently clears the runner slot. Here we only check if the
-    // owning group is fully done so we can remove it.
+    // owning group has reached all-terminal so we can fire groupFinished.
+    // Group removal is deferred until the user (or shutdown) explicitly
+    // clears it.
     Task* t = findTask(taskId);
     if (!t) return;
-    if (TaskGroup* g = t->group()) maybeRemoveGroup(g);
+    if (TaskGroup* g = t->group()) maybeFinishGroup(g);
 }
 
-void TaskManager::maybeRemoveGroup(TaskGroup* group) {
+void TaskManager::maybeFinishGroup(TaskGroup* group) {
     if (!group) return;
     if (!group->allTerminal()) return;
     const QUuid id = group->id();
+    if (_finishedGroups.contains(id)) return;     // already announced
+    _finishedGroups.insert(id);
+    emit groupFinished(id);
+}
+
+void TaskManager::clearGroup(const QUuid& groupId) {
+    TaskGroup* group = findGroup(groupId);
+    if (!group) return;
+    if (!group->allTerminal()) return;            // refuse to drop a live group
     _groups.removeAll(group);
-    emit groupRemoved(id);
+    _finishedGroups.remove(groupId);
+    for (Task* t : group->tasks()) _taskProgress.remove(t->id());
+    emit groupRemoved(groupId);
     group->deleteLater();
+}
+
+void TaskManager::clearAllFinished() {
+    // Snapshot the ids first — clearGroup mutates _groups.
+    QList<QUuid> doomed;
+    for (TaskGroup* g : _groups) {
+        if (g->allTerminal()) doomed.append(g->id());
+    }
+    for (const QUuid& id : doomed) clearGroup(id);
+}
+
+bool TaskManager::hasActiveTasks() const {
+    for (TaskGroup* g : _groups) {
+        if (!g->allTerminal()) return true;
+    }
+    return false;
+}
+
+namespace {
+bool isTerminalState(int state) {
+    return state == Task::Completed || state == Task::Failed
+        || state == Task::Aborted   || state == Task::Skipped;
+}
+}
+
+int TaskManager::totalTaskCount() const {
+    int n = 0;
+    for (TaskGroup* g : _groups) n += g->tasks().size();
+    return n;
+}
+
+int TaskManager::terminalTaskCount() const {
+    int n = 0;
+    for (TaskGroup* g : _groups) {
+        for (Task* t : g->tasks()) {
+            if (isTerminalState(static_cast<int>(t->state()))) ++n;
+        }
+    }
+    return n;
+}
+
+int TaskManager::aggregateProgressPercent() const {
+    int total = 0;
+    int n = 0;
+    for (TaskGroup* g : _groups) {
+        for (Task* t : g->tasks()) {
+            const int s = static_cast<int>(t->state());
+            // Terminal tasks are 100 — even Failed/Aborted/Skipped, since
+            // they're "done" from the aggregate's perspective. Non-terminal
+            // tasks use the last reported chunk progress (0 if none yet).
+            const int pct = isTerminalState(s) ? 100
+                          : _taskProgress.value(t->id(), 0);
+            total += pct;
+            ++n;
+        }
+    }
+    if (n == 0) return 0;
+    return total / n;
 }
 
 Task* TaskManager::nextRunnableTaskFor(const QUuid& /*busyGroupId*/,

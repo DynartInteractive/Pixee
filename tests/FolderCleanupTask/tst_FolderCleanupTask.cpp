@@ -50,7 +50,7 @@ void TstFolderCleanupTask::empty_folder_is_removed() {
     QSignalSpy finishedSpy(task, &Task::finished);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(finishedSpy.count(), 1);
     QVERIFY2(!QFileInfo(root).exists(),
@@ -73,7 +73,7 @@ void TstFolderCleanupTask::non_empty_folder_is_left_in_place() {
     QSignalSpy failedSpy(task, &Task::failed);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 0);
@@ -94,7 +94,7 @@ void TstFolderCleanupTask::empty_root_path_is_refresh_marker_only() {
     QSignalSpy finishedSpy(task, &Task::finished);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(finishedSpy.count(), 1);
     QVERIFY(QFileInfo(refreshDir).isDir());
@@ -112,7 +112,7 @@ void TstFolderCleanupTask::missing_root_path_succeeds_no_op() {
     QSignalSpy failedSpy(task, &Task::failed);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 0);

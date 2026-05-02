@@ -210,6 +210,14 @@ Three new binaries, ~90 ms combined. Trash branch deliberately untested; documen
 - Shutdown mid-run: enqueue a long copy, call `shutdown()` while it's running — assert it returns within ~1 s and no thread is left.
 - `pathTouched` emits per affected dir on completion.
 
+## Dock-rework Phase 1 — TaskManager: keep finished groups ✅ shipped
+
+Behaviour change: `TaskManager` no longer auto-removes a group when its tasks reach all-terminal. The new `groupFinished(QUuid)` signal carries that semantic; `groupRemoved(QUuid)` now fires only on explicit `clearGroup` / `clearAllFinished`. Finished groups stay in `_groups` until cleared, so the upcoming UI can show them with a per-group Clear button.
+
+**Test impact**:
+- `TaskTestFixture::waitForGroupRemoved` → `waitForGroupFinished` (and a new `waitForGroupRemoved` that listens to the actual `groupRemoved` signal). All 8 existing test files renamed callers via batch replace.
+- New `tests/TaskManagerClear/` binary (7 tests, ~355 ms) locks in the Phase 1 contract: finished group stays tracked; `clearGroup` removes a terminal group and emits `groupRemoved`; refuses a non-terminal group; `clearAllFinished` only drops terminal ones; `hasActiveTasks` flips at terminal; aggregate counters reflect lifecycle; `shutdown` drops finished groups without firing `groupRemoved`.
+
 ## Phase 6 — Image format tasks + folder-expand integration ✅ shipped
 
 Two binaries totalling ~210 ms.

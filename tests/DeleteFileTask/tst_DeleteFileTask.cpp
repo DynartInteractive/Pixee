@@ -55,7 +55,7 @@ void TstDeleteFileTask::single_file_hard_delete_succeeds() {
     const QUuid id = task->id();
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 0);
@@ -77,7 +77,7 @@ void TstDeleteFileTask::folder_with_contents_removed_recursively() {
     QSignalSpy failedSpy(task, &Task::failed);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 0);
@@ -98,7 +98,7 @@ void TstDeleteFileTask::missing_path_succeeds_as_noop() {
     const QUuid id = task->id();
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 0);

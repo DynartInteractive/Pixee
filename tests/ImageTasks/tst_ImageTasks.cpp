@@ -67,7 +67,7 @@ void TstImageTasks::scale_downscales_landscape_preserving_aspect() {
     QSignalSpy finishedSpy(task, &Task::finished);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved(10000));
+    QVERIFY(f.waitForGroupFinished(10000));
 
     QCOMPARE(finishedSpy.count(), 1);
     QVERIFY(QFile::exists(dst));
@@ -91,7 +91,7 @@ void TstImageTasks::scale_does_not_upscale_smaller_than_target() {
     addScale(group, src, dst, /*longest=*/1024);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved(10000));
+    QVERIFY(f.waitForGroupFinished(10000));
 
     QImageReader reader(dst);
     const QSize size = reader.size();
@@ -119,7 +119,7 @@ void TstImageTasks::scale_skip_conflict_leaves_dest_untouched() {
     QUuid askedId; int kind = -1; QVariantMap ctx;
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(id, kind, int(Task::Skip), false);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(f.lastStateOf(id), int(Task::Skipped));
     QFile after(dst);
@@ -138,7 +138,7 @@ void TstImageTasks::convert_png_to_jpg_produces_valid_jpeg() {
     QSignalSpy finishedSpy(task, &Task::finished);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved(10000));
+    QVERIFY(f.waitForGroupFinished(10000));
 
     QCOMPARE(finishedSpy.count(), 1);
     QImageReader reader(dst);
@@ -167,7 +167,7 @@ void TstImageTasks::convert_skip_conflict_leaves_dest_untouched() {
     QUuid askedId; int kind = -1; QVariantMap ctx;
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(id, kind, int(Task::Skip), false);
-    QVERIFY(f.waitForGroupRemoved());
+    QVERIFY(f.waitForGroupFinished());
 
     QCOMPARE(f.lastStateOf(id), int(Task::Skipped));
     QFile after(dst);

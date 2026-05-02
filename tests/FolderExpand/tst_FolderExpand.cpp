@@ -48,7 +48,7 @@ void TstFolderExpand::recursive_folder_copy_mirrors_structure() {
         group->addTask(new CopyFileTask(p.src, p.dst, group));
     }
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved(10000));
+    QVERIFY(f.waitForGroupFinished(10000));
 
     // Every leaf file is byte-equal at the mirrored path under dest/src/.
     QVERIFY(TestHelpers::filesEqual(src + "/a.bin", destBase + "/src/a.bin"));
@@ -78,7 +78,7 @@ void TstFolderExpand::mixed_file_and_folder_selection_lands_under_dest() {
         group->addTask(new CopyFileTask(p.src, p.dst, group));
     }
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupRemoved(10000));
+    QVERIFY(f.waitForGroupFinished(10000));
 
     QVERIFY(TestHelpers::filesEqual(f.path("loose.bin"),
                                     destBase + "/loose.bin"));
