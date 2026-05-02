@@ -33,3 +33,6 @@ kling_*
 
 # Local scratch folder used to exercise paste / move flows.
 themes/new/
+
+# Portable distribution dir (Qt deploy output, not source).
+Pixee-portable/
