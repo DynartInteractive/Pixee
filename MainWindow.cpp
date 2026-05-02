@@ -1,4 +1,5 @@
 #include <QAction>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -13,6 +14,7 @@
 #include <QSortFilterProxyModel>
 #include <QStatusBar>
 #include <QStorageInfo>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include "MainWindow.h"
@@ -335,6 +337,11 @@ void MainWindow::create() {
                 goToFolderByFileIndex(fileIndex);
             } else if (item->fileType() == FileType::Image) {
                 activateImage(item);
+            } else if (item->fileType() == FileType::File) {
+                // Hand off to the OS shell — opens with the user's default
+                // app, or executes the file if it's a binary on Windows.
+                QDesktopServices::openUrl(
+                    QUrl::fromLocalFile(item->fileInfo().filePath()));
             }
         }
     );
