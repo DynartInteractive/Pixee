@@ -5,11 +5,11 @@
 Task::Task(TaskGroup* group, QObject* parent)
     : QObject(parent),
       _id(QUuid::createUuid()),
-      _group(group),
-      _completionEmitted(false) {
+      _group(group) {
     _state.storeRelease(static_cast<int>(Queued));
     _stopRequested.storeRelease(0);
     _pauseRequested.storeRelease(0);
+    _completionEmitted.storeRelease(0);
 }
 
 Task::~Task() = default;
@@ -59,6 +59,16 @@ void Task::requestStop() {
     {
         QMutexLocker lock(&_answerMutex);
         _answerCv.wakeAll();
+    }
+    // Queued tasks haven't been picked up by a runner yet — and never
+    // will be, since dispatch skips Stopped groups. Without this they
+    // stay in Queued forever, blocking allTerminal() from ever flipping
+    // and the group from ever being removed from the dock. CAS so we
+    // don't double-emit if a runner happens to be racing us.
+    if (state() == Queued
+            && _completionEmitted.testAndSetAcquire(0, 1)) {
+        setState(Aborted);
+        emit aborted(_id);
     }
 }
 
@@ -114,16 +124,17 @@ Task::ConflictAnswer Task::resolveOrAsk(QuestionKind kind, const QVariantMap& co
 }
 
 void Task::execute() {
+    // Claim the run atomically. CAS 0→2 fails if requestStop already
+    // force-aborted us (sentinel == 1) — bail without setState(Running)
+    // (which would overwrite the Aborted state) and without re-emitting.
+    if (!_completionEmitted.testAndSetAcquire(0, 2)) return;
+
     setState(Running);
     emitProgress(0);
 
     run();
 
-    // run() should have set _state to Completed/Failed/Aborted/Skipped
-    // implicitly through helpers, OR we infer from the flags here.
-    if (_completionEmitted) return;
-    _completionEmitted = true;
-
+    // We own the terminal emit (CAS at top set sentinel to 2).
     if (_stopRequested.loadAcquire()) {
         setState(Aborted);
         emit aborted(_id);

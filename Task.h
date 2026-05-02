@@ -118,7 +118,13 @@ private:
     // it's atomic. Stored as int because QAtomicInt doesn't take enums.
     QAtomicInt _state;
     QString _failureMessage;
-    bool _completionEmitted;
+    // Atomic 3-value sentinel so requestStop() (GUI thread) and execute()
+    // (worker thread) can resolve the "who owns the terminal emit" race
+    // without intermediate-state corruption.
+    //   0 = unclaimed
+    //   1 = requestStop force-aborted; execute() should bail without running
+    //   2 = execute() has claimed the run; owns the terminal emit at the end
+    QAtomicInt _completionEmitted;
 
     QAtomicInt _stopRequested;
     QAtomicInt _pauseRequested;
