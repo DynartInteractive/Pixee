@@ -25,6 +25,7 @@ private slots:
     void clear_all_finished_removes_terminal_groups_only();
     void has_active_tasks_flips_at_terminal();
     void aggregate_counters_reflect_lifecycle();
+    void aggregate_counters_exclude_finished_groups();
     void shutdown_drops_finished_groups_without_groupRemoved();
 };
 
@@ -165,11 +166,48 @@ void TstTaskManagerClear::aggregate_counters_reflect_lifecycle() {
     f.mgr.enqueueGroup(group);
     QVERIFY(f.waitForGroupFinished());
 
-    QCOMPARE(f.mgr.totalTaskCount(), 2);
-    QCOMPARE(f.mgr.terminalTaskCount(), 2);
-    QCOMPARE(f.mgr.aggregateProgressPercent(), 100);
+    // Finished groups are excluded from the aggregate counters — the
+    // status-bar widget should hide once everything's done, not show
+    // 2 / 2 forever until cleared.
+    QCOMPARE(f.mgr.totalTaskCount(), 0);
+    QCOMPARE(f.mgr.terminalTaskCount(), 0);
+    QCOMPARE(f.mgr.aggregateProgressPercent(), 0);
 
     f.mgr.clearGroup(group->id());
+    QCOMPARE(f.mgr.totalTaskCount(), 0);
+    QCOMPARE(f.mgr.aggregateProgressPercent(), 0);
+}
+
+void TstTaskManagerClear::aggregate_counters_exclude_finished_groups() {
+    // Finished group A still in the dock; running group B with the
+    // first task paused. Aggregate should reflect ONLY B's tasks so
+    // a stale A doesn't dilute the X / Y label.
+    TaskTestFixture f;
+    TestHelpers::writeBytes(f.path("a.bin"), 1024);
+    TestHelpers::writeBytes(f.path("b1.bin"), 4 * 1024 * 1024);
+    TestHelpers::writeBytes(f.path("b2.bin"), 1024);
+
+    auto* groupA = new TaskGroup(QStringLiteral("A"));
+    addCopy(groupA, f.path("a.bin"), f.path("a-out.bin"));
+    f.mgr.enqueueGroup(groupA);
+    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.mgr.hasGroups());                   // A still tracked
+
+    auto* groupB = new TaskGroup(QStringLiteral("B"));
+    auto* tB1 = addCopy(groupB, f.path("b1.bin"), f.path("b1-out.bin"));
+    addCopy(groupB, f.path("b2.bin"), f.path("b2-out.bin"));
+    f.mgr.enqueueGroup(groupB);
+
+    f.mgr.pauseTask(tB1->id());
+    QTRY_COMPARE_WITH_TIMEOUT(tB1->state(), Task::Paused, 5000);
+
+    QCOMPARE(f.mgr.totalTaskCount(), 2);          // only B's two tasks
+    QCOMPARE(f.mgr.terminalTaskCount(), 0);       // neither finished
+
+    f.mgr.resumeTask(tB1->id());
+    QTRY_COMPARE_WITH_TIMEOUT(f.groupFinishedSpy.count(), 2, 15000);
+
+    // Both groups finished now — aggregate is empty again.
     QCOMPARE(f.mgr.totalTaskCount(), 0);
     QCOMPARE(f.mgr.aggregateProgressPercent(), 0);
 }

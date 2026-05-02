@@ -237,15 +237,25 @@ bool isTerminalState(int state) {
 }
 }
 
+// Aggregate counters intentionally exclude groups that have reached
+// all-terminal — once a batch is "done", it stops contributing to the
+// status-bar progress. Otherwise a fresh batch enqueued while a finished
+// (but not-yet-cleared) one is still in the dock would dilute its X / Y
+// label and progress percentage.
+
 int TaskManager::totalTaskCount() const {
     int n = 0;
-    for (TaskGroup* g : _groups) n += g->tasks().size();
+    for (TaskGroup* g : _groups) {
+        if (g->allTerminal()) continue;
+        n += g->tasks().size();
+    }
     return n;
 }
 
 int TaskManager::terminalTaskCount() const {
     int n = 0;
     for (TaskGroup* g : _groups) {
+        if (g->allTerminal()) continue;
         for (Task* t : g->tasks()) {
             if (isTerminalState(static_cast<int>(t->state()))) ++n;
         }
@@ -257,11 +267,13 @@ int TaskManager::aggregateProgressPercent() const {
     int total = 0;
     int n = 0;
     for (TaskGroup* g : _groups) {
+        if (g->allTerminal()) continue;
         for (Task* t : g->tasks()) {
             const int s = static_cast<int>(t->state());
-            // Terminal tasks are 100 — even Failed/Aborted/Skipped, since
-            // they're "done" from the aggregate's perspective. Non-terminal
-            // tasks use the last reported chunk progress (0 if none yet).
+            // Terminal tasks (within a still-active group — typically a
+            // failed/aborted task while siblings keep running) count as
+            // 100. Non-terminal tasks use the last reported chunk
+            // progress, defaulting to 0 if none yet.
             const int pct = isTerminalState(s) ? 100
                           : _taskProgress.value(t->id(), 0);
             total += pct;

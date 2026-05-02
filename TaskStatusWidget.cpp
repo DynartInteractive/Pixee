@@ -15,6 +15,7 @@ TaskStatusWidget::TaskStatusWidget(TaskManager* manager, QWidget* parent)
     auto* layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(6);
+    layout->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     _bar = new QProgressBar(this);
     _bar->setObjectName("taskStatusBar");
@@ -27,6 +28,10 @@ TaskStatusWidget::TaskStatusWidget(TaskManager* manager, QWidget* parent)
     _label = new QLabel(QStringLiteral("0 / 0"), this);
     _label->setObjectName("taskStatusLabel");
 
+    // Leading stretch so the bar + label hug the right edge of whatever
+    // cell QStatusBar gives us. Without this, the QHBoxLayout centers
+    // them when the cell is wider than the contents.
+    layout->addStretch(1);
     layout->addWidget(_bar);
     layout->addWidget(_label);
 

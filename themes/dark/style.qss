@@ -150,6 +150,21 @@ QPushButton#taskQuestionButton:pressed {
 	background-color: #1f3460;
 }
 
+/* ---- Status-bar progress widget ---- */
+
+#taskStatusLabel {
+	color: #fff;
+}
+QProgressBar#taskStatusBar {
+	background-color: #2a2a2a;
+	border: 1px solid #1f1f1f;
+	border-radius: 2px;
+}
+QProgressBar#taskStatusBar::chunk {
+	background-color: #2b4580;
+	border-radius: 2px;
+}
+
 QScrollBar:vertical {
 	background-color: #333;
 	min-height: 16px;
