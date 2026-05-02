@@ -17,6 +17,7 @@
 #include "ConvertFormatTask.h"
 #include "CopyFileTask.h"
 #include "DeleteFileTask.h"
+#include "FileOpsHelpers.h"
 #include "FolderCleanupTask.h"
 #include "MoveFileTask.h"
 #include "OpenWithDialog.h"
@@ -25,108 +26,19 @@
 #include "TaskManager.h"
 #include "Toast.h"
 
+using FileOpsHelpers::clipboardSaysCut;
+using FileOpsHelpers::destIsSourceOrDescendant;
+using FileOpsHelpers::dropEffectBytes;
+using FileOpsHelpers::expandToFiles;
+using FileOpsHelpers::isDriveRoot;
+using FileOpsHelpers::Pair;
+
 namespace {
 constexpr const char* kLastCopyKey = "lastCopyToPath";
 constexpr const char* kLastMoveKey = "lastMoveToPath";
 
 const int kScalePresets[] = { 1024, 1920, 2560, 4096 };
 const QList<QByteArray> kConvertFormats = { "jpg", "png", "webp" };
-
-// True if `path` is a filesystem root (a drive root on Windows, '/' on
-// posix). We refuse to recursively copy / move / delete drive roots —
-// the user almost certainly didn't intend to operate on the entire
-// drive, and the cost of a mistake is too high.
-bool isDriveRoot(const QString& path) {
-    return QFileInfo(path).isRoot();
-}
-
-// True if `dest` is the same folder as `source` or a folder under it.
-// Copying / moving / pasting into one of source's own descendants is a
-// recursion landmine: expandToFiles mkpath's destination subdirs as it
-// walks, and those new dirs land inside the source tree the iterator
-// is still enumerating. Refuse up-front. Comparison is case-sensitive
-// and uses cleanPath + absolutePath so 'D:/foo' matches 'D:\\foo' and
-// 'D:/foo/.' matches 'D:/foo'.
-bool destIsSourceOrDescendant(const QString& dest, const QString& source) {
-    const QString d = QDir::cleanPath(QDir(dest).absolutePath());
-    const QString s = QDir::cleanPath(QDir(source).absolutePath());
-    if (d == s) return true;
-    return d.startsWith(s + QLatin1Char('/'));
-}
-
-// Windows clipboard: 'Preferred DropEffect' is a 4-byte little-endian
-// DWORD. 2 = DROPEFFECT_MOVE (Cut); 5 = DROPEFFECT_COPY. Qt surfaces it
-// as a custom mime format. Other platforms have analogues (gnome-copied-
-// files on Linux); we only handle the Windows one for now.
-constexpr const char* kDropEffectMime = "application/x-qt-windows-mime;value=\"Preferred DropEffect\"";
-
-bool clipboardSaysCut(const QMimeData* mime) {
-    if (!mime || !mime->hasFormat(kDropEffectMime)) return false;
-    const QByteArray data = mime->data(kDropEffectMime);
-    if (data.size() < 4) return false;
-    const quint32 effect = static_cast<quint8>(data.at(0))
-                         | (static_cast<quint8>(data.at(1)) << 8)
-                         | (static_cast<quint8>(data.at(2)) << 16)
-                         | (static_cast<quint8>(data.at(3)) << 24);
-    return effect == 2;
-}
-
-QByteArray dropEffectBytes(quint32 effect) {
-    QByteArray b(4, '\0');
-    b[0] = static_cast<char>(effect & 0xFF);
-    b[1] = static_cast<char>((effect >> 8) & 0xFF);
-    b[2] = static_cast<char>((effect >> 16) & 0xFF);
-    b[3] = static_cast<char>((effect >> 24) & 0xFF);
-    return b;
-}
-
-// A (source file, destination file) pair. Recursive expansion produces
-// many of these from a single folder source.
-struct Pair {
-    QString src;
-    QString dst;
-};
-
-// Expand `src` (a file or folder) into a list of file-level (src, dst)
-// pairs under `destBase`. For folders, replicates the directory tree at
-// `destBase / <folderName> / ...`, mkpath'ing empty subdirectories so
-// they survive the operation. Symlinks are skipped.
-QList<Pair> expandToFiles(const QString& src, const QString& destBase) {
-    QList<Pair> out;
-    const QFileInfo info(src);
-    if (!info.exists()) return out;
-
-    if (info.isFile()) {
-        out.append({ src, QDir(destBase).filePath(info.fileName()) });
-        return out;
-    }
-    if (!info.isDir()) return out;
-
-    const QString folderName = info.fileName();
-    const QString folderDest = QDir(destBase).filePath(folderName);
-    QDir().mkpath(folderDest);
-
-    // Replicate the directory structure first so empty subfolders are
-    // preserved at the destination.
-    QDirIterator dirIt(src,
-        QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot | QDir::NoSymLinks,
-        QDirIterator::Subdirectories);
-    while (dirIt.hasNext()) {
-        const QString d = dirIt.next();
-        const QString rel = QDir(src).relativeFilePath(d);
-        QDir().mkpath(QDir(folderDest).filePath(rel));
-    }
-
-    QDirIterator fileIt(src,
-        QDir::Files | QDir::Hidden | QDir::NoSymLinks,
-        QDirIterator::Subdirectories);
-    while (fileIt.hasNext()) {
-        const QString f = fileIt.next();
-        const QString rel = QDir(src).relativeFilePath(f);
-        out.append({ f, QDir(folderDest).filePath(rel) });
-    }
-    return out;
-}
 }
 
 FileOpsMenuBuilder::FileOpsMenuBuilder(QStringList sourcePaths,
@@ -416,7 +328,7 @@ QMimeData* FileOpsMenuBuilder::buildPathsMimeData(const QStringList& paths) {
     // Tag as DROPEFFECT_COPY explicitly so other apps that key off this
     // (Explorer, etc.) treat the payload unambiguously — symmetrical with
     // how we read the same flag in handleDropOrPaste for Cut.
-    mime->setData(kDropEffectMime, dropEffectBytes(5));
+    mime->setData(FileOpsHelpers::kDropEffectMime, dropEffectBytes(5));
     return mime;
 }
 

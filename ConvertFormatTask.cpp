@@ -7,23 +7,7 @@
 #include <QImageReader>
 #include <QImageWriter>
 
-namespace {
-QString uniqueRenamedPath(const QString& path) {
-    if (!QFile::exists(path)) return path;
-    const QFileInfo info(path);
-    const QString stem = info.completeBaseName();
-    const QString ext = info.suffix();
-    const QString dir = info.absolutePath();
-    for (int n = 1; n < 10000; ++n) {
-        QString candidate = ext.isEmpty()
-                ? QStringLiteral("%1 (%2)").arg(stem).arg(n)
-                : QStringLiteral("%1 (%2).%3").arg(stem).arg(n).arg(ext);
-        QString full = QDir(dir).filePath(candidate);
-        if (!QFile::exists(full)) return full;
-    }
-    return path;
-}
-}
+#include "FileOpsHelpers.h"
 
 ConvertFormatTask::ConvertFormatTask(const QString& sourcePath, const QString& destPath,
                                      const QByteArray& targetFormat, int jpegQuality,
@@ -61,7 +45,7 @@ void ConvertFormatTask::run() {
             }
             break;
         case Rename:
-            _dst = uniqueRenamedPath(_dst);
+            _dst = FileOpsHelpers::uniqueRenamedPath(_dst);
             break;
         }
     }
