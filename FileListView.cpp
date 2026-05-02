@@ -8,6 +8,7 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QMimeData>
 #include <QPainter>
 #include <QPaintEvent>
@@ -413,7 +414,17 @@ void FileListView::startDrag(Qt::DropActions supportedActions) {
     // sources to complete the move. Internal Move drops have a non-null
     // target — our drop handler ran MoveFileTasks already, so deleting
     // again here would race with the move tasks reading the source.
-    if (result == Qt::MoveAction && drag->target() == nullptr && _taskManager) {
+    //
+    // Shift gate: some external receivers (browsers running Gradio /
+    // similar frameworks) advertise dropEffect=move on dragover even
+    // when the user only intended a Copy — the OS reports MoveAction
+    // back to us and we'd silently delete the sources. The user's only
+    // intent signal we can trust is the Shift key; honour the Move
+    // result only if Shift is still down at the moment exec() returns.
+    const bool shiftHeld =
+        QGuiApplication::keyboardModifiers().testFlag(Qt::ShiftModifier);
+    if (result == Qt::MoveAction && shiftHeld
+            && drag->target() == nullptr && _taskManager) {
         FileOpsMenuBuilder::enqueueDeleteForExternalMove(sel.paths, _taskManager);
     }
 }

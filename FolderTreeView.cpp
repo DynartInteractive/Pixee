@@ -6,6 +6,7 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QMimeData>
 #include <QPainter>
 #include <QPaintEvent>
@@ -161,8 +162,11 @@ void FolderTreeView::startDrag(Qt::DropActions supportedActions) {
     const Qt::DropAction result =
         drag->exec(Qt::CopyAction | Qt::MoveAction, Qt::CopyAction);
 
-    // External Move post-exec delete (see FileListView::startDrag).
-    if (result == Qt::MoveAction && drag->target() == nullptr && _taskManager) {
+    // External Move post-exec delete + Shift gate (see FileListView::startDrag).
+    const bool shiftHeld =
+        QGuiApplication::keyboardModifiers().testFlag(Qt::ShiftModifier);
+    if (result == Qt::MoveAction && shiftHeld
+            && drag->target() == nullptr && _taskManager) {
         FileOpsMenuBuilder::enqueueDeleteForExternalMove(paths, _taskManager);
     }
 }
