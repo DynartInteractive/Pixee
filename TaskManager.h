@@ -34,10 +34,9 @@ public:
     explicit TaskManager(int workerCount, QObject* parent = nullptr);
     ~TaskManager() override;
 
-    // Submit a group. Manager takes ownership; the group stays in the
-    // tracked list once all its tasks reach a terminal state (signalled
-    // via groupFinished) and is deleted only on clearGroup /
-    // clearAllFinished / shutdown.
+    // Submit a group. Manager takes ownership; the group is deleted
+    // automatically once every task reaches a terminal state (or on
+    // shutdown).
     void enqueueGroup(TaskGroup* group);
 
     // Group-level controls. Look up the group by id.
@@ -55,54 +54,26 @@ public:
     // this question kind.
     void provideAnswer(const QUuid& taskId, int kind, int answer, bool applyToGroup);
 
-    // Explicit removal — moves the group out of _groups, emits
-    // groupRemoved, and schedules deletion. Refuses (no-op) on a group
-    // that still has non-terminal tasks; the UI's per-group Clear button
-    // is only shown for terminal groups, but the guard keeps the API
-    // safe to call regardless.
-    void clearGroup(const QUuid& groupId);
-
-    // Bulk clear: drops every group whose tasks are all terminal.
-    // Running / paused / queued groups are untouched.
-    void clearAllFinished();
-
     // Stops everything, drains workers, joins threads. Idempotent.
     void shutdown();
 
-    // True iff at least one group is still tracked. After Phase 1 of the
-    // dock-rework, finished groups stay in _groups until explicitly
-    // cleared, so this no longer means "work is in progress" — see
-    // hasActiveTasks for that.
+    // True iff at least one group is still in the queue. Equivalent to
+    // "is there work in progress" because finished groups are auto-
+    // removed.
     bool hasGroups() const { return !_groups.isEmpty(); }
 
-    // True iff any task in any group is in a non-terminal state. Drives
-    // the status-bar progress widget's visibility and the auto-hide-on-
-    // empty behaviour for status-bar-opened docks.
-    bool hasActiveTasks() const;
-
-    // True iff at least one tracked group has reached all-terminal and
-    // hasn't been cleared yet. Drives the dock's "Clear all finished"
-    // button enabled state.
-    bool hasFinishedGroups() const;
-
     // Aggregate counters for the status-bar widget. terminalTaskCount
-    // includes Completed + Failed + Aborted + Skipped. aggregateProgress
-    // sums per-task progress (terminal = 100, others = last reported)
-    // divided by total task count. Returns 0 when there are no tasks at
-    // all (used as the "hide me" sentinel by the widget).
+    // includes Completed + Failed + Aborted + Skipped (a task that
+    // failed early in a multi-task group; siblings keep running).
+    // aggregateProgress sums per-task progress (terminal = 100, others
+    // = last reported) divided by total task count. Returns 0 when
+    // there are no tasks (the widget's hide sentinel).
     int totalTaskCount() const;
     int terminalTaskCount() const;
     int aggregateProgressPercent() const;
 
 signals:
     void groupAdded(TaskGroup* group);
-    // Emitted once when every task in a group reaches a terminal state.
-    // The group itself stays in the manager's list until clearGroup or
-    // clearAllFinished removes it. Use this signal (not groupRemoved)
-    // to know "this batch is done".
-    void groupFinished(QUuid groupId);
-    // Emitted only when a group is explicitly removed (clearGroup /
-    // clearAllFinished / shutdown). Use to take down the per-group UI.
     void groupRemoved(QUuid groupId);
     void taskStateChanged(QUuid taskId, int state);
     void taskProgress(QUuid taskId, int pct);
@@ -133,15 +104,12 @@ private:
     TaskGroup* findGroup(const QUuid& groupId) const;
     void onTaskTerminal(const QUuid& taskId);
     void freeRunnerForTask(const QUuid& taskId);
-    // Renamed from maybeRemoveGroup — fires groupFinished but leaves the
-    // group in _groups for explicit clear. Tracks groups already finished
-    // so we don't re-fire on subsequent terminal transitions in the same
-    // group (e.g. an already-finished group whose state we re-check).
-    void maybeFinishGroup(TaskGroup* group);
+    // Removes the group from _groups, emits groupRemoved, schedules
+    // deletion. No-op if the group still has non-terminal tasks.
+    void maybeRemoveGroup(TaskGroup* group);
 
     QList<RunnerSlot> _runners;
     QList<TaskGroup*> _groups;          // submission order
-    QSet<QUuid> _finishedGroups;        // groups that already emitted groupFinished
     QHash<QUuid, int> _taskProgress;    // taskId → last reported pct, for aggregate
     bool _shutdown;
 };

@@ -79,7 +79,7 @@ void TstMoveFileTask::same_volume_rename_completes() {
     const QUuid id = task->id();
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(abortedSpy.count(), 0);
@@ -121,7 +121,7 @@ void TstMoveFileTask::conflict_skip_leaves_both_untouched() {
     QCOMPARE(kind, int(Task::DestinationExists));
     f.mgr.provideAnswer(id, kind, int(Task::Skip), false);
 
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(f.lastStateOf(id), int(Task::Skipped));
@@ -158,7 +158,7 @@ void TstMoveFileTask::conflict_overwrite_replaces_dest_and_removes_source() {
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(id, kind, int(Task::Overwrite), false);
 
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(f.lastStateOf(id), int(Task::Completed));
@@ -198,7 +198,7 @@ void TstMoveFileTask::conflict_rename_creates_uniquified_and_removes_source() {
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(id, kind, int(Task::Rename), false);
 
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(f.lastStateOf(id), int(Task::Completed));
@@ -237,7 +237,7 @@ void TstMoveFileTask::cross_volume_falls_back_to_copy_and_delete() {
     const QUuid id = task->id();
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupFinished(15000));
+    QVERIFY(f.waitForGroupRemoved(15000));
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(f.lastStateOf(id), int(Task::Completed));

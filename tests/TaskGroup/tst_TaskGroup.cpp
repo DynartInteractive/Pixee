@@ -64,7 +64,7 @@ void TstTaskGroup::sticky_overwrite_short_circuits_remaining_tasks_in_group() {
     f.mgr.provideAnswer(askedId, kind, int(Task::Overwrite),
                         /*applyToGroup=*/true);
 
-    QVERIFY(f.waitForGroupFinished(10000));
+    QVERIFY(f.waitForGroupRemoved(10000));
 
     // No further questions in the queue (waitForQuestion popped the only one).
     QCOMPARE(f.questionSpy.count(), 0);
@@ -92,7 +92,7 @@ void TstTaskGroup::sticky_answer_does_not_cross_groups() {
     QUuid askedId; int kind = -1; QVariantMap ctx;
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(askedId, kind, int(Task::Overwrite), true);
-    QTRY_COMPARE_WITH_TIMEOUT(f.groupFinishedSpy.count(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(f.groupRemovedSpy.count(), 1, 5000);
 
     // Group B — different group, same conflict shape. Sticky from A must
     // NOT carry over: the new group has its own (empty) sticky map.
@@ -102,7 +102,7 @@ void TstTaskGroup::sticky_answer_does_not_cross_groups() {
 
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(askedId, kind, int(Task::Overwrite), false);
-    QTRY_COMPARE_WITH_TIMEOUT(f.groupFinishedSpy.count(), 2, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(f.groupRemovedSpy.count(), 2, 5000);
 }
 
 void TstTaskGroup::stop_group_aborts_queued_tasks() {
@@ -132,7 +132,7 @@ void TstTaskGroup::stop_group_aborts_queued_tasks() {
     QTRY_COMPARE_WITH_TIMEOUT(tasks[0]->state(), Task::Paused, 5000);
     f.mgr.stopGroup(groupId);
 
-    QVERIFY(f.waitForGroupFinished(10000));
+    QVERIFY(f.waitForGroupRemoved(10000));
 
     for (CopyFileTask* t : tasks) {
         QCOMPARE(f.lastStateOf(t->id()), int(Task::Aborted));
@@ -162,7 +162,7 @@ void TstTaskGroup::sequential_dispatch_within_a_group() {
     QCOMPARE(t2->state(), Task::Queued);
 
     f.mgr.resumeTask(t1->id());
-    QVERIFY(f.waitForGroupFinished(15000));
+    QVERIFY(f.waitForGroupRemoved(15000));
 
     QCOMPARE(f.lastStateOf(t1->id()), int(Task::Completed));
     QCOMPARE(f.lastStateOf(t2->id()), int(Task::Completed));
@@ -193,7 +193,7 @@ void TstTaskGroup::parallel_dispatch_across_groups() {
 
     f.mgr.resumeTask(tA->id());
     f.mgr.resumeTask(tB->id());
-    QTRY_COMPARE_WITH_TIMEOUT(f.groupFinishedSpy.count(), 2, 15000);
+    QTRY_COMPARE_WITH_TIMEOUT(f.groupRemovedSpy.count(), 2, 15000);
     QCOMPARE(f.lastStateOf(tA->id()), int(Task::Completed));
     QCOMPARE(f.lastStateOf(tB->id()), int(Task::Completed));
 }
@@ -206,7 +206,7 @@ void TstTaskGroup::path_touched_emits_for_completed_task() {
     auto* group = new TaskGroup(QStringLiteral("Touch"));
     addCopy(group, f.path("src.bin"), f.path("dest/dst.bin"));
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     // Manager fires pathTouched once per affectedDir on Completed (not
     // on Skipped). CopyFileTask::affectedDirs returns the dest's parent.

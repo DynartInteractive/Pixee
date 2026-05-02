@@ -53,7 +53,6 @@ void TaskManager::shutdown() {
     // Delete remaining groups (groups own their tasks via QObject parent).
     qDeleteAll(_groups);
     _groups.clear();
-    _finishedGroups.clear();
     _taskProgress.clear();
 }
 
@@ -179,55 +178,20 @@ void TaskManager::onTaskAborted(QUuid taskId) {
 void TaskManager::onTaskTerminal(const QUuid& taskId) {
     // The task itself signaled its terminal state. The runner-idle slot
     // independently clears the runner slot. Here we only check if the
-    // owning group has reached all-terminal so we can fire groupFinished.
-    // Group removal is deferred until the user (or shutdown) explicitly
-    // clears it.
+    // owning group is fully done so we can remove it.
     Task* t = findTask(taskId);
     if (!t) return;
-    if (TaskGroup* g = t->group()) maybeFinishGroup(g);
+    if (TaskGroup* g = t->group()) maybeRemoveGroup(g);
 }
 
-void TaskManager::maybeFinishGroup(TaskGroup* group) {
+void TaskManager::maybeRemoveGroup(TaskGroup* group) {
     if (!group) return;
     if (!group->allTerminal()) return;
     const QUuid id = group->id();
-    if (_finishedGroups.contains(id)) return;     // already announced
-    _finishedGroups.insert(id);
-    emit groupFinished(id);
-}
-
-void TaskManager::clearGroup(const QUuid& groupId) {
-    TaskGroup* group = findGroup(groupId);
-    if (!group) return;
-    if (!group->allTerminal()) return;            // refuse to drop a live group
     _groups.removeAll(group);
-    _finishedGroups.remove(groupId);
     for (Task* t : group->tasks()) _taskProgress.remove(t->id());
-    emit groupRemoved(groupId);
+    emit groupRemoved(id);
     group->deleteLater();
-}
-
-void TaskManager::clearAllFinished() {
-    // Snapshot the ids first — clearGroup mutates _groups.
-    QList<QUuid> doomed;
-    for (TaskGroup* g : _groups) {
-        if (g->allTerminal()) doomed.append(g->id());
-    }
-    for (const QUuid& id : doomed) clearGroup(id);
-}
-
-bool TaskManager::hasActiveTasks() const {
-    for (TaskGroup* g : _groups) {
-        if (!g->allTerminal()) return true;
-    }
-    return false;
-}
-
-bool TaskManager::hasFinishedGroups() const {
-    for (TaskGroup* g : _groups) {
-        if (g->allTerminal()) return true;
-    }
-    return false;
 }
 
 namespace {
@@ -237,25 +201,15 @@ bool isTerminalState(int state) {
 }
 }
 
-// Aggregate counters intentionally exclude groups that have reached
-// all-terminal — once a batch is "done", it stops contributing to the
-// status-bar progress. Otherwise a fresh batch enqueued while a finished
-// (but not-yet-cleared) one is still in the dock would dilute its X / Y
-// label and progress percentage.
-
 int TaskManager::totalTaskCount() const {
     int n = 0;
-    for (TaskGroup* g : _groups) {
-        if (g->allTerminal()) continue;
-        n += g->tasks().size();
-    }
+    for (TaskGroup* g : _groups) n += g->tasks().size();
     return n;
 }
 
 int TaskManager::terminalTaskCount() const {
     int n = 0;
     for (TaskGroup* g : _groups) {
-        if (g->allTerminal()) continue;
         for (Task* t : g->tasks()) {
             if (isTerminalState(static_cast<int>(t->state()))) ++n;
         }
@@ -267,13 +221,8 @@ int TaskManager::aggregateProgressPercent() const {
     int total = 0;
     int n = 0;
     for (TaskGroup* g : _groups) {
-        if (g->allTerminal()) continue;
         for (Task* t : g->tasks()) {
             const int s = static_cast<int>(t->state());
-            // Terminal tasks (within a still-active group — typically a
-            // failed/aborted task while siblings keep running) count as
-            // 100. Non-terminal tasks use the last reported chunk
-            // progress, defaulting to 0 if none yet.
             const int pct = isTerminalState(s) ? 100
                           : _taskProgress.value(t->id(), 0);
             total += pct;

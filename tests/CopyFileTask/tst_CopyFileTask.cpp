@@ -59,7 +59,7 @@ void TstCopyFileTask::happy_small_file() {
     const QUuid id = task->id();
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 0);
@@ -81,7 +81,7 @@ void TstCopyFileTask::happy_multi_mb_emits_progress_and_completes() {
     QSignalSpy finishedSpy(task, &Task::finished);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupFinished(15000));
+    QVERIFY(f.waitForGroupRemoved(15000));
 
     QCOMPARE(finishedSpy.count(), 1);
     QVERIFY2(progressSpy.count() > 2,
@@ -111,7 +111,7 @@ void TstCopyFileTask::source_missing_fails() {
     const QUuid id = task->id();
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(failedSpy.count(), 1);
     QCOMPARE(finishedSpy.count(), 0);
@@ -131,7 +131,7 @@ void TstCopyFileTask::dest_parent_is_created() {
     QSignalSpy finishedSpy(task, &Task::finished);
 
     f.mgr.enqueueGroup(group);
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QVERIFY(QFileInfo(f.path("nested/sub/dir")).isDir());
@@ -161,7 +161,7 @@ void TstCopyFileTask::cancel_after_pause_aborts_and_removes_partial() {
     QTRY_COMPARE_WITH_TIMEOUT(task->state(), Task::Paused, 5000);
 
     f.mgr.stopTask(id);
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(abortedSpy.count(), 1);
     QCOMPARE(finishedSpy.count(), 0);
@@ -194,7 +194,7 @@ void TstCopyFileTask::pause_then_resume_completes_with_correct_bytes() {
     QCOMPARE(progressSpy.count(), frozen);
 
     f.mgr.resumeTask(id);
-    QVERIFY(f.waitForGroupFinished(15000));
+    QVERIFY(f.waitForGroupRemoved(15000));
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(abortedSpy.count(), 0);
@@ -226,7 +226,7 @@ void TstCopyFileTask::conflict_skip_leaves_dest_untouched() {
     QCOMPARE(kind, int(Task::DestinationExists));
     f.mgr.provideAnswer(id, kind, int(Task::Skip), /*applyToGroup=*/false);
 
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(f.lastStateOf(id), int(Task::Skipped));
@@ -253,7 +253,7 @@ void TstCopyFileTask::conflict_overwrite_replaces_dest() {
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(id, kind, int(Task::Overwrite), false);
 
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(f.lastStateOf(id), int(Task::Completed));
@@ -283,7 +283,7 @@ void TstCopyFileTask::conflict_rename_creates_uniquified_copy() {
     QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
     f.mgr.provideAnswer(id, kind, int(Task::Rename), false);
 
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(f.lastStateOf(id), int(Task::Completed));
@@ -319,7 +319,7 @@ void TstCopyFileTask::stop_while_awaiting_answer_aborts_without_writing() {
     // Don't provide an answer — stop instead. The answer-cv unblocks on
     // stop, run() bails on isStopRequested, execute emits aborted.
     f.mgr.stopTask(id);
-    QVERIFY(f.waitForGroupFinished());
+    QVERIFY(f.waitForGroupRemoved());
 
     QCOMPARE(abortedSpy.count(), 1);
     QCOMPARE(finishedSpy.count(), 0);

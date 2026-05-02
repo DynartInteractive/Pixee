@@ -272,9 +272,9 @@ void MainWindow::create() {
                 _taskDockWidget->setVisible(true);
                 _taskDockWidget->raise();
             });
-    connect(_pixee->taskManager(), &TaskManager::groupFinished,
+    connect(_pixee->taskManager(), &TaskManager::groupRemoved,
             this, [this](QUuid) {
-                if (_pixee->taskManager()->hasActiveTasks()) return;
+                if (_pixee->taskManager()->hasGroups()) return;
                 if (_userTasksDockEnabled) return;
                 if (!_taskDockWidget->isVisible()) return;
                 _suppressDockVisibilitySync = true;

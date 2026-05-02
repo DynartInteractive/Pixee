@@ -77,16 +77,6 @@ TaskGroupWidget::TaskGroupWidget(TaskGroup* group, QWidget* parent)
     _stopGroupButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_DialogCloseButton));
     _stopGroupButton->setAutoRaise(true);
     _stopGroupButton->setToolTip(tr("Abort all tasks in group"));
-    _clearGroupButton = new QToolButton(header);
-    _clearGroupButton->setIcon(QApplication::style()->standardIcon(
-        QStyle::SP_DialogDiscardButton));
-    _clearGroupButton->setAutoRaise(true);
-    _clearGroupButton->setToolTip(tr("Remove this finished batch from the list"));
-    _clearGroupButton->setVisible(false);
-    connect(_clearGroupButton, &QToolButton::clicked, this, [this]() {
-        emit clearGroupRequested(_groupId);
-    });
-
     connect(_stopGroupButton, &QToolButton::clicked, this, [this]() {
         if (QMessageBox::question(this, tr("Abort task group"),
                 tr("Abort all remaining tasks in \"%1\"?").arg(_nameLabel->text()),
@@ -102,7 +92,6 @@ TaskGroupWidget::TaskGroupWidget(TaskGroup* group, QWidget* parent)
     hh->addWidget(_aggregate, 1);
     hh->addWidget(_pauseGroupButton, 0);
     hh->addWidget(_stopGroupButton, 0);
-    hh->addWidget(_clearGroupButton, 0);
     outer->addWidget(header);
 
     // ---- body ----
@@ -162,28 +151,6 @@ void TaskGroupWidget::onTaskStateChanged(const QUuid& taskId, int state) {
     // If the group is in paused state but no tasks are still pause-able,
     // sync the icon back to a play icon.
     updateGroupPauseButton();
-    updateTerminalAffordance();
-}
-
-bool TaskGroupWidget::allTasksTerminal() const {
-    if (_states.isEmpty()) return false;          // empty group is never "done"
-    for (auto it = _states.constBegin(); it != _states.constEnd(); ++it) {
-        const int s = it.value();
-        if (s != int(Task::Completed) && s != int(Task::Failed)
-                && s != int(Task::Aborted) && s != int(Task::Skipped)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-void TaskGroupWidget::updateTerminalAffordance() {
-    const bool done = allTasksTerminal();
-    // Pause/stop are useless on a finished group — swap them for the
-    // Clear button so the row says "you can dismiss me now".
-    _pauseGroupButton->setVisible(!done);
-    _stopGroupButton->setVisible(!done);
-    _clearGroupButton->setVisible(done);
 }
 
 void TaskGroupWidget::rebuildAggregateProgress() {

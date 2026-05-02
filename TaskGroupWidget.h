@@ -43,19 +43,10 @@ signals:
     void resumeTaskRequested(QUuid taskId);
     void stopTaskRequested(QUuid taskId);
     void answerProvided(QUuid taskId, int kind, int answer, bool applyToGroup);
-    // Clear button emit — only fires once all tasks in the group are
-    // terminal (the button is hidden until then). The dock owner wires
-    // this to TaskManager::clearGroup.
-    void clearGroupRequested(QUuid groupId);
 
 private:
     void rebuildAggregateProgress();
     void updateGroupPauseButton();
-    // Recomputes terminal-ness of the group from _states and updates
-    // header button visibility (pause/stop hidden, clear shown when
-    // every task has reached a terminal state).
-    void updateTerminalAffordance();
-    bool allTasksTerminal() const;
 
     QUuid _groupId;
     QToolButton* _toggleButton;
@@ -63,7 +54,6 @@ private:
     QProgressBar* _aggregate;
     QToolButton* _pauseGroupButton;
     QToolButton* _stopGroupButton;
-    QToolButton* _clearGroupButton;
     QFrame* _body;
     QVBoxLayout* _bodyLayout;
 

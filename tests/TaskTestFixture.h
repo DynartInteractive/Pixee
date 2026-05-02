@@ -30,20 +30,13 @@ public:
     QSignalSpy taskStateSpy;       // (QUuid, int)        — every transition
     QSignalSpy taskProgressSpy;    // (QUuid, int)
     QSignalSpy questionSpy;        // (QUuid, int, QVariantMap)
-    QSignalSpy groupFinishedSpy;   // (QUuid)              — all tasks terminal
-    QSignalSpy groupRemovedSpy;    // (QUuid)              — explicit clear
+    QSignalSpy groupRemovedSpy;    // (QUuid)              — fires on all-terminal
     QSignalSpy pathTouchedSpy;     // (QString)
 
-    // Block until the manager's groupFinished signal fires (or timeout).
-    // This is the cleanest "task reached terminal" wait — the manager
-    // emits it once every task in the owning group has reached a
-    // terminal state. The group itself stays tracked until clearGroup
-    // / clearAllFinished is called (use waitForGroupRemoved for that).
-    bool waitForGroupFinished(int timeoutMs = 5000);
-
-    // Block until the manager's groupRemoved signal fires. Used by tests
-    // that exercise the explicit clear path; ordinary "wait for done"
-    // tests should use waitForGroupFinished.
+    // Block until the manager's groupRemoved signal fires (or timeout).
+    // The manager auto-removes a group once every task in it reaches a
+    // terminal state, so this is the cleanest "task reached terminal"
+    // wait.
     bool waitForGroupRemoved(int timeoutMs = 5000);
 
     // Block until a question is posed; returns the question kind and

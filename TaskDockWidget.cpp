@@ -2,7 +2,6 @@
 
 #include <QFrame>
 #include <QPointer>
-#include <QPushButton>
 #include <QScrollArea>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -26,26 +25,7 @@ TaskDockWidget::TaskDockWidget(TaskManager* manager, QWidget* parent)
     _containerLayout = new QVBoxLayout(_container);
     _containerLayout->setContentsMargins(2, 2, 2, 2);
     _containerLayout->setSpacing(4);
-
-    // Header: "Clear all finished" button + thin separator. Stays at the
-    // top of the scroll container; new group widgets are inserted below
-    // it (above the trailing stretch).
-    _clearAllFinishedButton = new QPushButton(tr("Clear all finished"));
-    _clearAllFinishedButton->setObjectName("clearAllFinishedButton");
-    _clearAllFinishedButton->setFlat(true);
-    _clearAllFinishedButton->setCursor(Qt::PointingHandCursor);
-    _clearAllFinishedButton->setEnabled(false);
-    connect(_clearAllFinishedButton, &QPushButton::clicked,
-            _manager, &TaskManager::clearAllFinished);
-    _containerLayout->addWidget(_clearAllFinishedButton);
-
-    auto* headerSep = new QFrame();
-    headerSep->setObjectName("tasksDockHeaderSep");
-    headerSep->setFrameShape(QFrame::NoFrame);
-    headerSep->setFixedHeight(1);
-    _containerLayout->addWidget(headerSep);
-
-    _containerLayout->addStretch(1);  // pushes group widgets toward the top
+    _containerLayout->addStretch(1);  // pushes group widgets to the top
 
     _scrollArea = new QScrollArea();
     _scrollArea->setWidgetResizable(true);
@@ -58,8 +38,6 @@ TaskDockWidget::TaskDockWidget(TaskManager* manager, QWidget* parent)
             this, &TaskDockWidget::onGroupAdded);
     connect(_manager, &TaskManager::groupRemoved,
             this, &TaskDockWidget::onGroupRemoved);
-    connect(_manager, &TaskManager::groupFinished,
-            this, &TaskDockWidget::onGroupFinished);
     connect(_manager, &TaskManager::taskStateChanged,
             this, &TaskDockWidget::onTaskStateChanged);
     connect(_manager, &TaskManager::taskProgress,
@@ -88,8 +66,6 @@ void TaskDockWidget::onGroupAdded(TaskGroup* group) {
             _manager, &TaskManager::stopTask);
     connect(gw, &TaskGroupWidget::answerProvided,
             _manager, &TaskManager::provideAnswer);
-    connect(gw, &TaskGroupWidget::clearGroupRequested,
-            _manager, &TaskManager::clearGroup);
 
     // Insert before the trailing stretch so groups stack at the top.
     const int insertAt = qMax(0, _containerLayout->count() - 1);
@@ -102,15 +78,6 @@ void TaskDockWidget::onGroupRemoved(QUuid groupId) {
     if (!gw) return;
     _containerLayout->removeWidget(gw);
     gw->deleteLater();
-    updateClearAllFinishedButton();
-}
-
-void TaskDockWidget::onGroupFinished(QUuid /*groupId*/) {
-    updateClearAllFinishedButton();
-}
-
-void TaskDockWidget::updateClearAllFinishedButton() {
-    _clearAllFinishedButton->setEnabled(_manager->hasFinishedGroups());
 }
 
 TaskGroupWidget* TaskDockWidget::groupWidgetForTask(const QUuid& taskId) const {

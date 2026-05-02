@@ -45,7 +45,6 @@ TaskStatusWidget::TaskStatusWidget(TaskManager* manager, QWidget* parent)
         if (!_refreshTimer.isActive()) _refreshTimer.start();
     };
     connect(_manager, &TaskManager::groupAdded, this, kick);
-    connect(_manager, &TaskManager::groupFinished, this, kick);
     connect(_manager, &TaskManager::groupRemoved, this, kick);
     connect(_manager, &TaskManager::taskStateChanged, this, kick);
     connect(_manager, &TaskManager::taskProgress, this, kick);
@@ -57,13 +56,13 @@ void TaskStatusWidget::refresh() {
     const int total = _manager->totalTaskCount();
     const int done = _manager->terminalTaskCount();
     const int pct = _manager->aggregateProgressPercent();
-    const bool active = _manager->hasActiveTasks();
 
     _bar->setValue(pct);
     _label->setText(QStringLiteral("%1 / %2").arg(done).arg(total));
     setToolTip(tr("%1 of %2 tasks done — click to show / hide the tasks dock")
                    .arg(done).arg(total));
-    setVisible(active);
+    // Finished groups are auto-removed, so hasGroups() == "is there work".
+    setVisible(_manager->hasGroups());
 }
 
 void TaskStatusWidget::mousePressEvent(QMouseEvent* event) {

@@ -9,7 +9,6 @@ TaskTestFixture::TaskTestFixture(int workerCount)
       taskStateSpy(&mgr, &TaskManager::taskStateChanged),
       taskProgressSpy(&mgr, &TaskManager::taskProgress),
       questionSpy(&mgr, &TaskManager::taskQuestionPosed),
-      groupFinishedSpy(&mgr, &TaskManager::groupFinished),
       groupRemovedSpy(&mgr, &TaskManager::groupRemoved),
       pathTouchedSpy(&mgr, &TaskManager::pathTouched) {}
 
@@ -19,11 +18,6 @@ QString TaskTestFixture::path() const {
 
 QString TaskTestFixture::path(const QString& rel) const {
     return QDir(tmp.path()).filePath(rel);
-}
-
-bool TaskTestFixture::waitForGroupFinished(int timeoutMs) {
-    if (groupFinishedSpy.count() > 0) return true;
-    return groupFinishedSpy.wait(timeoutMs);
 }
 
 bool TaskTestFixture::waitForGroupRemoved(int timeoutMs) {
