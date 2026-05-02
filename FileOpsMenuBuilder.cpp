@@ -236,7 +236,7 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
 
     // ---- Delete ----
     QAction* deleteAct = menu->addAction(tr("Delete"));
-    connect(deleteAct, &QAction::triggered, this, [this]() { doDelete(); });
+    connect(deleteAct, &QAction::triggered, this, [this]() { doDelete(/*toTrash=*/true); });
 }
 
 void FileOpsMenuBuilder::doCopyToClipboard() {
@@ -275,11 +275,20 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
     if (!mime || !mime->hasUrls()) return;
 
     const bool isMove = forceMove || clipboardSaysCut(mime);
+    const QString destNorm = QDir::cleanPath(QDir(destFolder).absolutePath());
 
     QStringList sourcePaths;
     for (const QUrl& url : mime->urls()) {
         if (!url.isLocalFile()) continue;  // skip http/data/etc. URLs
-        sourcePaths.append(url.toLocalFile());
+        const QString path = url.toLocalFile();
+        // Silent same-folder skip — dragging a file onto the folder it
+        // already lives in (e.g. list selection onto the tree node of
+        // the currently-viewed folder) is almost always an accidental
+        // gesture. No conflict prompt, no Toast, no TaskGroup row for
+        // these. Mixed selections still process the remaining sources.
+        const QString parentNorm = QDir::cleanPath(QFileInfo(path).absolutePath());
+        if (parentNorm == destNorm) continue;
+        sourcePaths.append(path);
     }
     if (sourcePaths.isEmpty()) return;
 
@@ -345,12 +354,8 @@ void FileOpsMenuBuilder::enqueueDeleteForExternalMove(const QStringList& paths,
     if (!taskManager || paths.isEmpty()) return;
 
     QStringList alive;
-    QStringList folderRoots;
     for (const QString& src : paths) {
-        const QFileInfo info(src);
-        if (!info.exists()) continue;     // already gone (optimized move)
-        if (info.isDir()) folderRoots.append(src);
-        alive.append(src);
+        if (QFileInfo::exists(src)) alive.append(src);
     }
     if (alive.isEmpty()) return;
 
@@ -358,20 +363,10 @@ void FileOpsMenuBuilder::enqueueDeleteForExternalMove(const QStringList& paths,
         ? QObject::tr("Move out: delete \"%1\"").arg(QFileInfo(alive.first()).fileName())
         : QObject::tr("Move out: delete %1 item(s)").arg(alive.size()));
 
+    // toTrash=false: external Move-out semantic — the file moved away,
+    // a recoverable trash copy at the source would contradict Move.
     for (const QString& src : alive) {
-        if (QFileInfo(src).isFile()) {
-            group->addTask(new DeleteFileTask(src, group));
-        } else {
-            QDirIterator it(src,
-                QDir::Files | QDir::Hidden | QDir::NoSymLinks,
-                QDirIterator::Subdirectories);
-            while (it.hasNext()) {
-                group->addTask(new DeleteFileTask(it.next(), group));
-            }
-        }
-    }
-    for (const QString& root : folderRoots) {
-        group->addTask(new FolderCleanupTask(root, {}, group));
+        group->addTask(new DeleteFileTask(src, group, /*toTrash=*/false));
     }
     taskManager->enqueueGroup(group);
 }
@@ -527,54 +522,42 @@ void FileOpsMenuBuilder::doConvert(const QByteArray& format) {
     _taskManager->enqueueGroup(group);
 }
 
-void FileOpsMenuBuilder::doDelete() {
+void FileOpsMenuBuilder::doDelete(bool toTrash) {
     QStringList rejectedRoots;
+    QStringList paths;
     for (const QString& src : _paths) {
-        if (isDriveRoot(src)) rejectedRoots.append(src);
+        if (isDriveRoot(src)) {
+            rejectedRoots.append(src);
+            continue;
+        }
+        paths.append(src);
     }
     if (!rejectedRoots.isEmpty()) {
         Toast::show(_dialogParent,
             tr("Refusing to delete a drive root: %1").arg(rejectedRoots.join(", ")),
             Toast::Error);
     }
-
-    QStringList paths;
-    QStringList folderRoots;
-    for (const QString& src : _paths) {
-        if (isDriveRoot(src)) continue;
-        if (QFileInfo(src).isDir()) folderRoots.append(src);
-        paths.append(src);
-    }
     if (paths.isEmpty()) return;
 
+    const QString verb = toTrash ? tr("Delete") : tr("Permanently delete");
+    const QString title = toTrash ? tr("Delete") : tr("Permanently delete");
     const QString question = paths.size() == 1
-        ? tr("Delete \"%1\"?").arg(QFileInfo(paths.first()).fileName())
-        : tr("Delete %1 selected items?").arg(paths.size());
-    if (QMessageBox::question(_dialogParent, tr("Delete"), question,
+        ? tr("%1 \"%2\"?").arg(verb, QFileInfo(paths.first()).fileName())
+        : tr("%1 %2 selected items?").arg(verb).arg(paths.size());
+    if (QMessageBox::question(_dialogParent, title, question,
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
         return;
     }
     if (_advance) _advance();
     auto* group = new TaskGroup(paths.size() == 1
-        ? tr("Delete \"%1\"").arg(QFileInfo(paths.first()).fileName())
-        : tr("Delete %1 item(s)").arg(paths.size()));
-    // Expand folders into per-file delete tasks. For a plain file source,
-    // expandToFiles returns a single (src, src) pair — we just need the
-    // src side.
+        ? tr("%1 \"%2\"").arg(verb, QFileInfo(paths.first()).fileName())
+        : tr("%1 %2 item(s)").arg(verb).arg(paths.size()));
+    // One task per top-level path. DeleteFileTask handles folders
+    // atomically (moveToTrash on the whole folder, or removeRecursively
+    // on fallback) so the user's trash gets one entry per item rather
+    // than per inner file.
     for (const QString& src : paths) {
-        if (QFileInfo(src).isFile()) {
-            group->addTask(new DeleteFileTask(src, group));
-        } else {
-            QDirIterator it(src,
-                QDir::Files | QDir::Hidden | QDir::NoSymLinks,
-                QDirIterator::Subdirectories);
-            while (it.hasNext()) {
-                group->addTask(new DeleteFileTask(it.next(), group));
-            }
-        }
-    }
-    for (const QString& root : folderRoots) {
-        group->addTask(new FolderCleanupTask(root, {}, group));
+        group->addTask(new DeleteFileTask(src, group, toTrash));
     }
     _taskManager->enqueueGroup(group);
 }

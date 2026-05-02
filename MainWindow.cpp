@@ -133,6 +133,45 @@ void MainWindow::create() {
     QObject::connect(viewerPasteShortcut, &QShortcut::activated,
                      this, &MainWindow::pasteIntoViewerImageFolder);
 
+    // Del / Shift+Del — delete via the same code path as the right-click
+    // menu (confirmation dialog, viewer's advance-after-removal). Shift
+    // skips the OS trash and hard-deletes (matches Explorer convention).
+    auto deleteFromList = [this](bool toTrash) {
+        const auto sel = _fileListView->selectionPaths();
+        if (sel.paths.isEmpty()) return;
+        FileOpsMenuBuilder builder(sel.paths, _pixee->taskManager(), this);
+        builder.runDelete(toTrash);
+    };
+    auto deleteFromViewer = [this](bool toTrash) {
+        if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+        const QString src = _viewerImagePaths.at(_viewerIndex);
+        FileOpsMenuBuilder builder({src}, _pixee->taskManager(), this);
+        builder.setAdvanceCallback([this]() { advanceViewerAfterRemoval(); });
+        builder.runDelete(toTrash);
+    };
+
+    auto* listDeleteShortcut = new QShortcut(QKeySequence::Delete, _fileListView);
+    listDeleteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listDeleteShortcut, &QShortcut::activated, this,
+                     [deleteFromList]() { deleteFromList(/*toTrash=*/true); });
+
+    auto* listHardDeleteShortcut = new QShortcut(
+        QKeySequence(Qt::SHIFT | Qt::Key_Delete), _fileListView);
+    listHardDeleteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listHardDeleteShortcut, &QShortcut::activated, this,
+                     [deleteFromList]() { deleteFromList(/*toTrash=*/false); });
+
+    auto* viewerDeleteShortcut = new QShortcut(QKeySequence::Delete, _viewerWidget);
+    viewerDeleteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerDeleteShortcut, &QShortcut::activated, this,
+                     [deleteFromViewer]() { deleteFromViewer(/*toTrash=*/true); });
+
+    auto* viewerHardDeleteShortcut = new QShortcut(
+        QKeySequence(Qt::SHIFT | Qt::Key_Delete), _viewerWidget);
+    viewerHardDeleteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerHardDeleteShortcut, &QShortcut::activated, this,
+                     [deleteFromViewer]() { deleteFromViewer(/*toTrash=*/false); });
+
     // Async image loader for the viewer. The atomic abort version is
     // bumped whenever we ask for a different image, so the previous
     // in-flight load aborts at the next chunk boundary instead of

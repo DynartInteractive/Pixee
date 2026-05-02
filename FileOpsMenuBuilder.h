@@ -52,6 +52,12 @@ public:
     // No-op if there are no source paths.
     void populate(QMenu* menu);
 
+    // Trigger the Delete action programmatically — same path as the
+    // menu item, including confirmation dialog and advance callback.
+    // Used by the Del / Shift+Del shortcuts. toTrash=false skips the
+    // OS trash and hard-deletes (matches Explorer's Shift+Delete).
+    void runDelete(bool toTrash = true) { doDelete(toTrash); }
+
     // Static helper so window-wide Ctrl+C handlers can put paths on the
     // clipboard with the same payload format the context menu uses
     // (CF_HDROP via setUrls + plain-text path list via setText).
@@ -106,7 +112,7 @@ private:
     void doMove(const QString& destFolder);
     void doScale(int longestEdge);
     void doConvert(const QByteArray& format);
-    void doDelete();
+    void doDelete(bool toTrash);
 
     // Opens QFileDialog::getExistingDirectory; remembers the result under
     // the matching settings key. Returns empty string on cancel.
