@@ -20,6 +20,7 @@
 #include "Pixee.h"
 
 class FileItem;
+class FileListView;
 class ImageLoader;
 class TaskDockWidget;
 class ViewerWidget;
@@ -103,7 +104,7 @@ private:
     FileFilterModel* _fileFilterModel;
     QDockWidget* _dockWidget;
     TaskDockWidget* _taskDockWidget;
-    QListView* _fileListView;
+    FileListView* _fileListView;
     QTreeView* _folderTreeView;
     QLineEdit* _pathLineEdit;
     QStackedWidget* _centerStack;

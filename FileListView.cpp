@@ -2,17 +2,24 @@
 
 #include <QAbstractItemModel>
 #include <QDateTime>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QFileInfo>
+#include <QMimeData>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QUrl>
 #include <QWheelEvent>
 
 #include "FileFilterModel.h"
 #include "FileItem.h"
 #include "FileListViewDelegate.h"
 #include "FileModel.h"
+#include "FileOpsMenuBuilder.h"
 #include "Theme.h"
 #include "ThumbnailCache.h"
+#include "Toast.h"
 
 namespace {
 constexpr int kPrefetchRows = 5;
@@ -38,6 +45,21 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
     setContextMenuPolicy(Qt::CustomContextMenu);
     setUniformItemSizes(true);
     setVerticalScrollMode(QAbstractItemView::ScrollPerItem);
+
+    // Drag-and-drop. Drop = copy by default (Windows convention); Shift
+    // forces move. setDragEnabled is for outgoing drags; the QDrag object
+    // and the source-side selection MIME are set up in Phase 3.
+    //
+    // QAbstractScrollArea quirk: the OS delivers drag events to the
+    // viewport widget, not to the view itself. setAcceptDrops on the view
+    // alone is NOT enough — without the viewport accepting drops, the
+    // events bubble past our handlers and the cursor stays "disallowed".
+    setAcceptDrops(true);
+    viewport()->setAcceptDrops(true);
+    setDragEnabled(true);
+    setDropIndicatorShown(true);
+    setDragDropMode(QAbstractItemView::DragDrop);
+    setDefaultDropAction(Qt::CopyAction);
 
     _updateTimer.setSingleShot(true);
     _updateTimer.setInterval(kUpdateDebounceMs);
@@ -316,6 +338,93 @@ void FileListView::onCacheJobDone(const QString& path) {
     if (_activeJobs.isEmpty()) {
         tryExpandWindow();
     }
+}
+
+void FileListView::setDropContext(TaskManager* taskManager, QWidget* dialogParent) {
+    _taskManager = taskManager;
+    _dialogParent = dialogParent;
+}
+
+namespace {
+// True iff the mime data carries at least one local file URL — what we
+// can actually act on. Remote URLs (http://...) and pure-text drags
+// don't apply.
+bool dropHasLocalFile(const QMimeData* mime) {
+    if (!mime || !mime->hasUrls()) return false;
+    for (const QUrl& url : mime->urls()) {
+        if (url.isLocalFile()) return true;
+    }
+    return false;
+}
+
+// Pixee policy: drop = copy by default (Windows convention); Shift forces
+// move. We also honour an already-set MoveAction on the event — that's
+// how internal Qt drags signal Move (Phase 4).
+Qt::DropAction pickDropAction(const QDropEvent* event) {
+    if (event->modifiers().testFlag(Qt::ShiftModifier)) {
+        return Qt::MoveAction;
+    }
+    if (event->dropAction() == Qt::MoveAction) {
+        return Qt::MoveAction;
+    }
+    return Qt::CopyAction;
+}
+}
+
+void FileListView::dragEnterEvent(QDragEnterEvent* event) {
+    if (!dropHasLocalFile(event->mimeData())) {
+        event->ignore();
+        return;
+    }
+    event->setDropAction(pickDropAction(event));
+    event->accept();
+}
+
+void FileListView::dragMoveEvent(QDragMoveEvent* event) {
+    if (!dropHasLocalFile(event->mimeData())) {
+        event->ignore();
+        return;
+    }
+    event->setDropAction(pickDropAction(event));
+    event->accept();
+}
+
+void FileListView::dropEvent(QDropEvent* event) {
+    if (!dropHasLocalFile(event->mimeData()) || !_taskManager) {
+        event->ignore();
+        return;
+    }
+
+    // Resolve the target folder from rootIndex — same walk as
+    // MainWindow::currentFolder(). When the view is showing the synthetic
+    // drive list (no rootIndex), there's nowhere to drop to.
+    const QModelIndex proxyRoot = rootIndex();
+    if (!proxyRoot.isValid()) {
+        Toast::show(_dialogParent,
+            tr("Cannot drop here — pick a folder first"), Toast::Error);
+        event->ignore();
+        return;
+    }
+    const QModelIndex srcRoot = _fileFilterModel->mapToSource(proxyRoot);
+    if (!srcRoot.isValid()) {
+        event->ignore();
+        return;
+    }
+    FileItem* folder = static_cast<FileItem*>(srcRoot.internalPointer());
+    if (!folder) {
+        event->ignore();
+        return;
+    }
+
+    const Qt::DropAction action = pickDropAction(event);
+    const bool isMove = (action == Qt::MoveAction);
+
+    FileOpsMenuBuilder::handleDropOrPaste(
+        event->mimeData(), folder->fileInfo().filePath(), isMove,
+        _taskManager, _dialogParent);
+
+    event->setDropAction(action);
+    event->acceptProposedAction();
 }
 
 void FileListView::tryExpandWindow() {

@@ -9,6 +9,7 @@
 #include <functional>
 
 class QMenu;
+class QMimeData;
 class QWidget;
 class TaskManager;
 
@@ -65,6 +66,19 @@ public:
     static void pasteFromClipboardToFolder(const QString& destFolder,
                                            TaskManager* taskManager,
                                            QWidget* dialogParent);
+
+    // Shared core for clipboard-paste and drop-event handlers. Reads URLs
+    // out of `mime`, applies the same drive-root + descendant guards as
+    // the menu actions, expands folders, and enqueues one TaskGroup.
+    // `forceMove` is set by drop handlers when QDropEvent::dropAction()
+    // is MoveAction (the Qt-native signal); the helper still ORs in the
+    // Windows 'Preferred DropEffect' MIME so external sources from
+    // Explorer that signalled Cut also flow through Move.
+    static void handleDropOrPaste(const QMimeData* mime,
+                                  const QString& destFolder,
+                                  bool forceMove,
+                                  TaskManager* taskManager,
+                                  QWidget* dialogParent);
 
 private:
     void doCopyToClipboard();

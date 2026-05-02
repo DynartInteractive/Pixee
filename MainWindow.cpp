@@ -73,6 +73,9 @@ void MainWindow::create() {
         _pixee->thumbnailCache(),
         _fileFilterModel
     );
+    // Drop handler routes to the same TaskManager as the menu / Ctrl+V
+    // path; toasts on rejection are parented to MainWindow.
+    _fileListView->setDropContext(_pixee->taskManager(), this);
 
     _pathLineEdit = new QLineEdit();
     _pathLineEdit->setObjectName("pathLineEdit");

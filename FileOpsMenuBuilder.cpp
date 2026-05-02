@@ -254,10 +254,30 @@ void FileOpsMenuBuilder::pasteFromClipboardToFolder(const QString& destFolder,
     const QMimeData* clip = QApplication::clipboard()->mimeData();
     if (!clip || !clip->hasUrls()) return;
 
-    const bool isCut = clipboardSaysCut(clip);
+    const bool wasCut = clipboardSaysCut(clip);
+    handleDropOrPaste(clip, destFolder, /*forceMove=*/false, taskManager, dialogParent);
+
+    // After a Cut+Paste, the clipboard's source paths are stale. Mirror
+    // Explorer behaviour and clear it so a second paste doesn't try to
+    // move-from-already-gone. Only relevant on the clipboard path — drop
+    // handlers use a transient QMimeData owned by the drag.
+    if (wasCut) {
+        QApplication::clipboard()->clear();
+    }
+}
+
+void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
+                                           const QString& destFolder,
+                                           bool forceMove,
+                                           TaskManager* taskManager,
+                                           QWidget* dialogParent) {
+    if (destFolder.isEmpty() || !taskManager) return;
+    if (!mime || !mime->hasUrls()) return;
+
+    const bool isMove = forceMove || clipboardSaysCut(mime);
 
     QStringList sourcePaths;
-    for (const QUrl& url : clip->urls()) {
+    for (const QUrl& url : mime->urls()) {
         if (!url.isLocalFile()) continue;  // skip http/data/etc. URLs
         sourcePaths.append(url.toLocalFile());
     }
@@ -299,17 +319,17 @@ void FileOpsMenuBuilder::pasteFromClipboardToFolder(const QString& destFolder,
     }
     if (pairs.isEmpty() && folderRoots.isEmpty()) return;
 
-    auto* group = new TaskGroup(isCut
+    auto* group = new TaskGroup(isMove
         ? QObject::tr("Move %1 file(s) to \"%2\"")
               .arg(pairs.size()).arg(QDir(destFolder).dirName())
         : QObject::tr("Paste %1 file(s) to \"%2\"")
               .arg(pairs.size()).arg(QDir(destFolder).dirName()));
 
     for (const Pair& p : pairs) {
-        if (isCut) group->addTask(new MoveFileTask(p.src, p.dst, group));
-        else       group->addTask(new CopyFileTask(p.src, p.dst, group));
+        if (isMove) group->addTask(new MoveFileTask(p.src, p.dst, group));
+        else        group->addTask(new CopyFileTask(p.src, p.dst, group));
     }
-    if (isCut) {
+    if (isMove) {
         for (const QString& root : folderRoots) {
             group->addTask(new FolderCleanupTask(root, { destFolder }, group));
         }
@@ -318,13 +338,6 @@ void FileOpsMenuBuilder::pasteFromClipboardToFolder(const QString& destFolder,
     }
 
     taskManager->enqueueGroup(group);
-
-    // After a Cut+Paste, the clipboard's source paths are stale. Mirror
-    // Explorer behaviour and clear it so a second paste doesn't try to
-    // move-from-already-gone.
-    if (isCut) {
-        QApplication::clipboard()->clear();
-    }
 }
 
 void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {

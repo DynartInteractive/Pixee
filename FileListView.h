@@ -9,7 +9,11 @@
 class Config;
 class Theme;
 class FileFilterModel;
+class TaskManager;
 class ThumbnailCache;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
 
 class FileListView : public QListView
 {
@@ -19,9 +23,17 @@ public:
 
     void setRootIndex(const QModelIndex& index) override;
 
+    // Wires the bits the drop handler needs without reaching back into
+    // MainWindow: where to enqueue tasks, and what widget to parent
+    // dialogs / toasts to. Call once after construction.
+    void setDropContext(TaskManager* taskManager, QWidget* dialogParent);
+
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
 private slots:
     void scheduleSubscriptionUpdate();
@@ -36,6 +48,8 @@ private:
 
     ThumbnailCache* _cache;
     FileFilterModel* _fileFilterModel;
+    TaskManager* _taskManager = nullptr;
+    QWidget* _dialogParent = nullptr;
     QTimer _updateTimer;
     QSet<QString> _lastSubscribed;
     // Paths currently waiting on cache pipeline completion (subscribed but
