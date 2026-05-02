@@ -4,6 +4,7 @@
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QStackedWidget>
@@ -59,11 +60,17 @@ TaskItemWidget::TaskItemWidget(const QUuid& taskId, const QString& name, QWidget
         });
 
         _stopButton = new QToolButton();
-        _stopButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_MediaStop));
+        _stopButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_DialogCloseButton));
         _stopButton->setAutoRaise(true);
-        _stopButton->setToolTip(tr("Stop"));
+        _stopButton->setToolTip(tr("Abort"));
         _stopButton->setVisible(false);
         connect(_stopButton, &QToolButton::clicked, this, [this]() {
+            if (QMessageBox::question(this, tr("Abort task"),
+                    tr("Abort \"%1\"?").arg(_nameLabel->text()),
+                    QMessageBox::Yes | QMessageBox::No,
+                    QMessageBox::No) != QMessageBox::Yes) {
+                return;
+            }
             emit stopRequested(_taskId);
         });
 

@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QProgressBar>
 #include <QStyle>
 #include <QToolButton>
@@ -73,10 +74,16 @@ TaskGroupWidget::TaskGroupWidget(TaskGroup* group, QWidget* parent)
     });
 
     _stopGroupButton = new QToolButton(header);
-    _stopGroupButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_MediaStop));
+    _stopGroupButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_DialogCloseButton));
     _stopGroupButton->setAutoRaise(true);
-    _stopGroupButton->setToolTip(tr("Stop all tasks in group"));
+    _stopGroupButton->setToolTip(tr("Abort all tasks in group"));
     connect(_stopGroupButton, &QToolButton::clicked, this, [this]() {
+        if (QMessageBox::question(this, tr("Abort task group"),
+                tr("Abort all remaining tasks in \"%1\"?").arg(_nameLabel->text()),
+                QMessageBox::Yes | QMessageBox::No,
+                QMessageBox::No) != QMessageBox::Yes) {
+            return;
+        }
         emit stopGroupRequested(_groupId);
     });
 
