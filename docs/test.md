@@ -111,20 +111,33 @@ void harnessSmoke() {
 
 **Verification**: every test method has at least one `QCOMPARE` or `QVERIFY`; no test relies on filesystem state surviving across methods (each constructs its own `QTemporaryDir` if it needs one).
 
-## Phase 3 — CopyFileTask end-to-end
+## Phase 3 — CopyFileTask end-to-end ✅ shipped
 
 **Goal**: exercise the conflict handshake and the cooperative-cancel loop with real file I/O on temp paths. This is the densest test file because `CopyFileTask` is the prototype every other task copies from.
 
-**Adds to `tests/TestHelpers.{h,cpp}`**:
-- `class TaskTestFixture` (a plain helper struct, not a base class):
-  - `QTemporaryDir tmp` member with `tmp.path()` accessor.
-  - `TaskManager mgr{2}` member — two workers (matches Config default).
-  - QSignalSpy members on `taskFinished` / `taskFailed` / `taskAborted` / `groupRemoved` / `taskQuestionPosed`.
-- Wait helpers:
-  - `bool waitForGroupRemoved(int timeoutMs = 5000)` — most tests just need "task is done". This is the cleanest end-of-run signal.
-  - `bool waitForQuestion(QUuid* outTaskId, QVariantMap* outCtx, int timeoutMs = 2000)` — for conflict tests.
+**What landed**:
+- `tests/TaskTestFixture.{h,cpp}` (separate from `TestHelpers` so the Phase 1/2 pure-logic binary doesn't have to link the task layer):
+  - `QTemporaryDir tmp` + `TaskManager mgr{workerCount=2}` members; `path()` / `path(rel)` shorthand.
+  - `QSignalSpy` members on `taskStateChanged` / `taskProgress` / `taskQuestionPosed` / `groupRemoved` / `pathTouched`.
+  - `waitForGroupRemoved(timeoutMs)` — most tests just need "task is done".
+  - `waitForQuestion(QUuid*, int*, QVariantMap*, timeoutMs)` — pops one entry off the question spy.
+  - `lastStateOf(taskId)` — scans `taskStateSpy` in reverse so a test can assert the terminal state without spying on the task itself.
+- `TestHelpers::filesEqual(a, b)` — chunked byte-for-byte comparison.
+- `tests/CopyFileTask/` binary with 10 tests (12 incl. init/cleanup). 856 ms total.
 
-**`tst_CopyFileTask.cpp`**:
+**Coverage**:
+- Happy path (1 KB) — exactly one `finished`, no `failed` / `aborted`, dest byte-equal.
+- Happy path (4 MB) — multiple monotonic progress emissions, final 100, dest byte-equal.
+- Source missing → `failed` with non-empty message, no dest created.
+- Dest parent missing → `mkpath` creates `nested/sub/dir/`, copy succeeds.
+- Cancel-after-pause — pauses, waits for `Task::Paused`, stops; assert `aborted`, partial dest cleaned up.
+- Pause-then-resume — pauses, asserts no progress for 200 ms event-loop spin, resumes, completes byte-equal.
+- Conflict Skip → terminal state `Skipped`, dest unchanged.
+- Conflict Overwrite → terminal `Completed`, dest replaced.
+- Conflict Rename → terminal `Completed`, original dest unchanged AND new `name (1).ext` holds the source bytes.
+- Stop-while-awaiting-answer — answer-CV unblocks on stop, `run()` bails on `isStopRequested()`, terminal `Aborted`, dest unchanged.
+
+**`tst_CopyFileTask.cpp`** — uses `TaskTestFixture`:
 
 - **Happy path, small file**: 1 KB source, copy → assert `groupRemoved` fires within 1 s, dest exists, byte-for-byte equal to source, `taskFinished` emitted exactly once, no `taskFailed` / `taskAborted`.
 - **Happy path, multi-MB file**: 4 MB random-byte source — exercises chunked loop (64 KB chunks → ~64 iterations), `taskProgress` emitted multiple times with monotonic non-decreasing values, final value 100.

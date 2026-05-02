@@ -32,4 +32,17 @@ void writeImage(const QString& path, int width, int height, const char* format) 
     w.write(img);
 }
 
+bool filesEqual(const QString& a, const QString& b) {
+    QFile fa(a);
+    QFile fb(b);
+    if (!fa.open(QIODevice::ReadOnly)) return false;
+    if (!fb.open(QIODevice::ReadOnly)) return false;
+    if (fa.size() != fb.size()) return false;
+    constexpr qint64 kChunk = 64 * 1024;
+    while (!fa.atEnd()) {
+        if (fa.read(kChunk) != fb.read(kChunk)) return false;
+    }
+    return true;
+}
+
 }

@@ -22,6 +22,10 @@ void writeBytes(const QString& path, qint64 size);
 void writeImage(const QString& path, int width, int height,
                 const char* format = "png");
 
+// Byte-for-byte file comparison. Returns false if either file can't be
+// opened, sizes differ, or any chunk diverges.
+bool filesEqual(const QString& a, const QString& b);
+
 }
 
 #endif
