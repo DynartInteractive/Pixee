@@ -26,6 +26,7 @@ SOURCES += \
     ImageLoader.cpp \
     MainWindow.cpp \
     MoveFileTask.cpp \
+    OpenWithDialog.cpp \
     Pixee.cpp \
     ScaleImageTask.cpp \
     Task.cpp \
@@ -63,6 +64,7 @@ HEADERS += \
     ImageLoader.h \
     MainWindow.h \
     MoveFileTask.h \
+    OpenWithDialog.h \
     Pixee.h \
     ScaleImageTask.h \
     Task.h \

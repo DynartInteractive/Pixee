@@ -19,6 +19,7 @@
 #include "DeleteFileTask.h"
 #include "FolderCleanupTask.h"
 #include "MoveFileTask.h"
+#include "OpenWithDialog.h"
 #include "ScaleImageTask.h"
 #include "TaskGroup.h"
 #include "TaskManager.h"
@@ -174,6 +175,31 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     }
 
     if (_paths.isEmpty()) return;
+
+    // ---- Open with ----
+    // Image-only — non-image / folder selections route through the OS
+    // shell via double-click instead. Always shows at least a 'Configure...'
+    // entry so the user can discover the dialog before adding any programs.
+    if (_imageOpsEnabled) {
+        QMenu* openMenu = menu->addMenu(tr("Open with"));
+        const QList<OpenWithProgram> programs = OpenWithDialog::loadPrograms();
+        const QStringList paths = _paths;
+        QWidget* dialogParent = _dialogParent;
+        for (const OpenWithProgram& p : programs) {
+            QAction* a = openMenu->addAction(p.label);
+            const OpenWithProgram pCopy = p;
+            connect(a, &QAction::triggered, this, [pCopy, paths, dialogParent]() {
+                OpenWithDialog::launch(pCopy, paths, dialogParent);
+            });
+        }
+        if (!programs.isEmpty()) openMenu->addSeparator();
+        QAction* configAct = openMenu->addAction(tr("Configure..."));
+        connect(configAct, &QAction::triggered, this, [dialogParent]() {
+            OpenWithDialog dlg(dialogParent);
+            dlg.exec();
+        });
+        menu->addSeparator();
+    }
 
     // ---- Copy to system clipboard ----
     // Pasting in Explorer creates a copy of the file at the destination
