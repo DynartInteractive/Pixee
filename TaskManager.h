@@ -80,6 +80,11 @@ public:
     // empty behaviour for status-bar-opened docks.
     bool hasActiveTasks() const;
 
+    // True iff at least one tracked group has reached all-terminal and
+    // hasn't been cleared yet. Drives the dock's "Clear all finished"
+    // button enabled state.
+    bool hasFinishedGroups() const;
+
     // Aggregate counters for the status-bar widget. terminalTaskCount
     // includes Completed + Failed + Aborted + Skipped. aggregateProgress
     // sums per-task progress (terminal = 100, others = last reported)

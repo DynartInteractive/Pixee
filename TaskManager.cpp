@@ -223,6 +223,13 @@ bool TaskManager::hasActiveTasks() const {
     return false;
 }
 
+bool TaskManager::hasFinishedGroups() const {
+    for (TaskGroup* g : _groups) {
+        if (g->allTerminal()) return true;
+    }
+    return false;
+}
+
 namespace {
 bool isTerminalState(int state) {
     return state == Task::Completed || state == Task::Failed
