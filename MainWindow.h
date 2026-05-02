@@ -35,6 +35,7 @@ public:
     ~MainWindow();
     virtual QSize sizeHint() const override;
     virtual void closeEvent(QCloseEvent* event) override;
+    void changeEvent(QEvent* event) override;
     void create();
     void exit();
     void goToFolderByFileIndex(const QModelIndex& fileIndex);
@@ -83,17 +84,6 @@ private:
     // image. Called *before* the move / delete task is enqueued so the
     // user is already looking at the next image while the task runs.
     void advanceViewerAfterRemoval();
-    // Collect the file paths the user has selected in the central list,
-    // filtered to types we can act on (Image + File; Folders are skipped
-    // until the recursive-ops pass). Also reports whether the selection
-    // is purely images, so the menu builder can disable Scale / Convert
-    // when a folder or non-image file is in the mix. Used by the right-
-    // click menu and the Ctrl+C shortcut.
-    struct FileListSelection {
-        QStringList paths;
-        bool imageOpsAllowed = true;
-    };
-    FileListSelection collectFileListSelection() const;
     void preloadViewerNeighbors(int currentIndex, int taskVersion);
     void touchViewerCache(const QString& path);
     QString displayPath(const QString& storedPath) const;
@@ -141,5 +131,10 @@ private:
     // back into one of them, so the model doesn't keep serving the stale
     // pre-task contents.
     QSet<QString> _staleDirs;
+    // True once the window has been deactivated at least once. Used to
+    // suppress the focus-in stale refresh on Pixee's very first
+    // activation at startup (the folder is freshly loaded then; refresh
+    // would just re-enumerate for nothing — costly on slow shares).
+    bool _everDeactivated = false;
 };
 #endif // MAINWINDOW_H

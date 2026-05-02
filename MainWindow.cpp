@@ -780,6 +780,27 @@ void MainWindow::closeEvent(QCloseEvent* event __attribute__((unused))) {
     _pixee->exit();
 }
 
+void MainWindow::changeEvent(QEvent* event) {
+    QMainWindow::changeEvent(event);
+    if (event->type() != QEvent::ActivationChange) return;
+
+    if (!isActiveWindow()) {
+        _everDeactivated = true;
+        return;
+    }
+    // Active. Skip the very first activation (Pixee opening) — refresh
+    // would just re-enumerate the freshly-loaded folder for nothing,
+    // costly on slow shares. Only refresh when we're regaining focus
+    // after being away — that's the case where external apps (Explorer
+    // and friends) might have changed the current folder behind our back.
+    if (!_everDeactivated) return;
+    FileItem* folder = currentFolder();
+    if (!folder || folder == _fileModel->rootItem()) return;
+    // Defer to the next event-loop tick so we don't refresh inside the
+    // activation handler itself.
+    QTimer::singleShot(0, this, &MainWindow::refreshCurrentFolder);
+}
+
 void MainWindow::exit() {
 
     // Restore the browser layout before saving — saveState() captures the
@@ -807,36 +828,8 @@ void MainWindow::exit() {
 
 MainWindow::~MainWindow() {}
 
-MainWindow::FileListSelection MainWindow::collectFileListSelection() const {
-    FileListSelection result;
-    if (!_fileListView->selectionModel()) return result;
-    const QModelIndexList sel = _fileListView->selectionModel()->selectedIndexes();
-    for (const QModelIndex& proxyIdx : sel) {
-        const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
-        if (!srcIdx.isValid()) continue;
-        FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
-        if (!item) continue;
-        const FileType t = item->fileType();
-        // ".." is a Folder-typed navigation aid, not a real folder — don't
-        // let it disable image ops or contribute to the operable paths.
-        const bool isDotDot = (t == FileType::Folder
-                               && item->fileInfo().fileName() == "..");
-        if (isDotDot) continue;
-        if (t == FileType::Folder || t == FileType::File) {
-            // Either disables image ops (Scale / Convert have nothing to
-            // do with folders or arbitrary files). Folders flow through
-            // Copy / Move / Delete via recursive expansion in the builder.
-            result.imageOpsAllowed = false;
-        }
-        if (t == FileType::Folder || t == FileType::Image || t == FileType::File) {
-            result.paths.append(item->fileInfo().filePath());
-        }
-    }
-    return result;
-}
-
 void MainWindow::showFileListContextMenu(const QPoint& pos) {
-    const FileListSelection selection = collectFileListSelection();
+    const FileListView::Selection selection = _fileListView->selectionPaths();
 
     FileOpsMenuBuilder builder(selection.paths, _pixee->taskManager(), this);
     builder.setImageOpsEnabled(selection.imageOpsAllowed);
@@ -858,7 +851,7 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
 }
 
 void MainWindow::copyFileListSelectionToClipboard() {
-    FileOpsMenuBuilder::copyPathsToClipboard(collectFileListSelection().paths);
+    FileOpsMenuBuilder::copyPathsToClipboard(_fileListView->selectionPaths().paths);
 }
 
 void MainWindow::copyViewedImageToClipboard() {

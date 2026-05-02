@@ -125,7 +125,11 @@ Qt::ItemFlags FileModel::flags(const QModelIndex& index) const {
     if (!index.isValid())
         return Qt::NoItemFlags;
 
-    return QAbstractItemModel::flags(index);
+    // ItemIsDragEnabled is what tells QListView/QTreeView "a press on this
+    // row can begin a drag" — without it, IconMode press+drag falls through
+    // to rubber-band selection. We add it for everything operable; the
+    // actual startDrag override filters the selection (drive roots, "..").
+    return QAbstractItemModel::flags(index) | Qt::ItemIsDragEnabled;
 }
 
 QVariant FileModel::headerData(int section, Qt::Orientation orientation, int role) const {

@@ -57,6 +57,25 @@ public:
     // (CF_HDROP via setUrls + plain-text path list via setText).
     static void copyPathsToClipboard(const QStringList& paths);
 
+    // Post-drop helper for external drag-out with MoveAction. Enqueues a
+    // delete-only TaskGroup for the source paths (same expansion as the
+    // Delete menu — folders → per-file DeleteFileTask + FolderCleanupTask)
+    // so the move-out is completed at our end. No confirmation dialog:
+    // the user already committed by holding Shift while releasing. Paths
+    // that no longer exist (Explorer's optimized same-volume move uses
+    // MoveFileEx and deletes the source itself) are silently skipped.
+    static void enqueueDeleteForExternalMove(const QStringList& paths,
+                                             TaskManager* taskManager);
+
+    // Builds the MIME payload used by both clipboard Copy and drag-out:
+    //   - setUrls(file://...)        — CF_HDROP on Windows (Explorer)
+    //   - setText(\n-joined paths)   — for paste-as-text targets (editors)
+    //   - "Preferred DropEffect" = 5 — explicit COPY tag for receivers
+    //                                  that key off the Windows MIME
+    // Caller owns the returned object (typically transferred to QDrag or
+    // QClipboard). Returns nullptr on empty input.
+    static QMimeData* buildPathsMimeData(const QStringList& paths);
+
     // Static helper so Ctrl+V handlers can paste without going through
     // the menu builder. Reads the system clipboard, detects Cut vs Copy
     // semantics (Windows 'Preferred DropEffect'), expands folder URLs

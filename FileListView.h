@@ -28,12 +28,24 @@ public:
     // dialogs / toasts to. Call once after construction.
     void setDropContext(TaskManager* taskManager, QWidget* dialogParent);
 
+    // The current multi-selection's operable paths, with the synthetic
+    // ".." item filtered out. imageOpsAllowed is false when the
+    // selection contains a folder or non-image file (so the menu builder
+    // can grey out Scale / Convert). Used by the right-click menu, the
+    // Ctrl+C shortcut, and (Phase 3) the drag-out startDrag override.
+    struct Selection {
+        QStringList paths;
+        bool imageOpsAllowed = true;
+    };
+    Selection selectionPaths() const;
+
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;
     void dropEvent(QDropEvent* event) override;
+    void startDrag(Qt::DropActions supportedActions) override;
 
 private slots:
     void scheduleSubscriptionUpdate();

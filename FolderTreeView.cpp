@@ -1,5 +1,6 @@
 #include "FolderTreeView.h"
 
+#include <QDrag>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
@@ -10,6 +11,7 @@
 #include "FileFilterModel.h"
 #include "FileItem.h"
 #include "FileOpsMenuBuilder.h"
+#include "Toast.h"
 
 namespace {
 bool dropHasLocalFile(const QMimeData* mime) {
@@ -95,6 +97,48 @@ void FolderTreeView::dragMoveEvent(QDragMoveEvent* event) {
     }
     event->setDropAction(pickDropAction(event));
     event->accept();
+}
+
+void FolderTreeView::startDrag(Qt::DropActions supportedActions) {
+    Q_UNUSED(supportedActions);
+    if (!selectionModel()) return;
+
+    QStringList paths;
+    QStringList rejectedRoots;
+    const QModelIndexList sel = selectionModel()->selectedRows();
+    for (const QModelIndex& proxyIdx : sel) {
+        const QModelIndex srcIdx = _folderFilterModel->mapToSource(proxyIdx);
+        if (!srcIdx.isValid()) continue;
+        FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+        if (!item || item->fileType() != FileType::Folder) continue;
+        const QString p = item->fileInfo().filePath();
+        // Drive-root drag would mean "drag the entire drive" — symmetric
+        // with the menu and paste guards.
+        if (QFileInfo(p).isRoot()) {
+            rejectedRoots.append(p);
+            continue;
+        }
+        paths.append(p);
+    }
+    if (!rejectedRoots.isEmpty()) {
+        Toast::show(_dialogParent,
+            tr("Refusing to drag a drive root: %1").arg(rejectedRoots.join(", ")),
+            Toast::Error);
+    }
+    if (paths.isEmpty()) return;
+
+    QMimeData* mime = FileOpsMenuBuilder::buildPathsMimeData(paths);
+    if (!mime) return;
+
+    auto* drag = new QDrag(this);
+    drag->setMimeData(mime);
+    const Qt::DropAction result =
+        drag->exec(Qt::CopyAction | Qt::MoveAction, Qt::CopyAction);
+
+    // External Move post-exec delete (see FileListView::startDrag).
+    if (result == Qt::MoveAction && drag->target() == nullptr && _taskManager) {
+        FileOpsMenuBuilder::enqueueDeleteForExternalMove(paths, _taskManager);
+    }
 }
 
 void FolderTreeView::dropEvent(QDropEvent* event) {

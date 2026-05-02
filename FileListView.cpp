@@ -2,6 +2,7 @@
 
 #include <QAbstractItemModel>
 #include <QDateTime>
+#include <QDrag>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
@@ -343,6 +344,57 @@ void FileListView::onCacheJobDone(const QString& path) {
 void FileListView::setDropContext(TaskManager* taskManager, QWidget* dialogParent) {
     _taskManager = taskManager;
     _dialogParent = dialogParent;
+}
+
+FileListView::Selection FileListView::selectionPaths() const {
+    Selection result;
+    if (!selectionModel()) return result;
+    const QModelIndexList sel = selectionModel()->selectedIndexes();
+    for (const QModelIndex& proxyIdx : sel) {
+        const QModelIndex srcIdx = _fileFilterModel->mapToSource(proxyIdx);
+        if (!srcIdx.isValid()) continue;
+        FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+        if (!item) continue;
+        const FileType t = item->fileType();
+        // ".." is a Folder-typed navigation aid, not a real folder — don't
+        // let it disable image ops or contribute to the operable paths.
+        const bool isDotDot = (t == FileType::Folder
+                               && item->fileInfo().fileName() == "..");
+        if (isDotDot) continue;
+        if (t == FileType::Folder || t == FileType::File) {
+            // Either disables image ops (Scale / Convert have nothing to
+            // do with folders or arbitrary files). Folders flow through
+            // Copy / Move / Delete via recursive expansion in the builder.
+            result.imageOpsAllowed = false;
+        }
+        if (t == FileType::Folder || t == FileType::Image || t == FileType::File) {
+            result.paths.append(item->fileInfo().filePath());
+        }
+    }
+    return result;
+}
+
+void FileListView::startDrag(Qt::DropActions supportedActions) {
+    Q_UNUSED(supportedActions);  // we decide the actions ourselves
+    const Selection sel = selectionPaths();
+    if (sel.paths.isEmpty()) return;
+
+    QMimeData* mime = FileOpsMenuBuilder::buildPathsMimeData(sel.paths);
+    if (!mime) return;
+
+    auto* drag = new QDrag(this);
+    drag->setMimeData(mime);
+    const Qt::DropAction result =
+        drag->exec(Qt::CopyAction | Qt::MoveAction, Qt::CopyAction);
+
+    // External Move: target() is null (drop landed in another process,
+    // typically Explorer). The receiver did the copy; we delete the
+    // sources to complete the move. Internal Move drops have a non-null
+    // target — our drop handler ran MoveFileTasks already, so deleting
+    // again here would race with the move tasks reading the source.
+    if (result == Qt::MoveAction && drag->target() == nullptr && _taskManager) {
+        FileOpsMenuBuilder::enqueueDeleteForExternalMove(sel.paths, _taskManager);
+    }
 }
 
 namespace {

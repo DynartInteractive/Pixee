@@ -340,8 +340,44 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
     taskManager->enqueueGroup(group);
 }
 
-void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
-    if (paths.isEmpty()) return;
+void FileOpsMenuBuilder::enqueueDeleteForExternalMove(const QStringList& paths,
+                                                      TaskManager* taskManager) {
+    if (!taskManager || paths.isEmpty()) return;
+
+    QStringList alive;
+    QStringList folderRoots;
+    for (const QString& src : paths) {
+        const QFileInfo info(src);
+        if (!info.exists()) continue;     // already gone (optimized move)
+        if (info.isDir()) folderRoots.append(src);
+        alive.append(src);
+    }
+    if (alive.isEmpty()) return;
+
+    auto* group = new TaskGroup(alive.size() == 1
+        ? QObject::tr("Move out: delete \"%1\"").arg(QFileInfo(alive.first()).fileName())
+        : QObject::tr("Move out: delete %1 item(s)").arg(alive.size()));
+
+    for (const QString& src : alive) {
+        if (QFileInfo(src).isFile()) {
+            group->addTask(new DeleteFileTask(src, group));
+        } else {
+            QDirIterator it(src,
+                QDir::Files | QDir::Hidden | QDir::NoSymLinks,
+                QDirIterator::Subdirectories);
+            while (it.hasNext()) {
+                group->addTask(new DeleteFileTask(it.next(), group));
+            }
+        }
+    }
+    for (const QString& root : folderRoots) {
+        group->addTask(new FolderCleanupTask(root, {}, group));
+    }
+    taskManager->enqueueGroup(group);
+}
+
+QMimeData* FileOpsMenuBuilder::buildPathsMimeData(const QStringList& paths) {
+    if (paths.isEmpty()) return nullptr;
     QList<QUrl> urls;
     QStringList textPaths;
     urls.reserve(paths.size());
@@ -358,9 +394,15 @@ void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
     mime->setText(textPaths.join('\n'));
     // Tag as DROPEFFECT_COPY explicitly so other apps that key off this
     // (Explorer, etc.) treat the payload unambiguously — symmetrical with
-    // how we read the same flag in pasteFromClipboardToFolder for Cut.
+    // how we read the same flag in handleDropOrPaste for Cut.
     mime->setData(kDropEffectMime, dropEffectBytes(5));
-    QApplication::clipboard()->setMimeData(mime);
+    return mime;
+}
+
+void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
+    if (QMimeData* mime = buildPathsMimeData(paths)) {
+        QApplication::clipboard()->setMimeData(mime);
+    }
 }
 
 void FileOpsMenuBuilder::doCopy(const QString& destFolder) {
