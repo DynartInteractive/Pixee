@@ -21,6 +21,7 @@ SOURCES += \
     FileOpsMenuBuilder.cpp \
     FolderCleanupTask.cpp \
     FolderEnumerator.cpp \
+    FolderRefresher.cpp \
     FolderTreeView.cpp \
     ImageLoader.cpp \
     MainWindow.cpp \
@@ -57,6 +58,7 @@ HEADERS += \
     FileType.h \
     FolderCleanupTask.h \
     FolderEnumerator.h \
+    FolderRefresher.h \
     FolderTreeView.h \
     ImageLoader.h \
     MainWindow.h \

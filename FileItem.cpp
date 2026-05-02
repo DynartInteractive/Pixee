@@ -25,7 +25,8 @@ int FileItem::childCount() const {
 }
 
 void FileItem::removeChild(int row) {
-    _childItems.removeAt(row);
+    if (row < 0 || row >= _childItems.size()) return;
+    delete _childItems.takeAt(row);
 }
 
 void FileItem::clear() {
@@ -41,6 +42,10 @@ int FileItem::row() const {
 
 QFileInfo FileItem::fileInfo() const {
     return _fileInfo;
+}
+
+void FileItem::setFileInfo(const QFileInfo& fileInfo) {
+    _fileInfo = fileInfo;
 }
 
 FileType FileItem::fileType() const {
