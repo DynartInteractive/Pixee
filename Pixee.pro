@@ -28,8 +28,10 @@ SOURCES += \
     ImageLoader.cpp \
     MainWindow.cpp \
     MoveFileTask.cpp \
+    NewFolderDialog.cpp \
     OpenWithDialog.cpp \
     Pixee.cpp \
+    RenameDialog.cpp \
     ScaleImageTask.cpp \
     Task.cpp \
     TaskDockWidget.cpp \
@@ -69,8 +71,10 @@ HEADERS += \
     ImageLoader.h \
     MainWindow.h \
     MoveFileTask.h \
+    NewFolderDialog.h \
     OpenWithDialog.h \
     Pixee.h \
+    RenameDialog.h \
     ScaleImageTask.h \
     Task.h \
     TaskDockWidget.h \

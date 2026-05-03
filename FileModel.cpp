@@ -566,6 +566,10 @@ FileItem* FileModel::rootItem() const {
     return _rootItem;
 }
 
+FileItem* FileModel::itemForPath(const QString& path) const {
+    return _itemsByPath.value(path);
+}
+
 QString FileModel::folderIndexSource(const QString& folderPath) const {
     return _folderIndexes.value(folderPath);
 }
@@ -684,6 +688,141 @@ void FileModel::onRefreshed(QString dirPath, qint64 version, QFileInfoList entri
     if (_refreshAgain.remove(dirPath)) {
         requestRefreshFolder(parent);
     }
+}
+
+bool FileModel::renameItem(FileItem* item, const QString& newName) {
+    if (!item || item == _rootItem) return false;
+    if (newName.isEmpty()) return false;
+    if (item->fileType() == FileType::Loading) return false;
+
+    const QFileInfo oldInfo = item->fileInfo();
+    if (oldInfo.fileName() == "..") return false;
+    const QString oldPath = oldInfo.filePath();
+    const QString parentDir = oldInfo.absolutePath();
+    const QString newPath = QDir(parentDir).filePath(newName);
+    if (oldPath == newPath) return true;  // no-op, treat as success
+
+    if (!QFile::rename(oldPath, newPath)) return false;
+
+    const bool wasFolder = (item->fileType() == FileType::Folder);
+
+    item->setFileInfo(QFileInfo(newPath));
+
+    // Path-keyed caches: rekey only when the old key actually maps to
+    // this item — avoids stomping if some other code path already
+    // changed the mapping mid-flight (paranoid; shouldn't happen on the
+    // GUI thread but cheap).
+    if (_itemsByPath.value(oldPath) == item) {
+        _itemsByPath.remove(oldPath);
+        _itemsByPath.insert(newPath, item);
+    }
+    if (auto it = _thumbnails.find(oldPath); it != _thumbnails.end()) {
+        const QImage img = it.value();
+        _thumbnails.erase(it);
+        _thumbnails.insert(newPath, img);
+    }
+    if (_pending.remove(oldPath)) _pending.insert(newPath);
+    if (_failed.remove(oldPath))  _failed.insert(newPath);
+
+    if (wasFolder) {
+        // If the renamed folder had its own auto-pick assignment,
+        // rekey that entry from old folder path to new folder path.
+        if (_folderIndexes.contains(oldPath)) {
+            const QString src = _folderIndexes.take(oldPath);
+            _folderIndexes.insert(newPath, src);
+            if (_indexUsers.contains(src)) {
+                _indexUsers[src].remove(oldPath);
+                _indexUsers[src].insert(newPath);
+            }
+        }
+        // Drop the entire subtree and restore a Loading placeholder so
+        // descendants are re-enumerated under the new path on next
+        // expand. Stale _folderIndexes entries pointing into the old
+        // subtree may persist as harmless dangling source paths
+        // (IndexImageRole resolves to an empty QImage and the folder
+        // shows its plain icon). Acceptable for v1.
+        const QModelIndex idx = createIndex(item->row(), 0, item);
+        if (item->childCount() > 0) {
+            beginRemoveRows(idx, 0, item->childCount() - 1);
+            for (int i = item->childCount() - 1; i >= 0; --i) {
+                FileItem* child = item->child(i);
+                forgetSubtree(child);
+                item->removeChild(i);
+            }
+            endRemoveRows();
+        }
+        beginInsertRows(idx, 0, 0);
+        FileItem* loading = new FileItem(QFileInfo(), FileType::Loading,
+                                          _theme->pixmap("folder"), item);
+        item->appendChild(loading);
+        endInsertRows();
+    } else {
+        // Image / file rename: if this path was the index source for
+        // any folder, rewrite those folders' assignments to point at
+        // the new path so the overlay survives without a re-decode.
+        if (_indexUsers.contains(oldPath)) {
+            const QSet<QString> users = _indexUsers.take(oldPath);
+            _indexUsers.insert(newPath, users);
+            for (const QString& folder : users) {
+                _folderIndexes.insert(folder, newPath);
+                emitDataChangedFor(folder);
+            }
+        }
+    }
+
+    const QModelIndex idx = createIndex(item->row(), 0, item);
+    emit dataChanged(idx, idx,
+        { Qt::DisplayRole, Qt::DecorationRole,
+          ThumbnailRole, ThumbnailStateRole, IndexImageRole });
+
+    // Auto-pick may need to re-evaluate within the parent — the renamed
+    // file might have moved out of the alphabetically-first slot.
+    if (FileItem* parent = item->parent()) {
+        repickFolderIndex(parent);
+    }
+
+    emit pathRenamed(oldPath, newPath);
+
+    // Lazy view refresh — the surgical fixup above keeps caches
+    // consistent, but dataChanged via the proxy doesn't always force
+    // the file list cells to repaint immediately (cell-level repaint
+    // sometimes lags behind, especially in IconMode where the proxy
+    // re-sort fires layoutChanged). Kicking a folder refresh costs
+    // nothing when the surgical update already matched disk (the diff
+    // is empty and applyRefreshDiff is a no-op) and guarantees the
+    // view picks up the new name + thumbnail otherwise.
+    if (FileItem* parent = item->parent()) {
+        requestRefreshFolder(parent);
+    }
+    return true;
+}
+
+FileItem* FileModel::createFolder(FileItem* parent, const QString& name) {
+    if (!parent || parent == _rootItem) return nullptr;
+    if (name.isEmpty()) return nullptr;
+
+    const QString parentDir = parent->fileInfo().filePath();
+    QDir dir(parentDir);
+    if (!dir.mkdir(name)) return nullptr;
+
+    const QString newPath = dir.filePath(name);
+    const QFileInfo info(newPath);
+
+    // Append the row at the end of the parent's child list. The proxy's
+    // alphabetical sort handles the visible position.
+    const int row = parent->childCount();
+    const QModelIndex parentIdx = createIndex(parent->row(), 0, parent);
+    beginInsertRows(parentIdx, row, row);
+    FileItem* item = createItemForFileInfo(info, parent);
+    parent->appendChild(item);
+    _itemsByPath.insert(newPath, item);
+    endInsertRows();
+
+    // Lazy refresh — same rationale as renameItem. No-op when the
+    // surgical insert above already matched disk; covers the case
+    // where the cell didn't repaint or the proxy missed the insert.
+    requestRefreshFolder(parent);
+    return item;
 }
 
 QModelIndex FileModel::indexFor(FileItem* item) const {

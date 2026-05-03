@@ -64,6 +64,19 @@ private slots:
     void copyViewedImageToClipboard();
     void pasteIntoCurrentFolder();
     void pasteIntoViewerImageFolder();
+    // Show RenameDialog for `path`, validate, drive FileModel::renameItem.
+    // Toast on disk failure. Used from the Rename menu action AND the F2
+    // shortcuts on the file list / viewer.
+    void renameItemAt(const QString& path);
+    // FileModel::pathRenamed handler — keeps the viewer's path list +
+    // image cache + recent-destination QSettings consistent across a
+    // rename of a currently-tracked file or folder.
+    void onPathRenamed(QString oldPath, QString newPath);
+    // Show NewFolderDialog for `parentDir`, validate, drive
+    // FileModel::createFolder. Selects + scrolls to the new folder in
+    // the file list when the parent matches the currently-viewed
+    // folder. Toast on disk failure.
+    void createFolderIn(const QString& parentDir);
 
 signals:
     void requestImageLoad(QString path, int taskVersion);

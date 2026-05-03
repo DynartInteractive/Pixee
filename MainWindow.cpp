@@ -31,8 +31,11 @@
 #include "FileOpsMenuBuilder.h"
 #include "ImageLoader.h"
 #include "MoveFileTask.h"
+#include "NewFolderDialog.h"
+#include "RenameDialog.h"
 #include "ScaleImageTask.h"
 #include "TaskDockWidget.h"
+#include "Toast.h"
 #include "TaskGroup.h"
 #include "TaskManager.h"
 #include "TaskStatusWidget.h"
@@ -52,6 +55,8 @@ void MainWindow::create() {
     // Models
 
     _fileModel = new FileModel(_pixee->config(), _pixee->theme(), _pixee->thumbnailCache());
+    QObject::connect(_fileModel, &FileModel::pathRenamed,
+                     this, &MainWindow::onPathRenamed);
 
     _folderFilterModel = new FileFilterModel();
     _folderFilterModel->setSourceModel(_fileModel);
@@ -175,6 +180,41 @@ void MainWindow::create() {
     viewerHardDeleteShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(viewerHardDeleteShortcut, &QShortcut::activated, this,
                      [deleteFromViewer]() { deleteFromViewer(/*toTrash=*/false); });
+
+    // F2 — rename. Single-selection only on the file list; the viewer
+    // always operates on the current image. Both shortcuts are
+    // WidgetShortcut so the path-edit (which has no rename concept) and
+    // the folder tree don't intercept.
+    auto* listRenameShortcut = new QShortcut(QKeySequence(Qt::Key_F2), _fileListView);
+    listRenameShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listRenameShortcut, &QShortcut::activated, this, [this]() {
+        const auto sel = _fileListView->selectionPaths();
+        if (sel.paths.size() != 1) return;
+        renameItemAt(sel.paths.first());
+    });
+    auto* viewerRenameShortcut = new QShortcut(QKeySequence(Qt::Key_F2), _viewerWidget);
+    viewerRenameShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerRenameShortcut, &QShortcut::activated, this, [this]() {
+        if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+        renameItemAt(_viewerImagePaths.at(_viewerIndex));
+    });
+
+    // F7 — new folder. File list creates inside the currently viewed
+    // folder; viewer creates inside the parent of the current image
+    // (matches Paste's destination semantics in each context).
+    auto* listNewFolderShortcut = new QShortcut(QKeySequence(Qt::Key_F7), _fileListView);
+    listNewFolderShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listNewFolderShortcut, &QShortcut::activated, this, [this]() {
+        FileItem* folder = currentFolder();
+        if (!folder || folder == _fileModel->rootItem()) return;
+        createFolderIn(folder->fileInfo().filePath());
+    });
+    auto* viewerNewFolderShortcut = new QShortcut(QKeySequence(Qt::Key_F7), _viewerWidget);
+    viewerNewFolderShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerNewFolderShortcut, &QShortcut::activated, this, [this]() {
+        if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+        createFolderIn(QFileInfo(_viewerImagePaths.at(_viewerIndex)).absolutePath());
+    });
 
     // Async image loader for the viewer. The atomic abort version is
     // bumped whenever we ask for a different image, so the previous
@@ -816,6 +856,9 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
     FileOpsMenuBuilder builder({src}, _pixee->taskManager(), this);
     builder.setAdvanceCallback([this]() { advanceViewerAfterRemoval(); });
     builder.setPasteDestination(QFileInfo(src).absolutePath());
+    builder.setRenameCallback([this](const QString& path) { renameItemAt(path); });
+    builder.setCreateFolderCallback(
+        [this](const QString& parentDir) { createFolderIn(parentDir); });
 
     QMenu menu(this);
     QMenu* zoomMenu = menu.addMenu(tr("Zoom"));
@@ -1010,6 +1053,9 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
 
     FileOpsMenuBuilder builder(selection.paths, _pixee->taskManager(), this);
     builder.setImageOpsEnabled(selection.imageOpsAllowed);
+    builder.setRenameCallback([this](const QString& path) { renameItemAt(path); });
+    builder.setCreateFolderCallback(
+        [this](const QString& parentDir) { createFolderIn(parentDir); });
     // The drive list (synthetic root) isn't a real folder and shouldn't
     // accept a paste. currentFolder() returns the drive list as the
     // model's rootItem, which we filter out here.
@@ -1048,4 +1094,116 @@ void MainWindow::pasteIntoViewerImageFolder() {
     const QString dest = QFileInfo(_viewerImagePaths.at(_viewerIndex)).absolutePath();
     FileOpsMenuBuilder::pasteFromClipboardToFolder(
         dest, _pixee->taskManager(), this);
+}
+
+void MainWindow::renameItemAt(const QString& path) {
+    FileItem* item = _fileModel->itemForPath(path);
+    if (!item) {
+        // Path isn't currently mapped — could happen for a viewer image
+        // whose parent folder hasn't been enumerated under the model
+        // (rare; viewer is normally launched from the file list which
+        // forces enumeration first).
+        Toast::show(this, tr("Cannot rename — item not found in model"),
+                    Toast::Error);
+        return;
+    }
+    const QFileInfo info = item->fileInfo();
+    const QString currentName = info.fileName();
+    const QString parentDir = info.absolutePath();
+    const bool isFolder = (item->fileType() == FileType::Folder);
+
+    RenameDialog dlg(currentName, parentDir, isFolder, this);
+    if (dlg.exec() != QDialog::Accepted) return;
+    const QString newName = dlg.newName();
+    if (newName.isEmpty()) return;  // unchanged-name treated as no-op cancel
+
+    if (!_fileModel->renameItem(item, newName)) {
+        Toast::show(this,
+            tr("Could not rename \"%1\" — file may be in use or read-only")
+                .arg(currentName),
+            Toast::Error);
+    }
+}
+
+void MainWindow::createFolderIn(const QString& parentDir) {
+    if (parentDir.isEmpty()) return;
+    FileItem* parent = _fileModel->itemForPath(parentDir);
+    if (!parent) {
+        Toast::show(this, tr("Cannot create folder — parent not in model"),
+                    Toast::Error);
+        return;
+    }
+
+    NewFolderDialog dlg(parentDir, this);
+    if (dlg.exec() != QDialog::Accepted) return;
+    const QString name = dlg.newName();
+    if (name.isEmpty()) return;
+
+    FileItem* created = _fileModel->createFolder(parent, name);
+    if (!created) {
+        Toast::show(this,
+            tr("Could not create folder \"%1\" — check permissions").arg(name),
+            Toast::Error);
+        return;
+    }
+
+    // If the user is currently viewing the parent folder in the file
+    // list, select + scroll to the freshly created row so the user can
+    // see it landed and can immediately F2-rename if they want a
+    // different name later.
+    if (currentFolder() == parent) {
+        const QModelIndex srcIdx = _fileModel->indexFor(created);
+        const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(srcIdx);
+        if (proxyIdx.isValid()) {
+            _fileListView->setCurrentIndex(proxyIdx);
+            _fileListView->scrollTo(proxyIdx);
+        }
+    }
+}
+
+void MainWindow::onPathRenamed(QString oldPath, QString newPath) {
+    // Viewer's image-path list: rekey if the renamed file is in it.
+    // For folder renames, also rekey any descendant viewer paths so a
+    // viewer opened from inside the renamed folder keeps working
+    // (paths get the parent prefix substituted).
+    auto rewritePath = [&](QString p) -> QString {
+        if (p == oldPath) return newPath;
+        // Folder-prefix rewrite: only when oldPath is a strict prefix
+        // followed by '/' so we don't catch sibling names that share a
+        // prefix (e.g. "/foo" matching "/foobar").
+        if (p.startsWith(oldPath + QLatin1Char('/'))) {
+            return newPath + p.mid(oldPath.length());
+        }
+        return p;
+    };
+    for (QString& p : _viewerImagePaths) p = rewritePath(p);
+    for (QString& p : _viewerCacheOrder) p = rewritePath(p);
+
+    // Image cache: rebuild with rewritten keys, preserving the cached
+    // QImages so the renamed image stays decoded under its new name.
+    QHash<QString, QImage> rebuilt;
+    rebuilt.reserve(_viewerImageCache.size());
+    for (auto it = _viewerImageCache.constBegin(); it != _viewerImageCache.constEnd(); ++it) {
+        rebuilt.insert(rewritePath(it.key()), it.value());
+    }
+    _viewerImageCache = std::move(rebuilt);
+
+    // Path edit reflects the current folder; if the user is inside a
+    // renamed folder, update the displayed path so it matches reality.
+    const QString currentText = _pathLineEdit->text();
+    const QString rewrittenCurrent = rewritePath(currentText);
+    if (rewrittenCurrent != currentText) {
+        _pathLineEdit->setText(rewrittenCurrent);
+    }
+
+    // Recent-destination QSettings: rekey if they pointed at the
+    // renamed folder (or a descendant of it). Avoids dangling 'last
+    // copy/move dest' shortcuts in the menu.
+    QSettings settings;
+    for (const char* key : { "lastCopyToPath", "lastMoveToPath" }) {
+        const QString stored = settings.value(key).toString();
+        if (stored.isEmpty()) continue;
+        const QString rewritten = rewritePath(stored);
+        if (rewritten != stored) settings.setValue(key, rewritten);
+    }
 }

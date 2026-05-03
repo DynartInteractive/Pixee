@@ -79,10 +79,22 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
         connect(pasteAct, &QAction::triggered, this, [this]() { doPaste(); });
     };
 
-    // No selection (folder background right-click): Paste alone, nothing
-    // else makes sense without a target.
+    auto addNewFolder = [this](QMenu* m) {
+        QAction* a = m->addAction(tr("New folder..."));
+        a->setShortcut(QKeySequence(Qt::Key_F7));
+        const QString parentDir = _pasteDestination;
+        connect(a, &QAction::triggered, this,
+                [this, parentDir]() { if (_createFolder) _createFolder(parentDir); });
+    };
+
+    // No selection (folder background right-click): New folder + Paste,
+    // nothing else makes sense without a target.
     if (_paths.isEmpty()) {
-        if (!_pasteDestination.isEmpty()) addPaste(menu);
+        if (!_pasteDestination.isEmpty() && _createFolder) addNewFolder(menu);
+        if (!_pasteDestination.isEmpty()) {
+            menu->addSeparator();
+            addPaste(menu);
+        }
         return;
     }
 
@@ -150,6 +162,32 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     });
 
     menu->addSeparator();
+
+    // ---- New folder ----
+    // Sits next to Rename / Delete because they're all 'do something
+    // to / inside the parent folder' actions. Only shown when the
+    // caller supplied a paste destination (the parent directory) and
+    // a callback.
+    if (!_pasteDestination.isEmpty() && _createFolder) {
+        addNewFolder(menu);
+    }
+
+    // ---- Rename ----
+    // Single-selection only. Drive roots and ".." (already filtered out
+    // upstream by FileListView::selectionPaths) can't be renamed; we
+    // grey rather than hide so the menu stays predictable.
+    if (_rename) {
+        QAction* renameAct = menu->addAction(tr("Rename..."));
+        renameAct->setShortcut(QKeySequence(Qt::Key_F2));
+        const bool canRename = (_paths.size() == 1)
+                            && !isDriveRoot(_paths.first());
+        renameAct->setEnabled(canRename);
+        if (canRename) {
+            const QString src = _paths.first();
+            connect(renameAct, &QAction::triggered, this,
+                    [this, src]() { if (_rename) _rename(src); });
+        }
+    }
 
     // ---- Delete ----
     QAction* deleteAct = menu->addAction(tr("Delete"));

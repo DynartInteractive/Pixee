@@ -32,6 +32,15 @@ public:
     // list leaves it unset because its selection clears naturally on the
     // post-task folder refresh.
     using AdvanceFn = std::function<void()>;
+    // Fires when the user picks Rename. Receives the single selected
+    // source path; the caller (typically MainWindow) shows the rename
+    // dialog and drives FileModel::renameItem from there. The builder
+    // does not show a dialog itself — the caller owns model access.
+    using RenameFn = std::function<void(const QString& sourcePath)>;
+    // Fires when the user picks New folder. Receives the parent
+    // directory (= the same path setPasteDestination was given); the
+    // caller shows the dialog and drives FileModel::createFolder.
+    using CreateFolderFn = std::function<void(const QString& parentDir)>;
 
     FileOpsMenuBuilder(QStringList sourcePaths,
                        TaskManager* taskManager,
@@ -39,6 +48,8 @@ public:
                        QObject* parent = nullptr);
 
     void setAdvanceCallback(AdvanceFn fn) { _advance = std::move(fn); }
+    void setRenameCallback(RenameFn fn) { _rename = std::move(fn); }
+    void setCreateFolderCallback(CreateFolderFn fn) { _createFolder = std::move(fn); }
     // When false, the 'Open with' submenu is suppressed — the caller
     // has decided the selection contains something image-typed actions
     // can't sensibly operate on (a folder, a non-image file, ...).
@@ -126,6 +137,8 @@ private:
     TaskManager* _taskManager;
     QWidget* _dialogParent;
     AdvanceFn _advance;
+    RenameFn _rename;
+    CreateFolderFn _createFolder;
     bool _imageOpsEnabled = true;
     QString _pasteDestination;
 };

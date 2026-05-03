@@ -71,6 +71,11 @@ public:
     QModelIndex expandPath(const QString& path);
     QModelIndex indexFor(FileItem* item) const;
     FileItem* rootItem() const;
+    // Reverse lookup from a file-system path to the FileItem currently
+    // representing it in the model. Returns nullptr when the path isn't
+    // mapped (folder lazy-unloaded, descendant outside the visited set,
+    // never enumerated). Cheap — backed by an internal QHash.
+    FileItem* itemForPath(const QString& path) const;
     // Source image used to represent a folder's index thumbnail. Empty
     // if no image was found (or no index assigned).
     QString folderIndexSource(const QString& folderPath) const;
@@ -78,8 +83,30 @@ public:
     // Used as a placeholder while the viewer's full-res load is in flight.
     QImage thumbnailFor(const QString& path) const;
 
+    // Rename a single item to `newName` within its current parent
+    // directory. Performs the on-disk rename via QFile::rename and
+    // surgically rekeys the model's caches (_itemsByPath / _thumbnails /
+    // _folderIndexes / _indexUsers) so the existing thumbnail survives.
+    // Folder renames drop the renamed folder's subtree back to a Loading
+    // placeholder — descendants get re-enumerated lazily on next expand.
+    // Returns false on rename failure (caller is responsible for the
+    // user-visible error). Emits pathRenamed on success.
+    bool renameItem(FileItem* item, const QString& newName);
+
+    // Create a new folder named `name` inside `parent`. Performs mkdir
+    // and inserts a fresh FileItem (with a Loading placeholder) so the
+    // new row appears immediately without an enumeration round-trip.
+    // Returns the FileItem* on success (caller can use indexFor() to
+    // select it), nullptr on failure (mkdir error, name collision).
+    FileItem* createFolder(FileItem* parent, const QString& name);
+
 signals:
     void folderPopulated(QString dirPath);
+    // Emitted after a successful renameItem. Cross-cache listeners
+    // (viewer's path list / image cache, lastCopyToPath / lastMoveToPath
+    // settings) re-key off this so an open viewer image stays under the
+    // new name and recent-destination shortcuts don't dangle.
+    void pathRenamed(QString oldPath, QString newPath);
     // Emitted after a refresh request has been resolved (either applied
     // or short-circuited because nothing changed). `changed` is false
     // when the worker found the folder identical to the live snapshot.
