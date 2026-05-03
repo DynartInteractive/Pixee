@@ -1,7 +1,6 @@
 #ifndef FILEOPSMENUBUILDER_H
 #define FILEOPSMENUBUILDER_H
 
-#include <QByteArray>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -13,13 +12,17 @@ class QMimeData;
 class QWidget;
 class TaskManager;
 
-// Builds the Copy / Move / Scale / Convert / Delete context menu shared
-// between the file list and the viewer. Both call sites populate a
-// QMenu via populate() and exec it themselves; the builder owns the
-// per-action handlers, the conflict-aware task construction, and the
-// shared 'last destination folder' persistence (lastCopyToPath /
-// lastMoveToPath in QSettings — same keys for both menus, so a recent
-// destination from one is one click away from the other).
+// Builds the Copy / Move / Delete context menu shared between the file
+// list and the viewer. Both call sites populate a QMenu via populate()
+// and exec it themselves; the builder owns the per-action handlers,
+// the conflict-aware task construction, and the shared 'last
+// destination folder' persistence (lastCopyToPath / lastMoveToPath
+// in QSettings — same keys for both menus, so a recent destination
+// from one is one click away from the other).
+//
+// Image-type operations (Scale, Convert, ...) used to live here too;
+// they were removed pending a plugin system that will repopulate an
+// 'Image operations' submenu from external code.
 class FileOpsMenuBuilder : public QObject
 {
     Q_OBJECT
@@ -36,10 +39,10 @@ public:
                        QObject* parent = nullptr);
 
     void setAdvanceCallback(AdvanceFn fn) { _advance = std::move(fn); }
-    // When false, the Scale / Convert submenus are added but disabled
-    // (greyed out) — the caller has decided the selection contains
-    // something Scale and Convert can't sensibly operate on (a folder,
-    // a non-image file, ...). Default true.
+    // When false, the 'Open with' submenu is suppressed — the caller
+    // has decided the selection contains something image-typed actions
+    // can't sensibly operate on (a folder, a non-image file, ...).
+    // Default true.
     void setImageOpsEnabled(bool enabled) { _imageOpsEnabled = enabled; }
     // If non-empty, populate() prepends a 'Paste' action that targets
     // this directory (caller's responsibility to make sure it's a real
@@ -47,9 +50,9 @@ public:
     // nothing pasteable on the clipboard.
     void setPasteDestination(const QString& dir) { _pasteDestination = dir; }
 
-    // Appends the Copy / Move / Scale / Convert / Delete actions onto
-    // `menu`. Caller still owns the menu and is responsible for exec().
-    // No-op if there are no source paths.
+    // Appends the Copy / Move / Delete actions onto `menu`. Caller
+    // still owns the menu and is responsible for exec(). No-op if
+    // there are no source paths.
     void populate(QMenu* menu);
 
     // Trigger the Delete action programmatically — same path as the
@@ -110,8 +113,6 @@ private:
     void doPaste();
     void doCopy(const QString& destFolder);
     void doMove(const QString& destFolder);
-    void doScale(int longestEdge);
-    void doConvert(const QByteArray& format);
     void doDelete(bool toTrash);
 
     // Opens QFileDialog::getExistingDirectory; remembers the result under

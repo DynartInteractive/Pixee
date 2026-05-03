@@ -14,14 +14,12 @@
 #include <QString>
 #include <QUrl>
 
-#include "ConvertFormatTask.h"
 #include "CopyFileTask.h"
 #include "DeleteFileTask.h"
 #include "FileOpsHelpers.h"
 #include "FolderCleanupTask.h"
 #include "MoveFileTask.h"
 #include "OpenWithDialog.h"
-#include "ScaleImageTask.h"
 #include "TaskGroup.h"
 #include "TaskManager.h"
 #include "Toast.h"
@@ -36,9 +34,6 @@ using FileOpsHelpers::Pair;
 namespace {
 constexpr const char* kLastCopyKey = "lastCopyToPath";
 constexpr const char* kLastMoveKey = "lastMoveToPath";
-
-const int kScalePresets[] = { 1024, 1920, 2560, 4096 };
-const QList<QByteArray> kConvertFormats = { "jpg", "png", "webp" };
 }
 
 FileOpsMenuBuilder::FileOpsMenuBuilder(QStringList sourcePaths,
@@ -74,19 +69,22 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     if (_paths.isEmpty() && _pasteDestination.isEmpty()) return;
 
     QSettings settings;
+    const QMimeData* clip = QApplication::clipboard()->mimeData();
 
-    // ---- Paste (clipboard → current folder) ----
-    if (!_pasteDestination.isEmpty()) {
-        const QMimeData* clip = QApplication::clipboard()->mimeData();
-        QAction* pasteAct = menu->addAction(
+    auto addPaste = [this, clip](QMenu* m) {
+        QAction* pasteAct = m->addAction(
             clipboardSaysCut(clip) ? tr("Paste (Move)") : tr("Paste"));
         pasteAct->setShortcut(QKeySequence::Paste);
         pasteAct->setEnabled(clip && clip->hasUrls());
         connect(pasteAct, &QAction::triggered, this, [this]() { doPaste(); });
-        if (!_paths.isEmpty()) menu->addSeparator();
-    }
+    };
 
-    if (_paths.isEmpty()) return;
+    // No selection (folder background right-click): Paste alone, nothing
+    // else makes sense without a target.
+    if (_paths.isEmpty()) {
+        if (!_pasteDestination.isEmpty()) addPaste(menu);
+        return;
+    }
 
     // ---- Open with ----
     // Image-only — non-image / folder selections route through the OS
@@ -113,7 +111,7 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
         menu->addSeparator();
     }
 
-    // ---- Copy to system clipboard ----
+    // ---- Copy + Paste (system clipboard) ----
     // Pasting in Explorer creates a copy of the file at the destination
     // (CF_HDROP semantics on Windows); pasting in a text editor gives the
     // path(s) as text — Qt's setUrls populates both representations.
@@ -123,6 +121,7 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     // and the viewer in MainWindow — actions inside an exec'd context menu
     // only have their shortcut active while the menu is open.
     connect(clipCopy, &QAction::triggered, this, [this]() { doCopyToClipboard(); });
+    if (!_pasteDestination.isEmpty()) addPaste(menu);
 
     menu->addSeparator();
 
@@ -149,26 +148,6 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
         const QString dest = pickFolder(kLastMoveKey, tr("Move to..."));
         if (!dest.isEmpty()) doMove(dest);
     });
-
-    menu->addSeparator();
-
-    // ---- Scale ----
-    QMenu* scaleMenu = menu->addMenu(tr("Scale to..."));
-    for (int edge : kScalePresets) {
-        QAction* a = scaleMenu->addAction(tr("%1 px (longest edge)").arg(edge));
-        const int edgeCopy = edge;
-        connect(a, &QAction::triggered, this, [this, edgeCopy]() { doScale(edgeCopy); });
-    }
-    scaleMenu->menuAction()->setEnabled(_imageOpsEnabled);
-
-    // ---- Convert ----
-    QMenu* convertMenu = menu->addMenu(tr("Convert to..."));
-    for (const QByteArray& fmt : kConvertFormats) {
-        QAction* a = convertMenu->addAction(QString::fromLatin1(fmt).toUpper());
-        const QByteArray fmtCopy = fmt;
-        connect(a, &QAction::triggered, this, [this, fmtCopy]() { doConvert(fmtCopy); });
-    }
-    convertMenu->menuAction()->setEnabled(_imageOpsEnabled);
 
     menu->addSeparator();
 
@@ -427,35 +406,6 @@ void FileOpsMenuBuilder::doMove(const QString& destFolder) {
     // deeply-nested per-file tasks alone.
     for (const QString& root : folderRoots) {
         group->addTask(new FolderCleanupTask(root, { destFolder }, group));
-    }
-    _taskManager->enqueueGroup(group);
-}
-
-void FileOpsMenuBuilder::doScale(int longestEdge) {
-    auto* group = new TaskGroup(summary(
-        tr("Scale %1 to %2 px"),
-        tr("Scale %1 file(s) to %2 px"),
-        QString::number(longestEdge)));
-    for (const QString& src : _paths) {
-        const QFileInfo info(src);
-        const QString dst = QDir(info.absolutePath()).filePath(
-            info.completeBaseName() + "_scaled." + info.suffix());
-        group->addTask(new ScaleImageTask(src, dst, longestEdge, 92, group));
-    }
-    _taskManager->enqueueGroup(group);
-}
-
-void FileOpsMenuBuilder::doConvert(const QByteArray& format) {
-    const QString fmtUpper = QString::fromLatin1(format).toUpper();
-    auto* group = new TaskGroup(summary(
-        tr("Convert %1 to %2"),
-        tr("Convert %1 file(s) to %2"),
-        fmtUpper));
-    for (const QString& src : _paths) {
-        const QFileInfo info(src);
-        const QString dst = QDir(info.absolutePath()).filePath(
-            info.completeBaseName() + "." + QString::fromLatin1(format));
-        group->addTask(new ConvertFormatTask(src, dst, format, 92, group));
     }
     _taskManager->enqueueGroup(group);
 }
