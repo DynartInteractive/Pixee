@@ -24,6 +24,7 @@ SOURCES += \
     FolderEnumerator.cpp \
     FolderRefresher.cpp \
     FolderTreeView.cpp \
+    IcoUtils.cpp \
     ImageLoader.cpp \
     MainWindow.cpp \
     MoveFileTask.cpp \
@@ -64,6 +65,7 @@ HEADERS += \
     FolderEnumerator.h \
     FolderRefresher.h \
     FolderTreeView.h \
+    IcoUtils.h \
     ImageLoader.h \
     MainWindow.h \
     MoveFileTask.h \

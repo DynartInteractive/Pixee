@@ -6,6 +6,8 @@
 #include <QImageReader>
 #include <QSize>
 
+#include "IcoUtils.h"
+
 namespace {
 constexpr int kChunkSize = 64 * 1024;
 }
@@ -72,41 +74,7 @@ void ThumbnailWorker::process(QString path, qint64 mtime, qint64 size, int taskV
     QImageReader reader(&buffer);
     reader.setAutoTransform(true);
 
-    QImage image;
-
-    // ICO files contain a directory of sub-images. Qt's ICO handler reads
-    // sizes from those directory entries, but the field is one unsigned
-    // byte — `0x00` actually means 256 px, and PNG-encoded entries can lie
-    // outright. Asking reader.size() per entry then picking the largest
-    // misses the high-res entry whenever it's reported as 0×0.
-    //
-    // Workaround: actually decode every sub-image and compare the resulting
-    // QImage sizes. N decodes for N entries, but the file is already in an
-    // in-memory buffer so it's cheap.
-    if (path.endsWith(".ico", Qt::CaseInsensitive) && reader.imageCount() > 1) {
-        // Most ICO files contain several entries at the same dimensions but
-        // different bit depths (e.g. 48×48 in 256-color, 24-bit, and 32-bit
-        // forms) — by convention the higher-quality versions come last in
-        // the directory. Score by area first; on a tie, prefer higher
-        // QImage::depth(), and `>=` lets later entries with the same depth
-        // win too (covers the case where the handler normalises everything
-        // to ARGB32 and depth-tiebreak alone wouldn't help).
-        int bestArea = 0;
-        int bestDepth = 0;
-        for (int i = 0; i < reader.imageCount(); ++i) {
-            if (!reader.jumpToImage(i)) continue;
-            const QImage candidate = reader.read();
-            if (candidate.isNull()) continue;
-            const int area = candidate.width() * candidate.height();
-            const int depth = candidate.depth();
-            if (area > bestArea
-                    || (area == bestArea && depth >= bestDepth)) {
-                bestArea = area;
-                bestDepth = depth;
-                image = candidate;
-            }
-        }
-    }
+    QImage image = IcoUtils::pickBestSubImage(reader, path);
 
     if (image.isNull()) {
         const QSize originalSize = reader.size();

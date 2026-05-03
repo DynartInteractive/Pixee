@@ -5,6 +5,8 @@
 #include <QFile>
 #include <QImageReader>
 
+#include "IcoUtils.h"
+
 namespace {
 constexpr int kChunkSize = 64 * 1024;
 }
@@ -61,7 +63,14 @@ void ImageLoader::load(QString path, int taskVersion) {
     buffer.open(QIODevice::ReadOnly);
     QImageReader reader(&buffer);
     reader.setAutoTransform(true);
-    QImage image = reader.read();
+    // For multi-image ICO files Qt's default reader.read() returns the
+    // first directory entry, which is rarely the highest-quality one.
+    // Mirror the thumbnail worker's best-pick (largest area, deepest
+    // pixel format) so the viewer surfaces the same image the grid
+    // shows. Returns null for non-ICO / single-entry files; we fall
+    // through to the normal read() in that case.
+    QImage image = IcoUtils::pickBestSubImage(reader, path);
+    if (image.isNull()) image = reader.read();
     if (image.isNull()) {
         qWarning() << "ImageLoader: decode failed for" << path << ":" << reader.errorString();
         emit failed(path);
