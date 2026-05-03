@@ -1,4 +1,5 @@
 #include <QAction>
+#include <QActionGroup>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -817,8 +818,64 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
     builder.setPasteDestination(QFileInfo(src).absolutePath());
 
     QMenu menu(this);
+    QMenu* zoomMenu = menu.addMenu(tr("Zoom"));
+    populateViewerZoomMenu(zoomMenu);
+    menu.addSeparator();
     builder.populate(&menu);
     menu.exec(_viewerWidget->mapToGlobal(pos));
+}
+
+void MainWindow::populateViewerZoomMenu(QMenu* zoomMenu) {
+    auto* viewer = _viewerWidget;
+
+    auto addPlain = [&](const QString& text, void (ViewerWidget::*slot)()) {
+        QAction* a = zoomMenu->addAction(text);
+        QObject::connect(a, &QAction::triggered, viewer, slot);
+        return a;
+    };
+    addPlain(tr("Zoom in") + QStringLiteral("\t+"),  &ViewerWidget::zoomIn);
+    addPlain(tr("Zoom out") + QStringLiteral("\t-"), &ViewerWidget::zoomOut);
+    zoomMenu->addSeparator();
+
+    // One exclusive group across the three fit modes AND the percent
+    // entries: picking 100% switches to NoFit and unchecks any fit
+    // mode; picking Fit unchecks any percent. The group is parented
+    // to the menu so it dies with it (the menu is rebuilt per show).
+    auto* group = new QActionGroup(zoomMenu);
+    group->setExclusive(true);
+
+    auto addFit = [&](const QString& text, ViewerWidget::FitMode m) {
+        QAction* a = zoomMenu->addAction(text);
+        a->setCheckable(true);
+        a->setActionGroup(group);
+        a->setChecked(viewer->fitMode() == m);
+        QObject::connect(a, &QAction::triggered, viewer,
+                         [viewer, m]() { viewer->setFitMode(m); });
+    };
+    addFit(tr("No fit"),                                          ViewerWidget::FitMode::NoFit);
+    addFit(tr("Fit image to window"),                             ViewerWidget::FitMode::Fit);
+    addFit(tr("Fit image to window, large only") + QStringLiteral("\t/"),
+                                                                  ViewerWidget::FitMode::FitLargeOnly);
+    zoomMenu->addSeparator();
+
+    const int currentPct = viewer->currentZoomPercent();  // 0 in any fit mode
+    constexpr int kPercents[] = { 1600, 1200, 800, 600, 400, 200, 100, 75, 50, 25, 10 };
+    for (int pct : kPercents) {
+        QString text = QStringLiteral("%1%").arg(pct);
+        if (pct == 100) text += QStringLiteral("\t*");
+        QAction* a = zoomMenu->addAction(text);
+        a->setCheckable(true);
+        a->setActionGroup(group);
+        a->setChecked(currentPct == pct);
+        QObject::connect(a, &QAction::triggered, viewer,
+                         [viewer, pct]() { viewer->setZoomPercent(pct); });
+    }
+    zoomMenu->addSeparator();
+
+    QAction* lock = zoomMenu->addAction(tr("Lock zoom"));
+    lock->setCheckable(true);
+    lock->setChecked(viewer->lockZoom());
+    QObject::connect(lock, &QAction::toggled, viewer, &ViewerWidget::setLockZoom);
 }
 
 void MainWindow::advanceViewerAfterRemoval() {

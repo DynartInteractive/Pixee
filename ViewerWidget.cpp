@@ -9,10 +9,14 @@
 
 namespace {
 constexpr double kZoomLevels[] = {
-    0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0
+    0.10, 0.25, 0.50, 0.75, 1.0, 2.0, 4.0, 6.0, 8.0, 12.0, 16.0
 };
 constexpr int kZoomCount = static_cast<int>(sizeof(kZoomLevels) / sizeof(double));
 constexpr int kZoomIndex100 = 4;  // index of 1.0 above
+
+int percentForIndex(int i) {
+    return int(kZoomLevels[i] * 100.0 + 0.5);
+}
 }
 
 ViewerWidget::ViewerWidget(QWidget* parent)
@@ -27,14 +31,19 @@ ViewerWidget::ViewerWidget(QWidget* parent)
 
 void ViewerWidget::setImage(const QImage& image) {
     _image = image;
-    // Reset to fit + centered each time we switch to a new image — matches
-    // Pixie's behaviour and is the expected default for "I just opened
-    // the next photo". Rotation also resets per-image.
-    _fit = true;
-    _zoomIndex = kZoomIndex100;
-    _translate = QPoint();
+    // Rotation is per-image regardless of lockZoom — it's a transform on
+    // the image data, not a property of the view.
     _rotation = 0;
     _rotatedImage = QImage();
+    if (!_lockZoom) {
+        // Fresh-image defaults: FitLargeOnly + 100% baseline + centered.
+        // (When locked, keep the user's current fit mode, zoom, and pan;
+        // clampTranslate will re-fit the pan to the new image's bounds
+        // on the first paint.)
+        _fitMode = FitMode::FitLargeOnly;
+        _zoomIndex = kZoomIndex100;
+        _translate = QPoint();
+    }
     update();
 }
 
@@ -84,11 +93,22 @@ void ViewerWidget::rotateRight() {
 QSize ViewerWidget::currentDrawSize() const {
     const QImage& img = currentImage();
     if (img.isNull()) return QSize();
-    if (_fit) {
+    switch (_fitMode) {
+    case FitMode::Fit:
         return img.size().scaled(size(), Qt::KeepAspectRatio);
+    case FitMode::FitLargeOnly:
+        // Only scale down — small images stay at native size so a
+        // 32×32 icon doesn't blow up to fill the viewport.
+        if (img.width() <= width() && img.height() <= height()) {
+            return img.size();
+        }
+        return img.size().scaled(size(), Qt::KeepAspectRatio);
+    case FitMode::NoFit: {
+        const double z = kZoomLevels[_zoomIndex];
+        return QSize(int(img.width() * z), int(img.height() * z));
     }
-    const double z = kZoomLevels[_zoomIndex];
-    return QSize(int(img.width() * z), int(img.height() * z));
+    }
+    return img.size();
 }
 
 void ViewerWidget::clampTranslate() {
@@ -118,51 +138,69 @@ void ViewerWidget::paintEvent(QPaintEvent* /*event*/) {
         center.y() - ds.height() / 2 + _translate.y());
     const QRect dst(topLeft, ds);
 
-    // Smooth for downscale (fit / zoom < 1.0); nearest for upscale (>1.0)
-    // so pixel art stays crisp when zooming above 1:1 — same convention
-    // as the thumbnail upscale path.
-    const bool smooth = _fit || kZoomLevels[_zoomIndex] <= 1.0;
+    // Smooth for downscale (any fit mode + NoFit < 1.0); nearest for
+    // upscale in NoFit (>1.0) so pixel art stays crisp when zooming
+    // above 1:1 — same convention as the thumbnail upscale path.
+    const bool smooth = (_fitMode != FitMode::NoFit)
+                     || kZoomLevels[_zoomIndex] <= 1.0;
     p.setRenderHint(QPainter::SmoothPixmapTransform, smooth);
     p.drawImage(dst, img);
 }
 
 void ViewerWidget::zoomIn() {
-    if (_fit) {
-        _fit = false;
+    if (_fitMode != FitMode::NoFit) {
+        // First zoomIn from any fit mode lands at NoFit @ 100%, then
+        // subsequent clicks step through kZoomLevels.
+        _fitMode = FitMode::NoFit;
         _zoomIndex = kZoomIndex100;
     } else if (_zoomIndex + 1 < kZoomCount) {
         ++_zoomIndex;
     }
+    updateCursor();
     update();
 }
 
 void ViewerWidget::zoomOut() {
-    if (_fit) {
-        _fit = false;
+    if (_fitMode != FitMode::NoFit) {
+        _fitMode = FitMode::NoFit;
         _zoomIndex = kZoomIndex100;
     } else if (_zoomIndex > 0) {
         --_zoomIndex;
     }
+    updateCursor();
     update();
 }
 
-void ViewerWidget::toggleFit() {
-    _fit = !_fit;
-    if (_fit) {
+int ViewerWidget::currentZoomPercent() const {
+    // Fit modes don't map to a discrete percent — the menu uses 0 to
+    // mean "no percentage row should be checked".
+    if (_fitMode != FitMode::NoFit) return 0;
+    return percentForIndex(_zoomIndex);
+}
+
+void ViewerWidget::setFitMode(FitMode mode) {
+    if (_fitMode == mode) return;
+    _fitMode = mode;
+    if (mode != FitMode::NoFit) {
+        // No pan in fit modes — the image either fills the widget or
+        // sits at native size centered, neither of which has anywhere
+        // to pan to.
         _translate = QPoint();
-    } else {
-        _zoomIndex = kZoomIndex100;
     }
     updateCursor();
     update();
 }
 
-void ViewerWidget::actualSize() {
-    _fit = false;
-    _zoomIndex = kZoomIndex100;
-    _translate = QPoint();
-    updateCursor();
-    update();
+void ViewerWidget::setZoomPercent(int pct) {
+    for (int i = 0; i < kZoomCount; ++i) {
+        if (percentForIndex(i) == pct) {
+            _fitMode = FitMode::NoFit;
+            _zoomIndex = i;
+            updateCursor();
+            update();
+            return;
+        }
+    }
 }
 
 void ViewerWidget::keyPressEvent(QKeyEvent* event) {
@@ -190,13 +228,12 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
         zoomOut();
         event->accept();
         return;
-    case Qt::Key_0:
     case Qt::Key_Asterisk:
-        toggleFit();
+        setZoomPercent(100);
         event->accept();
         return;
-    case Qt::Key_1:
-        actualSize();
+    case Qt::Key_Slash:
+        setFitMode(FitMode::FitLargeOnly);
         event->accept();
         return;
     case Qt::Key_Space:
@@ -225,7 +262,7 @@ void ViewerWidget::keyReleaseEvent(QKeyEvent* event) {
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
     const bool spacePan  = event->button() == Qt::LeftButton  && _spaceDown;
     const bool middlePan = event->button() == Qt::MiddleButton;
-    if (!_fit && (spacePan || middlePan)) {
+    if (_fitMode == FitMode::NoFit && (spacePan || middlePan)) {
         _panning = true;
         _panStart = event->pos() - _translate;
         updateCursor();
@@ -279,7 +316,7 @@ void ViewerWidget::wheelEvent(QWheelEvent* event) {
 }
 
 void ViewerWidget::updateCursor() {
-    if (currentImage().isNull() || _fit) {
+    if (currentImage().isNull() || _fitMode != FitMode::NoFit) {
         unsetCursor();
         return;
     }

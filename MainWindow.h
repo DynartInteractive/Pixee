@@ -24,6 +24,7 @@ class FileListView;
 class FolderTreeView;
 class ImageLoader;
 class QAction;
+class QMenu;
 class TaskDockWidget;
 class TaskStatusWidget;
 class ViewerWidget;
@@ -57,6 +58,7 @@ private slots:
     void onImageLoadAborted(QString path);
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
+    void populateViewerZoomMenu(QMenu* zoomMenu);
     void showFileListContextMenu(const QPoint& pos);
     void copyFileListSelectionToClipboard();
     void copyViewedImageToClipboard();

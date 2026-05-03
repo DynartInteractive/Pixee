@@ -15,18 +15,27 @@
 //   Ctrl + Wheel               : zoom in / out at the cursor
 //   + / =                      : zoom in
 //   -                          : zoom out
-//   0 / *                      : toggle fit-to-window
-//   1                          : 1:1 (actual size)
+//   *                          : 100% (also switches out of any fit mode)
+//   /                          : Fit-to-window, large only
 //   Space + Left-drag          : pan
 //   Middle-drag                : pan
 class ViewerWidget : public QWidget
 {
     Q_OBJECT
 public:
+    enum class FitMode {
+        NoFit,         // honour the explicit zoom from kZoomLevels[_zoomIndex]
+        Fit,           // scale image to widget, up or down
+        FitLargeOnly,  // scale down only when image > widget; else native size
+    };
+
     explicit ViewerWidget(QWidget* parent = nullptr);
 
-    // Replaces the image and resets fit / zoom / pan to defaults. Use when
-    // switching to a new image (placeholder or new prev/next selection).
+    // Replaces the image. When lockZoom() is false (default), resets fit
+    // mode + zoom + pan to defaults; when true, preserves the user's
+    // current fit / zoom / pan so they survive prev/next navigation.
+    // Rotation always resets — it's a per-image transform, not a view
+    // setting.
     void setImage(const QImage& image);
     // Replaces the image without touching fit / zoom / pan — used when the
     // full-res arrives to swap out the placeholder thumbnail under the
@@ -37,10 +46,18 @@ public:
 
     void zoomIn();
     void zoomOut();
-    void toggleFit();
-    void actualSize();
     void rotateLeft();
     void rotateRight();
+
+    // Zoom-menu API. setZoomPercent flips fit mode to NoFit and snaps to
+    // the matching kZoomLevels entry; currentZoomPercent returns 0 when
+    // any fit mode is active (i.e. no specific percent applies).
+    FitMode fitMode() const { return _fitMode; }
+    void setFitMode(FitMode mode);
+    int  currentZoomPercent() const;
+    void setZoomPercent(int pct);
+    bool lockZoom() const { return _lockZoom; }
+    void setLockZoom(bool on) { _lockZoom = on; }
 
 signals:
     void dismissed();
@@ -67,8 +84,9 @@ private:
     QImage _image;
     QImage _rotatedImage;        // cached _image rotated by _rotation, when != 0
     int _rotation = 0;           // 0/90/180/270; per-image, resets on setImage
-    bool _fit = true;
-    int _zoomIndex = 0;          // index into kZoomLevels (only when !_fit)
+    FitMode _fitMode = FitMode::FitLargeOnly;
+    bool _lockZoom = false;      // when true, fit / zoom / pan survive setImage
+    int _zoomIndex = 0;          // index into kZoomLevels (used when _fitMode == NoFit)
     QPoint _translate;           // pan offset relative to widget center
     bool _spaceDown = false;     // Space held → ready to pan with LMB
     bool _panning = false;       // dragging right now (LMB-with-Space or MMB)
