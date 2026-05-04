@@ -39,6 +39,11 @@ public slots:
     // Wipe queue + tracking. In-flight worker decodes still finish; their
     // results will be discarded by the cache when no subscriber remains.
     void abandonAll();
+    // Stop pulling new jobs from the queue. In-flight workers finish their
+    // current decode; the queue is preserved. Resuming calls dispatch() to
+    // drain whatever accumulated. Used to free SMB bandwidth for the
+    // viewer's full-res load while it's open.
+    void setPaused(bool paused);
 
 signals:
     void generated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes);
@@ -71,6 +76,7 @@ private:
         QThread* thread;
         ThumbnailWorker* worker;
         bool busy;
+        QString currentPath;  // path the worker is decoding right now
     };
 
     void dispatch();
@@ -85,6 +91,7 @@ private:
     // Bumped by abandonAll(); workers compare against the per-task snapshot
     // they were dispatched with. Mismatch = task has been abandoned.
     QAtomicInt _abortVersion;
+    bool _paused = false;
 };
 
 #endif // THUMBNAILGENERATOR_H

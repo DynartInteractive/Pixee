@@ -262,8 +262,16 @@ void FileListView::updateSubscriptions() {
             fileModel->requestEnumerate(item);
             const QString src = fileModel->folderIndexSource(item->fileInfo().filePath());
             if (src.isEmpty()) continue;
-            subscribeInfo = QFileInfo(src);
-            if (!subscribeInfo.exists() || !subscribeInfo.isFile()) continue;
+            // Reuse the cached QFileInfo from the model's image item — its
+            // mtime/size came from entryInfoList during enumeration, so no
+            // fresh stat is needed. A bare QFileInfo(src).exists() here would
+            // hit the network per visible folder on SMB shares and freeze the
+            // GUI for hundreds of ms when many index sources are resolved
+            // (e.g. returning to a folder after its subfolders have finished
+            // enumerating in the background).
+            FileItem* srcItem = fileModel->itemForPath(src);
+            if (!srcItem) continue;
+            subscribeInfo = srcItem->fileInfo();
             subscribePath = src;
         } else {
             continue;

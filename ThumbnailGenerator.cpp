@@ -22,7 +22,7 @@ ThumbnailGenerator::ThumbnailGenerator(int targetSize, int jpegQuality, int work
         // Soft scheduler hint — thumbnails are background work; viewer load
         // and user-initiated tasks should preempt them when CPU is contested.
         t->setPriority(QThread::LowPriority);
-        _workers.append({ t, w, false });
+        _workers.append({ t, w, false, QString() });
     }
 }
 
@@ -46,8 +46,23 @@ void ThumbnailGenerator::enqueue(QString path, qint64 mtime, qint64 size, int pr
 void ThumbnailGenerator::cancel(QString path) {
     _meta.remove(path);
     _currentPriority.remove(path);
-    // Stale queue entries are skipped at dispatch time. Workers currently
-    // decoding `path` finish; their result is dropped downstream.
+    // Queued entries are skipped at dispatch time. For an in-flight decode,
+    // signal the specific worker to bail at the next chunk boundary so the
+    // SMB pipe doesn't stay tied up streaming a now-invisible huge JPEG.
+    if (_processing.contains(path)) {
+        for (auto& slot : _workers) {
+            if (slot.busy && slot.currentPath == path) {
+                slot.worker->requestCurrentAbort();
+                break;
+            }
+        }
+    }
+}
+
+void ThumbnailGenerator::setPaused(bool paused) {
+    if (_paused == paused) return;
+    _paused = paused;
+    if (!_paused) dispatch();
 }
 
 void ThumbnailGenerator::abandonAll() {
@@ -86,12 +101,14 @@ void ThumbnailGenerator::markIdle(QObject* worker) {
     for (auto& slot : _workers) {
         if (slot.worker == worker) {
             slot.busy = false;
+            slot.currentPath.clear();
             return;
         }
     }
 }
 
 void ThumbnailGenerator::dispatch() {
+    if (_paused) return;
     while (true) {
         WorkerSlot* idle = nullptr;
         for (auto& slot : _workers) {
@@ -125,6 +142,12 @@ void ThumbnailGenerator::dispatch() {
         if (!found) return;
 
         idle->busy = true;
+        idle->currentPath = path;
+        // Clear any pending per-task abort BEFORE the worker starts so a
+        // stale flag from the previous task doesn't trip up this one. The
+        // store is on the same thread as cancel() (both in the generator's
+        // thread), so it can't race with a concurrent requestCurrentAbort.
+        idle->worker->clearAbort();
         emit started(path);
         const int taskVersion = _abortVersion.loadAcquire();
         QMetaObject::invokeMethod(idle->worker, "process", Qt::QueuedConnection,

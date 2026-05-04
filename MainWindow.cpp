@@ -26,6 +26,7 @@
 #include "FileFilterModel.h"
 #include "FileItem.h"
 #include "FileModel.h"
+#include "ThumbnailCache.h"
 #include "FolderTreeView.h"
 #include "FileListView.h"
 #include "ConvertFormatTask.h"
@@ -476,6 +477,8 @@ void MainWindow::navigateTo(FileItem* item) {
         _centerStack->setCurrentIndex(0);
         _viewerWidget->clear();
         if (_dockWasVisible) _dockWidget->show();
+        // Resume thumbnail generation paused by activateImage.
+        if (_pixee->thumbnailCache()) _pixee->thumbnailCache()->setPaused(false);
     }
     _fileListView->selectionModel()->clear();
     if (!item || item == _fileModel->rootItem()) {
@@ -817,6 +820,10 @@ void MainWindow::activateImage(FileItem* item) {
     _centerStack->setCurrentWidget(_viewerWidget);
     _viewerWidget->setFocus();
 
+    // Free SMB bandwidth for the full-res load. Thumbnails resume when
+    // the viewer is dismissed (see navigateTo's viewer-exit branch).
+    if (_pixee->thumbnailCache()) _pixee->thumbnailCache()->setPaused(true);
+
     showViewerImageAt(_viewerIndex);
 }
 
@@ -862,7 +869,7 @@ void MainWindow::showViewerImageAt(int index) {
         // immediately. Thumbnail first; otherwise the dark canvas.
         const QImage placeholder = _fileModel ? _fileModel->thumbnailFor(path) : QImage();
         if (!placeholder.isNull()) {
-            _viewerWidget->setImage(placeholder);
+            _viewerWidget->setPlaceholder(placeholder);
         } else {
             _viewerWidget->clear();
         }
@@ -1067,6 +1074,8 @@ void MainWindow::dismissViewer() {
     if (isFullScreen()) exitFullscreen();
     // Cancel any in-flight viewer load.
     _imageAbortVersion.fetchAndAddRelease(1);
+    // Resume thumbnail generation paused by activateImage.
+    if (_pixee->thumbnailCache()) _pixee->thumbnailCache()->setPaused(false);
     _centerStack->setCurrentIndex(0);     // back to the browser page
     _viewerWidget->clear();
     _viewerImagePaths.clear();

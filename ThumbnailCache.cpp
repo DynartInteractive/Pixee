@@ -98,6 +98,12 @@ void ThumbnailCache::setPriority(const QString& path, int distance) {
     }
 }
 
+void ThumbnailCache::setPaused(bool paused) {
+    // Generator runs on the same thread as the cache (GUI thread), so a
+    // direct call is safe — no signal hop needed.
+    if (_generator) _generator->setPaused(paused);
+}
+
 void ThumbnailCache::abandonAll() {
     _subscribers.clear();
     _priorities.clear();

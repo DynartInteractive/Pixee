@@ -16,6 +16,18 @@ public:
     explicit ThumbnailWorker(int targetSize, int jpegQuality,
                              QAtomicInt* abortVersion, QObject* parent = nullptr);
 
+    // Per-task abort. Called from the generator (different thread) when a
+    // cancel arrives for the path this worker is currently decoding. The
+    // generator clears the flag with clearAbort() right before each
+    // dispatch, then sets it with requestCurrentAbort() to ask the worker
+    // to bail at the next chunk boundary. Both are plain atomic stores —
+    // safe to call from any thread without a queued connection.
+    void requestCurrentAbort() { _abortRequested.storeRelease(1); }
+    void clearAbort() { _abortRequested.storeRelease(0); }
+    // Same check as the private isAborted, exposed for the file-scope
+    // chunked-read helper in the .cpp. Worker-thread-side; safe to call.
+    bool isAbortedExternal(int taskVersion) const;
+
 public slots:
     // taskVersion is the value of *abortVersion at dispatch time. If the
     // global has moved past it before / during work, the worker aborts.
@@ -32,6 +44,7 @@ private:
     int _targetSize;
     int _jpegQuality;
     QAtomicInt* _abortVersion;
+    QAtomicInt _abortRequested = 0;
 };
 
 #endif // THUMBNAILWORKER_H

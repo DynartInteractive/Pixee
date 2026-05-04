@@ -53,7 +53,10 @@ const QString Config::theme() {
 }
 
 int Config::maxThreadCount() {
-    return 4;
+    // Two parallel decoders keep the SMB pipe usefully busy without
+    // saturating it — four hammered the share hard enough that the
+    // viewer's full-res load would queue behind them.
+    return 2;
 }
 
 int Config::taskWorkerCount() {

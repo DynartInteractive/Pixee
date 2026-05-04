@@ -47,6 +47,18 @@ void ViewerWidget::setImage(const QImage& image) {
     update();
 }
 
+void ViewerWidget::setPlaceholder(const QImage& image) {
+    _image = image;
+    _rotation = 0;
+    _rotatedImage = QImage();
+    if (!_lockZoom) {
+        _fitMode = FitMode::Fit;
+        _zoomIndex = kZoomIndex100;
+        _translate = QPoint();
+    }
+    update();
+}
+
 void ViewerWidget::updateImage(const QImage& image) {
     _image = image;
     // Refresh the rotated cache for the new pixels (no-op when rotation == 0).

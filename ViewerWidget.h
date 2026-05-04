@@ -37,6 +37,12 @@ public:
     // Rotation always resets — it's a per-image transform, not a view
     // setting.
     void setImage(const QImage& image);
+    // Like setImage, but forces FitMode::Fit so the small thumbnail scales
+    // up to fill the viewport — gives the user a (blurry) full-size preview
+    // while the real image streams in. updateImage doesn't reset fit mode,
+    // so when the full-res replaces the placeholder it stays in Fit (which
+    // is identical to FitLargeOnly for any image bigger than the viewport).
+    void setPlaceholder(const QImage& image);
     // Replaces the image without touching fit / zoom / pan — used when the
     // full-res arrives to swap out the placeholder thumbnail under the
     // user's existing zoom state.

@@ -28,6 +28,11 @@ public:
     // the generator queue in one shot rather than per-path. The in-flight
     // decode (if any) still finishes but its result is discarded.
     void abandonAll();
+    // Pause / resume thumbnail decoding. While paused, queued requests stay
+    // queued and no new jobs are dispatched to workers; in-flight decodes
+    // run to completion. Used while the viewer is active so the full-res
+    // load doesn't compete with thumbnails for SMB bandwidth.
+    void setPaused(bool paused);
 
 signals:
     void thumbnailReady(QString path, QImage image);
