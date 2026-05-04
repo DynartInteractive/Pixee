@@ -84,6 +84,15 @@ signals:
 private:
     void navigateTo(FileItem* item);
     void expandFolderTreeTo(FileItem* item);
+    // Async startup path-restore. expandPath used to walk the saved chain
+    // synchronously, blocking the GUI thread per directory read — painful
+    // on SMB shares. beginPathRestore kicks off a chain descent driven by
+    // FileModel::folderPopulated: each level requests async enumeration,
+    // advances when the result lands, and finally navigateTo's the leaf.
+    // Any manual navigation via navigateTo() cancels the restore.
+    void beginPathRestore(const QString& targetPath);
+    void advancePathRestore();
+    void cancelPathRestore();
     void createMenus();
     void updateStatusBar(FileItem* folder);
     // Shows "Width: w | Height: h" in the status bar while the viewer is
@@ -161,5 +170,12 @@ private:
     // back into one of them, so the model doesn't keep serving the stale
     // pre-task contents.
     QSet<QString> _staleDirs;
+    // Async path-restore state. _restoreChain holds the remaining absolute
+    // paths to descend through (root → leaf); _restoreParent is the last
+    // resolved FileItem in the chain. Both clear when restore finishes or
+    // is cancelled by manual navigation.
+    QStringList _restoreChain;
+    FileItem* _restoreParent = nullptr;
+    bool _restorePending = false;
 };
 #endif // MAINWINDOW_H

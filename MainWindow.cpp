@@ -382,13 +382,15 @@ void MainWindow::create() {
 
     // Add events
 
-    // When expand in folder tree: append files
+    // When expand in folder tree: kick off async enumeration. The Loading
+    // placeholder stays until folderPopulated fires, so the user sees
+    // immediate UI feedback instead of a frozen window on slow shares.
     QObject::connect(
         _folderTreeView, &QTreeView::expanded, this, [=](const QModelIndex &folderIndex) {
             const QModelIndex fileIndex = _folderFilterModel->mapToSource(folderIndex);
             FileItem* fileItem = static_cast<FileItem*>(fileIndex.internalPointer());
             if (fileItem && fileItem->fileType() == FileType::Folder) {
-                _fileModel->appendFileItems(fileItem->fileInfo().filePath(), fileItem);
+                _fileModel->requestEnumerate(fileItem);
             }
         }
     );
@@ -439,20 +441,13 @@ void MainWindow::create() {
     QObject::connect(_fileListView, &QListView::customContextMenuRequested,
                      this, &MainWindow::showFileListContextMenu);
 
-    // Restore the last path the user was viewing. expandPath does the
-    // multi-step lazy load synchronously — fine on local disk, can stutter
-    // briefly on slow shares, but only once at startup.
+    // Show the drive list immediately, then start an async chain descent
+    // to the saved path so a slow share doesn't block the window from
+    // appearing. Manual navigation cancels the restore (see navigateTo).
+    navigateTo(nullptr);
     const QString lastPath = settings.value("lastPath").toString();
     if (!lastPath.isEmpty()) {
-        const QModelIndex sourceIdx = _fileModel->expandPath(lastPath);
-        if (sourceIdx.isValid()) {
-            FileItem* item = static_cast<FileItem*>(sourceIdx.internalPointer());
-            navigateTo(item);
-        } else {
-            navigateTo(nullptr);
-        }
-    } else {
-        navigateTo(nullptr);
+        beginPathRestore(lastPath);
     }
 }
 
@@ -470,6 +465,12 @@ void MainWindow::goToFolderByFileIndex(const QModelIndex& fileIndex) {
 }
 
 void MainWindow::navigateTo(FileItem* item) {
+    // Manual navigation supersedes any in-flight saved-path restore.
+    // advancePathRestore clears _restorePending before its own navigateTo
+    // call, so this only cancels true user-driven navigation.
+    if (_restorePending) {
+        cancelPathRestore();
+    }
     // Folder navigation always pulls the user out of viewer mode.
     if (_centerStack && _centerStack->currentIndex() != 0) {
         _centerStack->setCurrentIndex(0);
@@ -488,13 +489,16 @@ void MainWindow::navigateTo(FileItem* item) {
         updateStatusBar(nullptr);
         return;
     }
-    _fileModel->appendFileItems(item->fileInfo().filePath(), item);
+    // Async enumeration off the GUI thread (no-op if already populated).
+    // The central list shows empty until folderPopulated fires; on slow
+    // shares this is preferable to freezing the whole UI.
+    _fileModel->requestEnumerate(item);
     // If a task touched this folder while we were elsewhere, the model is
     // serving stale cached children. Invalidate them now so the user sees
     // the post-task state on entry, not just after F5.
     const QString itemNorm = QDir::cleanPath(item->fileInfo().filePath());
     if (_staleDirs.remove(itemNorm)) {
-        _fileModel->refreshFolder(item);
+        _fileModel->requestRefreshFolder(item);
     }
     const QModelIndex sourceIdx = _fileModel->indexFor(item);
     const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(sourceIdx);
@@ -695,6 +699,97 @@ void MainWindow::expandFolderTreeTo(FileItem* item) {
             leafProxy, QItemSelectionModel::ClearAndSelect);
         _folderTreeView->scrollTo(leafProxy);
     }
+}
+
+void MainWindow::beginPathRestore(const QString& targetPath) {
+    if (targetPath.isEmpty()) return;
+    const QFileInfo info(targetPath);
+    if (!info.exists() || !info.isDir()) return;
+
+    // Build the absolute-path chain root → leaf (same walk as the old
+    // synchronous expandPath used).
+    QStringList chain;
+    QDir walker(info.absoluteFilePath());
+    while (true) {
+        chain.prepend(walker.absolutePath());
+        if (!walker.cdUp()) break;
+    }
+    _restoreChain = chain;
+    _restoreParent = _fileModel->rootItem();
+    _restorePending = true;
+
+    // Drive the descent off folderPopulated. The lambda stays connected
+    // for the lifetime of the window — when nothing is pending it's a
+    // cheap no-op, and we don't need to manage connection lifetime.
+    QObject::connect(_fileModel, &FileModel::folderPopulated, this,
+        [this](const QString& dirPath) {
+            if (!_restorePending || !_restoreParent) return;
+            // Only advance when the populated folder is the one we're
+            // currently waiting on; ignore unrelated enumerations (e.g.
+            // FileListView pre-fetching index thumbnails for siblings).
+            if (_restoreParent->fileInfo().filePath() != dirPath) return;
+            advancePathRestore();
+        });
+
+    advancePathRestore();
+}
+
+void MainWindow::advancePathRestore() {
+    if (!_restorePending) return;
+    auto normalize = [](QString s) {
+        if (!s.endsWith('/')) s.append('/');
+        return s;
+    };
+
+    while (!_restoreChain.isEmpty() && _restoreParent) {
+        const QString seg = _restoreChain.first();
+        const QString segNorm = normalize(seg);
+
+        FileItem* match = nullptr;
+        for (int i = 0; i < _restoreParent->childCount(); ++i) {
+            FileItem* c = _restoreParent->child(i);
+            if (!c || c->fileType() != FileType::Folder) continue;
+            if (c->fileInfo().fileName() == "..") continue;
+            const QString childPath = normalize(c->fileInfo().filePath());
+            if (childPath.compare(segNorm, Qt::CaseInsensitive) == 0) {
+                match = c;
+                break;
+            }
+        }
+
+        if (match) {
+            _restoreParent = match;
+            _restoreChain.removeFirst();
+            continue;
+        }
+
+        // No match yet. If the parent only holds a Loading placeholder,
+        // its children haven't been read — kick off async enumeration
+        // and wait for folderPopulated to fire us back in.
+        if (_restoreParent->childCount() == 1
+                && _restoreParent->child(0)->fileType() == FileType::Loading) {
+            _fileModel->requestEnumerate(_restoreParent);
+            return;
+        }
+        // Already populated and the segment isn't there — saved path is
+        // stale (folder was renamed / share offline). Stop the restore.
+        cancelPathRestore();
+        return;
+    }
+
+    // Chain exhausted: _restoreParent is the leaf. Clear restore state
+    // first so navigateTo doesn't see _restorePending and self-cancel.
+    FileItem* leaf = _restoreParent;
+    cancelPathRestore();
+    if (leaf && leaf != _fileModel->rootItem()) {
+        navigateTo(leaf);
+    }
+}
+
+void MainWindow::cancelPathRestore() {
+    _restorePending = false;
+    _restoreParent = nullptr;
+    _restoreChain.clear();
 }
 
 QString MainWindow::displayPath(const QString& storedPath) const {
