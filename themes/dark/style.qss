@@ -27,6 +27,13 @@ QTreeView::item:selected:!active {
 	background-color: #2b4580;
 	color: #fff;
 }
+/* The branch column is its own sub-control — without this rule the
+   alternate-row colour bleeds through behind the expand arrow when a
+   selected row sits on an alt-bg slot. */
+QTreeView::branch:selected,
+QTreeView::branch:selected:!active {
+	background-color: #2b4580;
+}
 QTreeView::item:focus {
 	border: none;
 	color: #fff;

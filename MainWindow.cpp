@@ -211,13 +211,6 @@ void MainWindow::create() {
         if (!folder || folder == _fileModel->rootItem()) return;
         createFolderIn(folder->fileInfo().filePath());
     });
-    auto* viewerNewFolderShortcut = new QShortcut(QKeySequence(Qt::Key_F7), _viewerWidget);
-    viewerNewFolderShortcut->setContext(Qt::WidgetShortcut);
-    QObject::connect(viewerNewFolderShortcut, &QShortcut::activated, this, [this]() {
-        if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
-        createFolderIn(QFileInfo(_viewerImagePaths.at(_viewerIndex)).absolutePath());
-    });
-
     // Async image loader for the viewer. The atomic abort version is
     // bumped whenever we ask for a different image, so the previous
     // in-flight load aborts at the next chunk boundary instead of
@@ -965,8 +958,8 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
     builder.setAdvanceCallback([this]() { advanceViewerAfterRemoval(); });
     builder.setPasteDestination(QFileInfo(src).absolutePath());
     builder.setRenameCallback([this](const QString& path) { renameItemAt(path); });
-    builder.setCreateFolderCallback(
-        [this](const QString& parentDir) { createFolderIn(parentDir); });
+    // No "New folder" in the viewer — creating folders mid-view doesn't
+    // serve any flow we care about, and it crowds the menu.
 
     QMenu menu(this);
     QMenu* zoomMenu = menu.addMenu(tr("Zoom"));

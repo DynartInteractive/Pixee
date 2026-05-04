@@ -79,6 +79,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void focusOutEvent(QFocusEvent* event) override;
 
 private:
     QSize currentDrawSize() const;
@@ -86,6 +87,13 @@ private:
     void invalidateRotation();
     void clampTranslate();
     void updateCursor();
+    // Pan starts the moment any pan-trigger becomes active (Space in
+    // NoFit mode, or middle-button held) and ends when none are. The
+    // anchor is the mouse position at the moment the trigger first
+    // engages, so subsequent mouseMoveEvents drag relative to it.
+    bool wantPan() const;
+    void beginPanIfNeeded(const QPoint& mousePos);
+    void endPanIfDone();
 
     QImage _image;
     QImage _rotatedImage;        // cached _image rotated by _rotation, when != 0
@@ -94,8 +102,9 @@ private:
     bool _lockZoom = false;      // when true, fit / zoom / pan survive setImage
     int _zoomIndex = 0;          // index into kZoomLevels (used when _fitMode == NoFit)
     QPoint _translate;           // pan offset relative to widget center
-    bool _spaceDown = false;     // Space held → ready to pan with LMB
-    bool _panning = false;       // dragging right now (LMB-with-Space or MMB)
+    bool _spaceDown = false;     // Space held → pan with mouse motion (Photoshop-style)
+    bool _midDown = false;       // middle button held → also pans
+    bool _panning = false;       // dragging right now
     QPoint _panStart;            // mouse-pos − translate at drag start
 };
 

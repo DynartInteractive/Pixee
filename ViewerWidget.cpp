@@ -24,7 +24,9 @@ ViewerWidget::ViewerWidget(QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(1, 1);
     setAutoFillBackground(false);
-    setMouseTracking(false);
+    // Tracking is on so mouseMoveEvents fire even with no button held —
+    // needed for Space-only panning (cursor moves drag the image).
+    setMouseTracking(true);
     setContextMenuPolicy(Qt::CustomContextMenu);
     _zoomIndex = kZoomIndex100;
 }
@@ -199,6 +201,9 @@ void ViewerWidget::setFitMode(FitMode mode) {
         // to pan to.
         _translate = QPoint();
     }
+    // Mode change can flip wantPan(), so re-evaluate before updating
+    // the cursor (otherwise we'd show OpenHand under Fit briefly).
+    endPanIfDone();
     updateCursor();
     update();
 }
@@ -251,6 +256,11 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
     case Qt::Key_Space:
         if (!event->isAutoRepeat()) {
             _spaceDown = true;
+            // Anchor at the cursor's current position over the widget.
+            // mapFromGlobal gives the right result even if the mouse
+            // is outside the widget (negative or out-of-bounds — the
+            // delta math in mouseMoveEvent still works once it enters).
+            beginPanIfNeeded(mapFromGlobal(QCursor::pos()));
             updateCursor();
         }
         event->accept();
@@ -264,6 +274,7 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
 void ViewerWidget::keyReleaseEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
         _spaceDown = false;
+        endPanIfDone();
         updateCursor();
         event->accept();
         return;
@@ -272,12 +283,9 @@ void ViewerWidget::keyReleaseEvent(QKeyEvent* event) {
 }
 
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
-    const bool spacePan  = event->button() == Qt::LeftButton  && _spaceDown;
-    const bool middlePan = event->button() == Qt::MiddleButton;
-    if (_fitMode == FitMode::NoFit && (spacePan || middlePan)) {
-        _panning = true;
-        _panStart = event->pos() - _translate;
-        updateCursor();
+    if (event->button() == Qt::MiddleButton) {
+        _midDown = true;
+        beginPanIfNeeded(event->pos());
         event->accept();
         return;
     }
@@ -296,13 +304,41 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void ViewerWidget::mouseReleaseEvent(QMouseEvent* event) {
-    if (_panning && (event->button() == Qt::LeftButton || event->button() == Qt::MiddleButton)) {
-        _panning = false;
-        updateCursor();
+    if (event->button() == Qt::MiddleButton) {
+        _midDown = false;
+        endPanIfDone();
         event->accept();
         return;
     }
     QWidget::mouseReleaseEvent(event);
+}
+
+void ViewerWidget::focusOutEvent(QFocusEvent* event) {
+    // Losing focus (Alt+Tab, click into another widget) means we won't
+    // see the matching key/button release. Reset the pan triggers so we
+    // don't come back panning unexpectedly when the user returns.
+    if (_spaceDown || _midDown || _panning) {
+        _spaceDown = false;
+        _midDown = false;
+        _panning = false;
+        updateCursor();
+    }
+    QWidget::focusOutEvent(event);
+}
+
+bool ViewerWidget::wantPan() const {
+    return (_spaceDown && _fitMode == FitMode::NoFit) || _midDown;
+}
+
+void ViewerWidget::beginPanIfNeeded(const QPoint& mousePos) {
+    if (_panning || !wantPan()) return;
+    _panning = true;
+    _panStart = mousePos - _translate;
+}
+
+void ViewerWidget::endPanIfDone() {
+    if (!_panning || wantPan()) return;
+    _panning = false;
 }
 
 void ViewerWidget::mouseDoubleClickEvent(QMouseEvent* event) {
