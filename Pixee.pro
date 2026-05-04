@@ -116,7 +116,11 @@ isEmpty(DESTDIR) {
     TARGET_DIR = $$DESTDIR
 }
 
-copy_themes.commands = $(COPY_DIR) $$shell_path($$PWD/themes) $$shell_path($$TARGET_DIR/themes)
+!equals(PWD, $$TARGET_DIR) {
+    copy_themes.commands = $(COPY_DIR) $$shell_path($$PWD/themes) $$shell_path($$TARGET_DIR/themes)
+} else {
+    copy_themes.commands = @echo \"In-source build — themes already in place, skipping copy.\"
+}
 first.depends = $(first) copy_themes
 export(first.depends)
 export(copy_themes.commands)

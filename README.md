@@ -24,7 +24,18 @@
 
 ## 🛠️ Building
 
-Pixee is a qmake project. With Qt 6.6+ installed:
+### Debian 13 (Trixie)
+
+```sh
+sudo apt install build-essential qt6-base-dev qt6-base-dev-tools qt6-l10n-tools
+qmake6 Pixee.pro
+make
+./Pixee
+```
+
+### Other platforms
+
+With Qt 6.6+ and qmake installed:
 
 ```sh
 qmake Pixee.pro

@@ -1,3 +1,4 @@
+#include <QApplication>
 #include <QAction>
 #include <QActionGroup>
 #include <QDesktopServices>
@@ -412,6 +413,11 @@ void MainWindow::create() {
     QObject::connect(
         _fileListView, &QListView::activated,
         this, [=](const QModelIndex& fileFilterIndex) {
+            // When the desktop is set to single-click activation, ignore
+            // Ctrl/Shift clicks — those are for multi-selection, not opening.
+            const Qt::KeyboardModifiers mods = QApplication::keyboardModifiers();
+            if (mods & (Qt::ControlModifier | Qt::ShiftModifier)) return;
+
             const QModelIndex fileIndex = _fileFilterModel->mapToSource(fileFilterIndex);
             if (!fileIndex.isValid()) return;
             FileItem* item = static_cast<FileItem*>(fileIndex.internalPointer());
