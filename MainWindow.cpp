@@ -392,7 +392,7 @@ void MainWindow::create() {
     // When change selection in folder tree: go to folder
     QObject::connect(
         _folderTreeView->selectionModel(), &QItemSelectionModel::selectionChanged,
-        this, [=](const QItemSelection &selected, const QItemSelection &deselected __attribute__((unused))) {
+        this, [=](const QItemSelection &selected, [[maybe_unused]] const QItemSelection &deselected) {
             if (selected.indexes().isEmpty()) {
                 return;
             }
@@ -1103,7 +1103,7 @@ QSize MainWindow::sizeHint() const {
     return QSize(1280, 720); // Default size
 }
 
-void MainWindow::closeEvent(QCloseEvent* event __attribute__((unused))) {
+void MainWindow::closeEvent([[maybe_unused]] QCloseEvent* event) {
     _pixee->exit();
 }
 
