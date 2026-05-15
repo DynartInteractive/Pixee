@@ -800,9 +800,26 @@ void MainWindow::activateImage(FileItem* item) {
     if (!item || item->fileType() != FileType::Image) return;
     const QString path = item->fileInfo().filePath();
 
+    // If the user has 2+ images selected, restrict viewer navigation to
+    // just those (in display order). Otherwise (the typical single-click
+    // / double-click case) browse the whole folder.
+    QSet<QString> restrictTo;
+    const QStringList selPaths = _fileListView->selectionPaths().paths;
+    if (selPaths.size() > 1 && _fileModel) {
+        for (const QString& p : selPaths) {
+            FileItem* it = _fileModel->itemForPath(p);
+            if (it && it->fileType() == FileType::Image) restrictTo.insert(p);
+        }
+        // Need the activated image to be one of the restricted set; otherwise
+        // fall back to whole-folder mode so the activation actually opens.
+        if (restrictTo.size() < 2 || !restrictTo.contains(path)) restrictTo.clear();
+    }
+    _viewerMultiSelect = !restrictTo.isEmpty();
+
     // Build the ordered image list (folder contents in file-list display
-    // order) and find where the activated image sits in it.
-    buildViewerImageList(path);
+    // order, optionally restricted to the multi-selection) and find where
+    // the activated image sits in it.
+    buildViewerImageList(path, restrictTo);
     if (_viewerImagePaths.isEmpty()) return;
 
     // Hide the folder-tree dock for the duration of the viewer; remember
@@ -820,7 +837,8 @@ void MainWindow::activateImage(FileItem* item) {
     showViewerImageAt(_viewerIndex);
 }
 
-void MainWindow::buildViewerImageList(const QString& currentPath) {
+void MainWindow::buildViewerImageList(const QString& currentPath,
+                                      const QSet<QString>& restrictTo) {
     _viewerImagePaths.clear();
     _viewerIndex = -1;
     const QModelIndex root = _fileListView->rootIndex();
@@ -835,10 +853,31 @@ void MainWindow::buildViewerImageList(const QString& currentPath) {
         FileItem* it = static_cast<FileItem*>(srcIdx.internalPointer());
         if (!it || it->fileType() != FileType::Image) continue;
         const QString p = it->fileInfo().filePath();
-        if (p == currentPath) _viewerIndex = _viewerImagePaths.size();
+        if (!restrictTo.isEmpty() && !restrictTo.contains(p)) continue;
+        // In restricted (multi-select) mode, always start at the first
+        // image in display order regardless of which one the user activated
+        // — the user-facing intent is "show me my selection from the top".
+        if (restrictTo.isEmpty() && p == currentPath) {
+            _viewerIndex = _viewerImagePaths.size();
+        }
         _viewerImagePaths.append(p);
     }
     if (_viewerIndex < 0 && !_viewerImagePaths.isEmpty()) _viewerIndex = 0;
+}
+
+void MainWindow::syncFileListSelectionTo(const QString& path, bool scroll) {
+    if (!_fileModel || !_fileFilterModel || !_fileListView) return;
+    FileItem* item = _fileModel->itemForPath(path);
+    if (!item) return;
+    const QModelIndex srcIdx = _fileModel->indexFor(item);
+    if (!srcIdx.isValid()) return;
+    const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(srcIdx);
+    if (!proxyIdx.isValid()) return;
+    // setCurrentIndex also updates the selection via the view's default
+    // SelectionCommand, which is what we want — a single-row selection on
+    // the active image.
+    _fileListView->setCurrentIndex(proxyIdx);
+    if (scroll) _fileListView->scrollTo(proxyIdx, QAbstractItemView::EnsureVisible);
 }
 
 void MainWindow::showViewerImageAt(int index) {
@@ -877,6 +916,13 @@ void MainWindow::showViewerImageAt(int index) {
     // Always preload neighbours after the current image is queued, so
     // navigation feels instant when the user moves to one we've cached.
     preloadViewerNeighbors(index, taskVersion);
+
+    // Single-entry mode: keep the file-list selection on the active image so
+    // dismissing leaves the user on the row they last viewed. Multi-select
+    // mode preserves the user's original selection untouched.
+    if (!_viewerMultiSelect) {
+        syncFileListSelectionTo(path, /*scroll=*/false);
+    }
 }
 
 void MainWindow::preloadViewerNeighbors(int currentIndex, int taskVersion) {
@@ -1073,10 +1119,18 @@ void MainWindow::dismissViewer() {
     _imageAbortVersion.fetchAndAddRelease(1);
     // Resume thumbnail generation paused by activateImage.
     if (_pixee->thumbnailCache()) _pixee->thumbnailCache()->setPaused(false);
+    // Capture the last-viewed image before clearing — used to scroll the
+    // list back to it in single-entry mode.
+    const QString lastViewed = (!_viewerMultiSelect
+                                && _viewerIndex >= 0
+                                && _viewerIndex < _viewerImagePaths.size())
+                               ? _viewerImagePaths.at(_viewerIndex)
+                               : QString();
     _centerStack->setCurrentIndex(0);     // back to the browser page
     _viewerWidget->clear();
     _viewerImagePaths.clear();
     _viewerIndex = -1;
+    _viewerMultiSelect = false;
     // Free the preload cache — those images can be tens of MB each.
     _viewerImageCache.clear();
     _viewerCacheOrder.clear();
@@ -1085,6 +1139,12 @@ void MainWindow::dismissViewer() {
     // Restore the folder counts now that we're back in browse mode.
     updateStatusBar(currentFolder());
     _fileListView->setFocus();
+    // Scroll the row of the last-viewed image into view now that the file
+    // list is visible again (selection was already kept in sync during
+    // viewer navigation).
+    if (!lastViewed.isEmpty()) {
+        syncFileListSelectionTo(lastViewed, /*scroll=*/true);
+    }
 }
 
 void MainWindow::goToPathFromLineEdit() {

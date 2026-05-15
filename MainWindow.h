@@ -100,8 +100,14 @@ private:
     // image is still loading and we have nothing accurate to report).
     void updateViewerStatusBar(const QSize& size);
     void activateImage(FileItem* item);
-    void buildViewerImageList(const QString& currentPath);
+    void buildViewerImageList(const QString& currentPath,
+                              const QSet<QString>& restrictTo = {});
     void showViewerImageAt(int index);
+    // Set the file-list's current item + selection to `path`, mapping
+    // through FileModel → FileFilterModel. Optionally scroll the path into
+    // view. Used to keep the list selection in sync with the viewer's
+    // active image when the viewer was opened with a single selection.
+    void syncFileListSelectionTo(const QString& path, bool scroll);
     void enterFullscreen();
     void exitFullscreen();
     // Drop the currently-viewed image from the viewer's local path list
@@ -148,6 +154,11 @@ private:
     // currently-shown image inside that list.
     QStringList _viewerImagePaths;
     int _viewerIndex = -1;
+    // True when the viewer was opened with 2+ images selected — navigation
+    // is restricted to those images and the file-list selection is left
+    // alone. False (the default) is the single-entry case: viewer browses
+    // the whole folder and the list selection follows the active image.
+    bool _viewerMultiSelect = false;
     // Async full-res loader for the viewer.
     QThread _imageLoaderThread;
     ImageLoader* _imageLoader = nullptr;
