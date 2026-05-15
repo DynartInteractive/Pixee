@@ -907,10 +907,14 @@ void MainWindow::onImageLoaded(QString path, QImage image) {
     }
 
     // If this is the currently-shown image, swap from placeholder to the
-    // full-res while preserving the user's zoom / pan / rotation.
+    // full-res. Use setImage so fresh-image defaults (FitLargeOnly, 100%,
+    // centered) apply — matches the cache-hit branch above. The placeholder
+    // was shown in Fit mode to upscale the thumbnail; carrying that mode
+    // over would force-fit a small full-res image instead of showing it at
+    // native size.
     if (_viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size()
             && path == _viewerImagePaths.at(_viewerIndex)) {
-        _viewerWidget->updateImage(image);
+        _viewerWidget->setImage(image);
         updateViewerStatusBar(image.size());
     }
 }
