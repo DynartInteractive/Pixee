@@ -188,5 +188,11 @@ private:
     QStringList _restoreChain;
     FileItem* _restoreParent = nullptr;
     bool _restorePending = false;
+    // Image path given on the command line (if any). Set during create()
+    // by scanning qApp->arguments(); consumed when the parent folder is
+    // populated by triggering activateImage. Cleared if path-restore is
+    // cancelled (manual nav / unreachable folder) so a later visit to the
+    // same folder doesn't trigger a surprise viewer pop-up.
+    QString _startupImagePath;
 };
 #endif // MAINWINDOW_H

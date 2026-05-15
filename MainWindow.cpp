@@ -435,13 +435,45 @@ void MainWindow::create() {
     QObject::connect(_fileListView, &QListView::customContextMenuRequested,
                      this, &MainWindow::showFileListContextMenu);
 
+    // Pick up an image path from the command line (e.g. "Pixee photo.jpg"
+    // or a shell association). First existing file wins; non-existing args
+    // are ignored so we don't error out on garbage tokens.
+    for (const QString& a : qApp->arguments().mid(1)) {
+        const QFileInfo fi(a);
+        if (fi.exists() && fi.isFile()) {
+            _startupImagePath = fi.absoluteFilePath();
+            break;
+        }
+    }
+
+    // When the startup image's parent folder is populated, look up the
+    // image and activate the viewer on it. Connected once for the lifetime
+    // of the window; self-clears _startupImagePath so a later F5 in the
+    // same folder doesn't re-open the viewer. Folder-tree pre-fetches fire
+    // folderPopulated for unrelated dirs too, hence the path/currentFolder
+    // checks.
+    QObject::connect(_fileModel, &FileModel::folderPopulated, this,
+        [this](const QString& dirPath) {
+            if (_startupImagePath.isEmpty()) return;
+            if (QFileInfo(_startupImagePath).absolutePath() != dirPath) return;
+            FileItem* folder = currentFolder();
+            if (!folder || folder->fileInfo().filePath() != dirPath) return;
+            FileItem* item = _fileModel->itemForPath(_startupImagePath);
+            _startupImagePath.clear();
+            if (item && item->fileType() == FileType::Image) {
+                activateImage(item);
+            }
+        });
+
     // Show the drive list immediately, then start an async chain descent
-    // to the saved path so a slow share doesn't block the window from
-    // appearing. Manual navigation cancels the restore (see navigateTo).
+    // to either the startup image's parent (CLI arg wins) or the saved
+    // lastPath. Manual navigation cancels the restore (see navigateTo).
     navigateTo(nullptr);
-    const QString lastPath = settings.value("lastPath").toString();
-    if (!lastPath.isEmpty()) {
-        beginPathRestore(lastPath);
+    const QString restorePath = _startupImagePath.isEmpty()
+            ? settings.value("lastPath").toString()
+            : QFileInfo(_startupImagePath).absolutePath();
+    if (!restorePath.isEmpty()) {
+        beginPathRestore(restorePath);
     }
 }
 
@@ -774,9 +806,13 @@ void MainWindow::advancePathRestore() {
     }
 
     // Chain exhausted: _restoreParent is the leaf. Clear restore state
-    // first so navigateTo doesn't see _restorePending and self-cancel.
+    // inline (NOT via cancelPathRestore, which also drops _startupImagePath
+    // — we still need that to trigger the viewer once the leaf is
+    // populated) so navigateTo doesn't see _restorePending and self-cancel.
     FileItem* leaf = _restoreParent;
-    cancelPathRestore();
+    _restorePending = false;
+    _restoreParent = nullptr;
+    _restoreChain.clear();
     if (leaf && leaf != _fileModel->rootItem()) {
         navigateTo(leaf);
     }
@@ -786,6 +822,10 @@ void MainWindow::cancelPathRestore() {
     _restorePending = false;
     _restoreParent = nullptr;
     _restoreChain.clear();
+    // Manual nav or unreachable folder means the CLI-supplied image won't
+    // be reached — drop it so revisiting that folder later doesn't suddenly
+    // trigger the viewer.
+    _startupImagePath.clear();
 }
 
 QString MainWindow::displayPath(const QString& storedPath) const {
