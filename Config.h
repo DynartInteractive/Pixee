@@ -12,6 +12,7 @@ public:
     int thumbnailSize();
     const QString thumbnailsPath();
     bool useBackslash();
+    bool hasDriveList();
     int maxThreadCount();
     int taskWorkerCount();
     const QString userFolder();

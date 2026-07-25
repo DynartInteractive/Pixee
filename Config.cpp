@@ -22,6 +22,20 @@ bool Config::useBackslash() {
 #endif
 }
 
+// Whether the platform has a meaningful list of drives to show above the
+// filesystem root. Windows does (C:, D:, network shares); Linux and macOS
+// have a single "/", so a drive list there is a one-item level the user
+// always has to click through. Callers root the folder tree at "/" instead
+// and default to the home folder on startup. (On macOS the extra volumes
+// under /Volumes stay reachable by browsing, same as /media on Linux.)
+bool Config::hasDriveList() {
+#if defined(__linux__) || defined(__APPLE__)
+    return false;
+#else
+    return true;
+#endif
+}
+
 const QString Config::userFolder() {
     auto result = QDir::homePath() + "/" + Config::_USER_FOLDER;
     return result;

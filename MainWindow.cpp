@@ -465,13 +465,34 @@ void MainWindow::create() {
             }
         });
 
+    // On a platform with no drive list (Linux) the synthetic root holds a
+    // single "/" — showing it as a tree row costs a level for nothing. Root
+    // the tree at "/" so its children are the top level, and enumerate it
+    // now so those children actually appear. "/" stays reachable in the
+    // central list (via ".." from a top-level folder), just not as a row of
+    // its own in the tree.
+    if (!_pixee->config()->hasDriveList()) {
+        if (FileItem* fsRoot = _fileModel->itemForPath(QDir::rootPath())) {
+            _fileModel->requestEnumerate(fsRoot);
+            const QModelIndex rootProxy =
+                    _folderFilterModel->mapFromSource(_fileModel->indexFor(fsRoot));
+            if (rootProxy.isValid()) _folderTreeView->setRootIndex(rootProxy);
+        }
+    }
+
     // Show the drive list immediately, then start an async chain descent
     // to either the startup image's parent (CLI arg wins) or the saved
     // lastPath. Manual navigation cancels the restore (see navigateTo).
     navigateTo(nullptr);
-    const QString restorePath = _startupImagePath.isEmpty()
+    QString restorePath = _startupImagePath.isEmpty()
             ? settings.value("lastPath").toString()
             : QFileInfo(_startupImagePath).absolutePath();
+    // Nothing to restore on a drive-list-less platform means we'd sit on
+    // "/" — open the home folder instead, which is where the user's images
+    // actually live. Windows keeps its drive list as the neutral start.
+    if (restorePath.isEmpty() && !_pixee->config()->hasDriveList()) {
+        restorePath = QDir::homePath();
+    }
     if (!restorePath.isEmpty()) {
         beginPathRestore(restorePath);
     }
@@ -506,6 +527,13 @@ void MainWindow::navigateTo(FileItem* item) {
         if (_pixee->thumbnailCache()) _pixee->thumbnailCache()->setPaused(false);
     }
     _fileListView->selectionModel()->clear();
+    // With no drive list there is nothing above "/" worth showing, so every
+    // route that would land on the synthetic root (startup, navigateUp from
+    // "/", an empty path box) is redirected to "/" itself. Keeps the hidden
+    // tree root and the central list from ever disagreeing about the top.
+    if ((!item || item == _fileModel->rootItem()) && !_pixee->config()->hasDriveList()) {
+        item = _fileModel->itemForPath(QDir::rootPath());
+    }
     if (!item || item == _fileModel->rootItem()) {
         // Drive list (synthetic root). Showing top-level needs an invalid root.
         _fileListView->setRootIndex(QModelIndex());
@@ -1141,7 +1169,9 @@ void MainWindow::viewerPrev() {
 void MainWindow::navigateUp() {
     FileItem* cur = currentFolder();
     if (!cur) return;                         // already at the drive list
-    navigateTo(cur->parent());                // parent == _rootItem → drive list
+    // parent == _rootItem → drive list, or a no-op stay on "/" where there
+    // is no drive list (navigateTo redirects the synthetic root back to "/").
+    navigateTo(cur->parent());
 }
 
 void MainWindow::viewerNext() {

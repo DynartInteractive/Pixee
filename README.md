@@ -13,7 +13,7 @@
 
 ## ✨ Features
 
-- **Folder browsing** with multi-drive root, async directory enumeration off the GUI thread, and `..` always sorted first.
+- **Folder browsing** with multi-drive root, async directory enumeration off the GUI thread, and `..` always sorted first. On Linux and macOS, where there is only ever one drive, the `/` row is hidden — the folder tree starts at the contents of `/` and Pixee opens in your home folder unless a previous session or a command-line image says otherwise. Other volumes (`/media`, `/mnt`, `/Volumes`) stay reachable by browsing.
 - **Thumbnail pipeline** — local SQLite cache, four-worker decode pool, viewport-driven priority queue (top-left → bottom-right), per-session negative caching, automatic background fill of the rest of the folder once the visible items are done.
 - **Folder index thumbnails** — the alphabetically-first image inside each folder is auto-picked and overlaid on the folder icon, with a configurable margin / border / vertical offset.
 - **Image viewer** integrated into the main window: async chunked loading with a cached-thumbnail placeholder, fit / 1:1 / discrete zoom (`0.1×` – `8×`), pan with `Space + LMB` or `Middle-drag`, 90° rotate, `F11` fullscreen, plus a 5-image preload cache for instant prev/next.
