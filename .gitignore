@@ -23,6 +23,16 @@ moc_*.h
 qrc_*.cpp
 ui_*.h
 *.qm
+.qmake.stash
+qmake_*.qrc
+
+# In-source build output. The app binary is extensionless on Linux, so
+# anchor it to the repo root — an unanchored "Pixee" would also swallow a
+# Pixee/ directory if one is ever added. Test binaries sit next to their
+# sources, hence the .cpp re-include so new suites stay visible to git.
+/Pixee
+tests/*/tst_*
+!tests/*/tst_*.cpp
 
 # OS noise
 .DS_Store
