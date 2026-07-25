@@ -5,6 +5,10 @@
 #include <QMouseEvent>
 #include <QProgressBar>
 
+// TaskGroup must be complete here: connecting groupAdded(TaskGroup*) to an
+// argument-less lambda makes Qt instantiate QMetaTypeId<TaskGroup*>, which
+// static_asserts on sizeof(T). TaskManager.h only forward-declares it.
+#include "TaskGroup.h"
 #include "TaskManager.h"
 
 TaskStatusWidget::TaskStatusWidget(TaskManager* manager, QWidget* parent)
