@@ -12,6 +12,7 @@ SOURCES += \
     $$PWD/../TestHelpers.cpp \
     $$PWD/../TaskTestFixture.cpp \
     $$PWD/../../src/FileOpsHelpers.cpp \
+    $$PWD/../../src/ImageFormats.cpp \
     $$PWD/../../src/Task.cpp \
     $$PWD/../../src/TaskGroup.cpp \
     $$PWD/../../src/TaskRunner.cpp \
@@ -24,6 +25,7 @@ HEADERS += \
     $$PWD/../TestHelpers.h \
     $$PWD/../TaskTestFixture.h \
     $$PWD/../../src/FileOpsHelpers.h \
+    $$PWD/../../src/ImageFormats.h \
     $$PWD/../../src/Task.h \
     $$PWD/../../src/TaskGroup.h \
     $$PWD/../../src/TaskRunner.h \

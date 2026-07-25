@@ -8,6 +8,7 @@
 #include <QImageWriter>
 
 #include "FileOpsHelpers.h"
+#include "ImageFormats.h"
 
 ScaleImageTask::ScaleImageTask(const QString& sourcePath, const QString& destPath,
                                int targetLongestEdge, int jpegQuality,
@@ -75,8 +76,18 @@ void ScaleImageTask::run() {
     if (!checkPauseStop()) return;
     emitProgress(75);
 
-    QImageWriter writer(_dst);
-    if (writer.format().toLower() == "jpg" || writer.format().toLower() == "jpeg") {
+    // Name the format explicitly rather than letting QImageWriter infer it
+    // from the destination suffix. Two reasons: the suffix may be an alias
+    // no plugin claims (.jfif is JPEG, and inferring would fail the write
+    // with "Unsupported image format"), and a writer constructed from a
+    // bare filename reports an empty format(), so testing it to decide on
+    // setQuality() never matched and JPEG quality was silently ignored.
+    const QString suffix = QFileInfo(_dst).suffix().toLower();
+    QByteArray format = ImageFormats::aliasedFormat(suffix);
+    if (format.isEmpty()) format = suffix.toLatin1();
+
+    QImageWriter writer(_dst, format);
+    if (format == "jpg" || format == "jpeg") {
         writer.setQuality(_jpegQuality);
     }
     if (!writer.write(img)) {

@@ -1,4 +1,5 @@
 #include "Config.h"
+#include "ImageFormats.h"
 #include <QImageReader>
 #include <QImageWriter>
 #include <QDir>
@@ -85,9 +86,14 @@ int Config::taskWorkerCount() {
 }
 
 void Config::_setUpImageExtensions() {
-    foreach (auto format, QImageReader::supportedImageFormats()) {
+    const QList<QByteArray> formats = QImageReader::supportedImageFormats();
+    foreach (auto format, formats) {
         _imageExtensions << QString(format);
     }
+    // Plus the suffixes no plugin advertises but which hold a format we can
+    // already decode — see ImageFormats.h. Only FileModel's extension-based
+    // classification needs these; decoding sniffs the magic bytes.
+    _imageExtensions << ImageFormats::aliasExtensionsFor(formats);
     foreach (auto extension, _imageExtensions) {
         _imageFileNameFilters.append("*." + extension);
     }

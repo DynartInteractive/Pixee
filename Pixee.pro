@@ -51,6 +51,7 @@ SOURCES += \
     src/FolderRefresher.cpp \
     src/FolderTreeView.cpp \
     src/IcoUtils.cpp \
+    src/ImageFormats.cpp \
     src/ImageLoader.cpp \
     src/MainWindow.cpp \
     src/BatchRenameDialog.cpp \
@@ -109,6 +110,7 @@ HEADERS += \
     src/BatchRenamePlan.h \
     src/SaveAsDialog.h \
     src/SaveImageTask.h \
+    src/ImageFormats.h \
     src/ImageLoader.h \
     src/ImageMetadata.h \
     src/MainWindow.h \
