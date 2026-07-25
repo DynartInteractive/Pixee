@@ -41,7 +41,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 
 ## 🛠️ Building
 
-### Debian 13 (Trixie)
+### Debian and derivatives (Debian 13 Trixie, Ubuntu 24.04+, Linux Mint 22+)
 
 ```sh
 sudo apt install build-essential qt6-base-dev qt6-base-dev-tools qt6-l10n-tools
@@ -49,6 +49,34 @@ qmake6 Pixee.pro
 make
 ./Pixee
 ```
+
+Qt only builds in PNG, BMP, GIF, ICO and JPEG support. For **WebP** — plus TIFF, TGA,
+WBMP, MNG and ICNS — install the extra plugin pack:
+
+```sh
+sudo apt install qt6-image-formats-plugins
+```
+
+No rebuild is needed: Pixee derives its extension list from
+`QImageReader::supportedImageFormats()` at startup, so restarting the app is enough.
+The `Supported image formats:` line it logs on launch tells you what was picked up.
+
+**AVIF** has no Qt 6 package in Debian or Ubuntu (`qt5-avif-image-plugin` and
+`kimageformat-plugins` are both Qt 5, so a Qt 6 build will not load them). Build
+[`qt-avif-image-plugin`](https://github.com/novomesk/qt-avif-image-plugin) instead —
+it ships a qmake project, so no CMake or KDE build tooling is required:
+
+```sh
+sudo apt install libavif-dev
+git clone --depth 1 https://github.com/novomesk/qt-avif-image-plugin.git
+cd qt-avif-image-plugin
+qmake6 qt-avif-image-plugin.pro && make
+sudo make install
+```
+
+Invoke `qmake6` directly as shown — the bundled `build_libqavif_dynamic.sh` looks for
+`qmake` / `qmake5` and fails where the Qt 6 binary is named `qmake6`. `make install`
+writes `libqavif.so` into the same system `qt6/plugins/imageformats` directory apt uses.
 
 ### Other platforms
 
