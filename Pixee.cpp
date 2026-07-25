@@ -8,11 +8,12 @@
 #include "TaskManager.h"
 #include "MainWindow.h"
 
-Pixee::Pixee(int argc, char** argv) {
+Pixee::Pixee(int argc, char** argv) : _argc(argc) {
     QCoreApplication::setOrganizationName("Dynart");
     QCoreApplication::setApplicationName("Pixee");
 
-    _app = new QApplication(argc, argv);
+    // _argc, not the by-value parameter — see the comment in Pixee.h.
+    _app = new QApplication(_argc, argv);
 
     _config = new Config();
     _theme = new Theme(_config);
