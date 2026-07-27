@@ -54,6 +54,9 @@ The build copies the `themes/` directory next to the executable on every build, 
 | `F5` | Refresh current folder |
 | `F11` | Toggle fullscreen |
 | `Enter` / Double-click | Open folder or image |
+| `Ctrl + C` | Copy selection to the clipboard |
+| `Ctrl + X` | Cut selection to the clipboard (next paste moves) |
+| `Ctrl + V` | Paste into the current folder |
 | `Ctrl + Q` | Quit |
 
 ### Image viewer
@@ -70,6 +73,7 @@ The build copies the `themes/` directory next to the executable on every build, 
 | Middle-drag | Pan |
 | `F11` | Toggle fullscreen |
 | `Esc` / `Enter` / Double-click | Return to the file list |
+| `Ctrl + C` / `Ctrl + X` / `Ctrl + V` | Copy / Cut / Paste the current image |
 | Right-click | Context menu — rotate left / right, **Copy to…** |
 
 ## 🎨 Theming

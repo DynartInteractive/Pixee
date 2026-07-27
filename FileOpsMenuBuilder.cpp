@@ -133,6 +133,13 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     // and the viewer in MainWindow — actions inside an exec'd context menu
     // only have their shortcut active while the menu is open.
     connect(clipCopy, &QAction::triggered, this, [this]() { doCopyToClipboard(); });
+
+    // Cut — same clipboard payload as Copy, tagged DROPEFFECT_MOVE so the
+    // next Paste (here or in Explorer) moves the source instead of copying.
+    QAction* clipCut = menu->addAction(tr("Cut"));
+    clipCut->setShortcut(QKeySequence::Cut);  // visual hint only, see Copy above
+    connect(clipCut, &QAction::triggered, this, [this]() { doCutToClipboard(); });
+
     if (!_pasteDestination.isEmpty()) addPaste(menu);
 
     menu->addSeparator();
@@ -196,6 +203,10 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
 
 void FileOpsMenuBuilder::doCopyToClipboard() {
     copyPathsToClipboard(_paths);
+}
+
+void FileOpsMenuBuilder::doCutToClipboard() {
+    cutPathsToClipboard(_paths);
 }
 
 void FileOpsMenuBuilder::doPaste() {
@@ -326,7 +337,7 @@ void FileOpsMenuBuilder::enqueueDeleteForExternalMove(const QStringList& paths,
     taskManager->enqueueGroup(group);
 }
 
-QMimeData* FileOpsMenuBuilder::buildPathsMimeData(const QStringList& paths) {
+QMimeData* FileOpsMenuBuilder::buildPathsMimeData(const QStringList& paths, bool cut) {
     if (paths.isEmpty()) return nullptr;
     QList<QUrl> urls;
     QStringList textPaths;
@@ -342,15 +353,22 @@ QMimeData* FileOpsMenuBuilder::buildPathsMimeData(const QStringList& paths) {
     // (Sublime, VS Code, etc.) end up with nothing. Set the path(s) as
     // newline-separated native paths so Ctrl-V in those apps gives the path.
     mime->setText(textPaths.join('\n'));
-    // Tag as DROPEFFECT_COPY explicitly so other apps that key off this
-    // (Explorer, etc.) treat the payload unambiguously — symmetrical with
-    // how we read the same flag in handleDropOrPaste for Cut.
-    mime->setData(FileOpsHelpers::kDropEffectMime, dropEffectBytes(5));
+    // Tag the DropEffect explicitly so other apps that key off this
+    // (Explorer, etc.) treat the payload unambiguously — DROPEFFECT_MOVE (2)
+    // for Cut, DROPEFFECT_COPY (5) otherwise. Symmetrical with how we read
+    // the same flag in handleDropOrPaste / clipboardSaysCut.
+    mime->setData(FileOpsHelpers::kDropEffectMime, dropEffectBytes(cut ? 2 : 5));
     return mime;
 }
 
 void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
-    if (QMimeData* mime = buildPathsMimeData(paths)) {
+    if (QMimeData* mime = buildPathsMimeData(paths, /*cut=*/false)) {
+        QApplication::clipboard()->setMimeData(mime);
+    }
+}
+
+void FileOpsMenuBuilder::cutPathsToClipboard(const QStringList& paths) {
+    if (QMimeData* mime = buildPathsMimeData(paths, /*cut=*/true)) {
         QApplication::clipboard()->setMimeData(mime);
     }
 }

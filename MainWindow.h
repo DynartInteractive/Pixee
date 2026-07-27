@@ -62,6 +62,8 @@ private slots:
     void showFileListContextMenu(const QPoint& pos);
     void copyFileListSelectionToClipboard();
     void copyViewedImageToClipboard();
+    void cutFileListSelectionToClipboard();
+    void cutViewedImageToClipboard();
     void pasteIntoCurrentFolder();
     void pasteIntoViewerImageFolder();
     // Show RenameDialog for `path`, validate, drive FileModel::renameItem.

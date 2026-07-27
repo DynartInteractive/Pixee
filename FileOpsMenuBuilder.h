@@ -77,6 +77,12 @@ public:
     // (CF_HDROP via setUrls + plain-text path list via setText).
     static void copyPathsToClipboard(const QStringList& paths);
 
+    // As copyPathsToClipboard, but tags the payload DROPEFFECT_MOVE (2)
+    // instead of COPY (5) so a subsequent Paste moves rather than copies.
+    // Symmetrical with clipboardSaysCut on the read side; used by the Cut
+    // menu item and the window-wide Ctrl+X handlers.
+    static void cutPathsToClipboard(const QStringList& paths);
+
     // Post-drop helper for external drag-out with MoveAction. Enqueues a
     // delete-only TaskGroup for the source paths (same expansion as the
     // Delete menu — folders → per-file DeleteFileTask + FolderCleanupTask)
@@ -90,11 +96,12 @@ public:
     // Builds the MIME payload used by both clipboard Copy and drag-out:
     //   - setUrls(file://...)        — CF_HDROP on Windows (Explorer)
     //   - setText(\n-joined paths)   — for paste-as-text targets (editors)
-    //   - "Preferred DropEffect" = 5 — explicit COPY tag for receivers
+    //   - "Preferred DropEffect"     — COPY (5) by default, or MOVE (2)
+    //                                  when `cut` is true, for receivers
     //                                  that key off the Windows MIME
     // Caller owns the returned object (typically transferred to QDrag or
     // QClipboard). Returns nullptr on empty input.
-    static QMimeData* buildPathsMimeData(const QStringList& paths);
+    static QMimeData* buildPathsMimeData(const QStringList& paths, bool cut = false);
 
     // Static helper so Ctrl+V handlers can paste without going through
     // the menu builder. Reads the system clipboard, detects Cut vs Copy
@@ -121,6 +128,7 @@ public:
 
 private:
     void doCopyToClipboard();
+    void doCutToClipboard();
     void doPaste();
     void doCopy(const QString& destFolder);
     void doMove(const QString& destFolder);

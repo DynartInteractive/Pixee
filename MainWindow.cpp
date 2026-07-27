@@ -133,6 +133,19 @@ void MainWindow::create() {
     QObject::connect(viewerCopyShortcut, &QShortcut::activated,
                      this, &MainWindow::copyViewedImageToClipboard);
 
+    // Ctrl+X — cut paths to the clipboard (same payload as Ctrl+C, tagged
+    // Move so the next paste relocates the source). Mirrors the two-context
+    // Ctrl+C wiring above.
+    auto* listCutShortcut = new QShortcut(QKeySequence::Cut, _fileListView);
+    listCutShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listCutShortcut, &QShortcut::activated,
+                     this, &MainWindow::cutFileListSelectionToClipboard);
+
+    auto* viewerCutShortcut = new QShortcut(QKeySequence::Cut, _viewerWidget);
+    viewerCutShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerCutShortcut, &QShortcut::activated,
+                     this, &MainWindow::cutViewedImageToClipboard);
+
     // Ctrl+V — paste clipboard contents into the relevant folder.
     auto* listPasteShortcut = new QShortcut(QKeySequence::Paste, _fileListView);
     listPasteShortcut->setContext(Qt::WidgetShortcut);
@@ -1317,6 +1330,15 @@ void MainWindow::copyFileListSelectionToClipboard() {
 void MainWindow::copyViewedImageToClipboard() {
     if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
     FileOpsMenuBuilder::copyPathsToClipboard({_viewerImagePaths.at(_viewerIndex)});
+}
+
+void MainWindow::cutFileListSelectionToClipboard() {
+    FileOpsMenuBuilder::cutPathsToClipboard(_fileListView->selectionPaths().paths);
+}
+
+void MainWindow::cutViewedImageToClipboard() {
+    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+    FileOpsMenuBuilder::cutPathsToClipboard({_viewerImagePaths.at(_viewerIndex)});
 }
 
 void MainWindow::pasteIntoCurrentFolder() {
