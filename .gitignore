@@ -44,5 +44,12 @@ kling_*
 # Local scratch folder used to exercise paste / move flows.
 themes/new/
 
-# Portable distribution dir (Qt deploy output, not source).
+# Portable distribution (Qt deploy output + its zip, not source).
 Pixee-portable/
+Pixee-portable.zip
+
+# Prebuilt HEIC/AVIF/PSD/XCF plugins + codec DLLs are intentionally checked
+# in (vcpkg, their build source, is gone) so make-portable.bat can bundle
+# them. Override the blanket *.dll ignore above for this one tree.
+!thirdparty/imageformats/codecs/*.dll
+!thirdparty/imageformats/plugins/*.dll
