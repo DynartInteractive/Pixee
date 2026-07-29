@@ -1405,6 +1405,7 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
 
     FileOpsMenuBuilder builder(selection.paths, _pixee->taskManager(), this);
     builder.setImageOpsEnabled(selection.imageOpsAllowed);
+    builder.setThumbnailRefreshEnabled(selection.refreshThumbnailAllowed);
     builder.setRenameCallback([this](const QString& path) { renameItemAt(path); });
     builder.setCreateFolderCallback(
         [this](const QString& parentDir) { createFolderIn(parentDir); });

@@ -67,7 +67,7 @@ Abort/supersede pattern used in `ThumbnailGenerator`, `ImageLoader`, and `FileMo
 
 `abandonAll()` is the fast path used on folder change: drops every subscription and bumps the generator's abort version so in-flight decodes bail.
 
-`refreshThumbnail(path, mtime, size)` is the manual override behind the "Refresh thumbnail" menu item (`FileModel::refreshThumbnail` → here): it clears the `_failures` entry and force-enqueues generation **bypassing step 1–2**, so a thumbnail cached from a still-being-written file (a long export) — which the negative cache would otherwise never retry this session — can be rebuilt from the file's current bytes.
+`refreshThumbnail(path, mtime, size)` is the manual override behind the "Refresh thumbnail" menu item (`FileModel::refreshThumbnail` → here): it clears the `_failures` entry and force-enqueues generation **bypassing step 1–2**, so a thumbnail cached from a still-being-written file (a long export) — which the negative cache would otherwise never retry this session — can be rebuilt from the file's current bytes. `FileModel::refreshThumbnail` dispatches on type: a folder path routes to `refreshFolderThumbnail`, which refreshes the folder's *index-image* thumbnail (the folder cell repaints via the `_indexUsers` fan-out).
 
 `FileListView` is the heaviest subscriber — it computes a viewport-driven prefetch window (visible rows + a margin), subscribes/unsubscribes diff-only on a debounced timer (`_updateTimer`), bumps priorities by viewport distance, and auto-expands the window once the current batch finishes so background fill of the rest of the folder happens after the visible cells are ready.
 

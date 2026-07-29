@@ -553,7 +553,23 @@ void FileModel::onThumbnailPending(QString path) {
     emitDataChangedFor(path);
 }
 
+void FileModel::refreshFolderThumbnail(const QString& folderPath) {
+    // The folder's thumbnail is its index image's thumbnail. Rebuild that;
+    // the folder cell repaints via the _indexUsers fan-out in onThumbnailReady.
+    const QString src = _folderIndexes.value(folderPath);
+    if (src.isEmpty()) return;   // no image inside (or not enumerated yet)
+    refreshThumbnail(src);
+}
+
 void FileModel::refreshThumbnail(const QString& path) {
+    // Folders don't have a thumbnail of their own — refresh their index image.
+    if (FileItem* item = itemForPath(path)) {
+        if (item->fileType() == FileType::Folder) {
+            refreshFolderThumbnail(path);
+            return;
+        }
+    }
+
     const QFileInfo info(path);
     if (!info.exists() || !info.isFile()) return;
 

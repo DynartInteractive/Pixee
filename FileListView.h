@@ -38,6 +38,10 @@ public:
     struct Selection {
         QStringList paths;
         bool imageOpsAllowed = true;
+        // True when at least one selected item has a thumbnail worth
+        // rebuilding — an image, or a folder (whose index-image thumbnail
+        // can be refreshed). Plain non-image files and ".." don't count.
+        bool refreshThumbnailAllowed = false;
     };
     Selection selectionPaths() const;
 

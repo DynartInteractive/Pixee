@@ -397,6 +397,11 @@ FileListView::Selection FileListView::selectionPaths() const {
             // Copy / Move / Delete via recursive expansion in the builder.
             result.imageOpsAllowed = false;
         }
+        if (t == FileType::Folder || t == FileType::Image) {
+            // Images and folders (via their index image) both have a
+            // thumbnail the "Refresh thumbnail" action can rebuild.
+            result.refreshThumbnailAllowed = true;
+        }
         if (t == FileType::Folder || t == FileType::Image || t == FileType::File) {
             result.paths.append(item->fileInfo().filePath());
         }

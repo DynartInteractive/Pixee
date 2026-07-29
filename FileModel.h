@@ -83,14 +83,16 @@ public:
     // Used as a placeholder while the viewer's full-res load is in flight.
     QImage thumbnailFor(const QString& path) const;
 
-    // Force a single image's thumbnail to be rebuilt from its current bytes.
-    // Drops this model's cached state for the path, re-stats the file so the
-    // row's mtime/size are current, and asks the cache to regenerate
-    // (bypassing DB + the session negative cache). The rebuilt thumbnail
-    // arrives via the normal onThumbnailReady path. Used by the "Refresh
-    // thumbnail" menu item to recover a thumbnail that was cached from a
-    // still-being-written file (e.g. a long export) and would otherwise stay
-    // wrong/failed for the whole session. No-op if the path no longer exists.
+    // Force a single item's thumbnail to be rebuilt from its current bytes.
+    // For an image: drops this model's cached state for the path, re-stats
+    // the file so the row's mtime/size are current, and asks the cache to
+    // regenerate (bypassing DB + the session negative cache). For a folder:
+    // rebuilds the folder's index-image thumbnail instead (see
+    // refreshFolderThumbnail). The rebuilt thumbnail arrives via the normal
+    // onThumbnailReady path. Used by the "Refresh thumbnail" menu item to
+    // recover a thumbnail cached from a still-being-written file (e.g. a long
+    // export) that would otherwise stay wrong/failed for the whole session.
+    // No-op if the path no longer exists.
     void refreshThumbnail(const QString& path);
 
     // Rename a single item to `newName` within its current parent
@@ -165,6 +167,10 @@ private:
     // children. Drops the assignment if no images remain. Emits
     // dataChanged on `parent` if the choice changed.
     void repickFolderIndex(FileItem* parent);
+    // Rebuild a folder's displayed thumbnail by refreshing its index-image's
+    // thumbnail (the folder icon shows an overlay of its alphabetically-first
+    // image). No-op if the folder holds no image / hasn't been enumerated.
+    void refreshFolderThumbnail(const QString& folderPath);
     void forgetSubtree(FileItem* item);
     void emitDataChangedFor(const QString& path);
 

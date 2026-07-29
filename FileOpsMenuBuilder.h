@@ -60,6 +60,10 @@ public:
     // can't sensibly operate on (a folder, a non-image file, ...).
     // Default true.
     void setImageOpsEnabled(bool enabled) { _imageOpsEnabled = enabled; }
+    // When true, offer "Refresh thumbnail" — for images and folders alike
+    // (a folder rebuilds its index-image thumbnail). Independent of
+    // setImageOpsEnabled, which is image-only. Needs the refresh callback set.
+    void setThumbnailRefreshEnabled(bool enabled) { _thumbnailRefreshEnabled = enabled; }
     // If non-empty, populate() prepends a 'Paste' action that targets
     // this directory (caller's responsibility to make sure it's a real
     // folder the user can write to). Action is disabled when there's
@@ -162,6 +166,7 @@ private:
     CreateFolderFn _createFolder;
     RefreshThumbnailFn _refreshThumbnail;
     bool _imageOpsEnabled = true;
+    bool _thumbnailRefreshEnabled = false;
     QString _pasteDestination;
 };
 

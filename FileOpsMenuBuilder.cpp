@@ -120,19 +120,19 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
             OpenWithDialog dlg(dialogParent);
             dlg.exec();
         });
+        menu->addSeparator();
+    }
 
-        // ---- Refresh thumbnail ----
-        // Rebuilds the thumbnail from the file's current bytes. The escape
-        // hatch for a thumbnail cached from a still-being-written file (a
-        // long export), which the session negative cache would otherwise
-        // never retry.
-        if (_refreshThumbnail) {
-            QAction* refreshThumb = menu->addAction(tr("Refresh thumbnail"));
-            const QStringList paths = _paths;
-            connect(refreshThumb, &QAction::triggered, this,
-                    [this, paths]() { if (_refreshThumbnail) _refreshThumbnail(paths); });
-        }
-
+    // ---- Refresh thumbnail ----
+    // For images and folders (a folder rebuilds its index-image thumbnail).
+    // Rebuilds from the file's current bytes — the escape hatch for a
+    // thumbnail cached from a still-being-written file (a long export), which
+    // the session negative cache would otherwise never retry.
+    if (_thumbnailRefreshEnabled && _refreshThumbnail) {
+        QAction* refreshThumb = menu->addAction(tr("Refresh thumbnail"));
+        const QStringList paths = _paths;
+        connect(refreshThumb, &QAction::triggered, this,
+                [this, paths]() { if (_refreshThumbnail) _refreshThumbnail(paths); });
         menu->addSeparator();
     }
 
