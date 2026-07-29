@@ -34,6 +34,7 @@ SOURCES += \
     Pixee.cpp \
     RenameDialog.cpp \
     ScaleImageTask.cpp \
+    SettingsDialog.cpp \
     Task.cpp \
     TaskConflictPrompter.cpp \
     TaskDockWidget.cpp \
@@ -53,6 +54,7 @@ SOURCES += \
     main.cpp
 
 HEADERS += \
+    AppSettings.h \
     Config.h \
     ConflictDialog.h \
     ConvertFormatTask.h \
@@ -79,6 +81,7 @@ HEADERS += \
     Pixee.h \
     RenameDialog.h \
     ScaleImageTask.h \
+    SettingsDialog.h \
     Task.h \
     TaskConflictPrompter.h \
     TaskDockWidget.h \
@@ -97,7 +100,11 @@ HEADERS += \
     ViewerWidget.h
 
 TRANSLATIONS += \
-    Pixee_en_US.ts
+    Pixee_en_US.ts \
+    Pixee_hu.ts \
+    Pixee_de.ts \
+    Pixee_fr.ts \
+    Pixee_es.ts
 
 CONFIG += lrelease
 CONFIG += embed_translations

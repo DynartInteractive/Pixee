@@ -8,6 +8,8 @@
         <file alias="image-in-queue-big.png">resources/icons/image-in-queue-big.png</file>
         <file alias="image-error-big.png">resources/icons/image-error-big.png</file>
         <file alias="back-big.png">resources/icons/back-big.png</file>
+        <file alias="settings/file-operations.svg">resources/icons/settings/file-operations.svg</file>
+        <file alias="settings/general.svg">resources/icons/settings/general.svg</file>
     </qresource>
     <qresource prefix="/database">
         <file alias="thumbnails.s3db">resources/thumbnails.s3db</file>

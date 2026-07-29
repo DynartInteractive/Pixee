@@ -20,6 +20,9 @@
 - **Format support** for everything Qt's image plugins can decode — JPEG, PNG, WebP, GIF, BMP, ICO, plus whatever extra plugins (HEIC, AVIF, PSD via [`kimageformats`](https://invent.kde.org/frameworks/kimageformats), …) are installed against your Qt build. ICO files pick the highest-area, highest-bit-depth sub-image. See [`docs/windows-extra-image-formats.md`](docs/windows-extra-image-formats.md) for the Windows MSVC setup recipe.
 - **Pixel-art aware** — nearest-neighbor upscaling for source images smaller than the cell, smooth scaling for downscaling. Transparent images render over a configurable checker pattern.
 - **SMB-friendly** — chunked file reads with cooperative abort, off-GUI directory enumeration, no `QFileSystemModel` / `QFileDialog` for browsing. Designed for image folders sitting on a network share.
+- **File operations** — Copy / Cut / Paste / Move / Rename / Delete / New folder, batched through a task pipeline with a modal conflict prompt (Skip / Rename / Overwrite). When a batch finishes, the files it added to the current folder are selected and scrolled into view (toggle in Settings).
+- **Settings window** (`Edit → Settings…`) — a non-modal, always-on-top panel: searchable settings (type to filter any label), groups in an icon sidebar, Save / Cancel. Currently: *Select added files* and *Language*.
+- **Languages** — English plus Hungarian / German / French / Spanish scaffolding; pick one in Settings (restart to apply) or follow the OS locale. Untranslated strings fall back to English.
 - **Themable** — Qt stylesheet (`style.qss`) plus an INI for non-CSS values (`style.ini`). User overrides drop in at `~/.pixee/themes/<name>/`. Dark theme included.
 
 ## 🛠️ Building

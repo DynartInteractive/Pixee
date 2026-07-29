@@ -7,6 +7,7 @@
 #include <QImage>
 #include <QLineEdit>
 #include <QListView>
+#include <QPointer>
 #include <QSet>
 #include <QStackedWidget>
 #include <QString>
@@ -25,6 +26,7 @@ class FolderTreeView;
 class ImageLoader;
 class QAction;
 class QMenu;
+class SettingsDialog;
 class TaskConflictPrompter;
 class TaskDockWidget;
 class TaskStatusWidget;
@@ -49,6 +51,11 @@ private slots:
     void refreshCurrentFolder();
     void onTaskPathTouched(QString dir);
     void onTouchedDirsRefreshDue();
+    // When a task group finishes, remember the files it added to the folder
+    // currently being viewed (if the "Select added files" setting is on) so
+    // they can be selected once the folder refresh inserts their rows.
+    void onGroupFinished(QStringList producedPaths);
+    void openSettings();
     void showAbout();
     void dismissViewer();
     void viewerPrev();
@@ -111,6 +118,11 @@ private:
     // view. Used to keep the list selection in sync with the viewer's
     // active image when the viewer was opened with a single selection.
     void syncFileListSelectionTo(const QString& path, bool scroll);
+    // Select + scroll to whichever _pendingSelectPaths currently resolve to
+    // rows in the file list; leave any not-yet-present paths pending for the
+    // next folder refresh. Abandons the pending set if the user has navigated
+    // away from _pendingSelectFolder.
+    void trySelectPending();
     void enterFullscreen();
     void exitFullscreen();
     // Drop the currently-viewed image from the viewer's local path list
@@ -182,6 +194,15 @@ private:
     // into a single refresh after a quiet interval.
     QSet<QString> _touchedDirs;
     QTimer _touchedDirsTimer;
+    // Files a just-finished task group added to the folder being viewed,
+    // waiting to be selected once the folder refresh inserts their rows.
+    // _pendingSelectFolder is the (cleaned) folder they belong to; both clear
+    // when applied or when the user navigates elsewhere.
+    QStringList _pendingSelectPaths;
+    QString _pendingSelectFolder;
+    // The modeless, stays-on-top settings window. QPointer so it auto-nulls
+    // when the window closes (it's WA_DeleteOnClose).
+    QPointer<SettingsDialog> _settingsDialog;
     // Async path-restore state. _restoreChain holds the remaining absolute
     // paths to descend through (root → leaf); _restoreParent is the last
     // resolved FileItem in the chain. Both clear when restore finishes or

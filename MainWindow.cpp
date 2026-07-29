@@ -6,6 +6,8 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QItemSelection>
+#include <QItemSelectionModel>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -35,7 +37,9 @@
 #include "MoveFileTask.h"
 #include "NewFolderDialog.h"
 #include "RenameDialog.h"
+#include "AppSettings.h"
 #include "ScaleImageTask.h"
+#include "SettingsDialog.h"
 #include "TaskConflictPrompter.h"
 #include "TaskDockWidget.h"
 #include "Toast.h"
@@ -287,6 +291,12 @@ void MainWindow::create() {
             this, &MainWindow::onTouchedDirsRefreshDue);
     connect(_pixee->taskManager(), &TaskManager::pathTouched,
             this, &MainWindow::onTaskPathTouched);
+    // Select files a finished group added to the current folder (gated by the
+    // "Select added files" setting). The rows appear only once the folder
+    // refresh applies, so onGroupFinished stashes the paths and the refresh
+    // hook below selects them.
+    connect(_pixee->taskManager(), &TaskManager::groupFinished,
+            this, &MainWindow::onGroupFinished);
 
     // Status bar reflects the post-refresh contents. Fires for every
     // resolved refresh (changed or not — we skip the FileItem walk when
@@ -297,6 +307,13 @@ void MainWindow::create() {
     // doesn't overwrite the current-folder counts.
     connect(_fileModel, &FileModel::folderRefreshed, this,
             [this](const QString& path, bool changed) {
+                // A refresh that inserted a just-added file's row is our cue to
+                // select it. Do this before the changed/current guards below —
+                // trySelectPending has its own folder check.
+                if (!_pendingSelectPaths.isEmpty()
+                        && QDir::cleanPath(path) == _pendingSelectFolder) {
+                    trySelectPending();
+                }
                 if (!changed) return;
                 FileItem* folder = currentFolder();
                 if (!folder || folder == _fileModel->rootItem()) return;
@@ -630,6 +647,82 @@ void MainWindow::onTouchedDirsRefreshDue() {
     _touchedDirs.clear();
 }
 
+void MainWindow::onGroupFinished(QStringList producedPaths) {
+    if (producedPaths.isEmpty()) return;
+    if (!QSettings().value(AppSettings::kSelectAddedFiles, true).toBool()) return;
+
+    FileItem* folder = currentFolder();
+    if (!folder || folder == _fileModel->rootItem()) return;
+    const QString cur = QDir::cleanPath(folder->fileInfo().filePath());
+
+    // Keep only files that landed in the folder we're looking at.
+    QStringList inCurrent;
+    for (const QString& p : producedPaths) {
+        if (QDir::cleanPath(QFileInfo(p).absolutePath()) == cur) {
+            inCurrent.append(QDir::cleanPath(p));
+        }
+    }
+    if (inCurrent.isEmpty()) return;
+
+    _pendingSelectFolder = cur;
+    _pendingSelectPaths = inCurrent;
+    // Some rows may already exist (a refresh raced ahead); grab those now and
+    // leave the rest for the folderRefreshed hook.
+    trySelectPending();
+}
+
+void MainWindow::trySelectPending() {
+    if (_pendingSelectPaths.isEmpty()) return;
+
+    FileItem* folder = currentFolder();
+    if (!folder || folder == _fileModel->rootItem()
+            || QDir::cleanPath(folder->fileInfo().filePath()) != _pendingSelectFolder) {
+        // User navigated away — the selection no longer makes sense.
+        _pendingSelectPaths.clear();
+        _pendingSelectFolder.clear();
+        return;
+    }
+
+    QItemSelection selection;
+    QModelIndex scrollTarget;   // topmost added row, for current + scroll
+    QStringList remaining;
+    for (const QString& p : _pendingSelectPaths) {
+        FileItem* item = _fileModel->itemForPath(p);
+        if (!item) { remaining.append(p); continue; }
+        const QModelIndex src = _fileModel->indexFor(item);
+        const QModelIndex proxy = _fileFilterModel->mapFromSource(src);
+        if (!proxy.isValid()) { remaining.append(p); continue; }
+        selection.select(proxy, proxy);
+        if (!scrollTarget.isValid() || proxy.row() < scrollTarget.row()) {
+            scrollTarget = proxy;
+        }
+    }
+
+    if (!selection.isEmpty()) {
+        QItemSelectionModel* sm = _fileListView->selectionModel();
+        sm->select(selection, QItemSelectionModel::ClearAndSelect);
+        // Anchor current on the topmost added row WITHOUT disturbing the
+        // multi-selection we just applied, then bring it into view.
+        sm->setCurrentIndex(scrollTarget, QItemSelectionModel::NoUpdate);
+        _fileListView->scrollTo(scrollTarget, QAbstractItemView::EnsureVisible);
+    }
+
+    _pendingSelectPaths = remaining;
+    if (_pendingSelectPaths.isEmpty()) _pendingSelectFolder.clear();
+}
+
+void MainWindow::openSettings() {
+    // Single instance: raise the existing window instead of stacking a second.
+    if (_settingsDialog) {
+        _settingsDialog->raise();
+        _settingsDialog->activateWindow();
+        return;
+    }
+    _settingsDialog = new SettingsDialog(this);
+    _settingsDialog->setAttribute(Qt::WA_DeleteOnClose);  // QPointer auto-nulls
+    _settingsDialog->show();
+}
+
 void MainWindow::updateViewerStatusBar(const QSize& size) {
     if (!size.isValid()) {
         statusBar()->clearMessage();
@@ -666,6 +759,12 @@ void MainWindow::createMenus() {
     QAction* quitAction = fileMenu->addAction(tr("&Quit"));
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
+
+    QMenu* editMenu = mb->addMenu(tr("&Edit"));
+    QAction* settingsAction = editMenu->addAction(tr("&Settings..."));
+    settingsAction->setShortcut(QKeySequence::Preferences);  // Ctrl+, where defined
+    settingsAction->setMenuRole(QAction::PreferencesRole);   // macOS app-menu placement
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
 
     QMenu* viewMenu = mb->addMenu(tr("&View"));
     QAction* refreshAction = viewMenu->addAction(tr("&Refresh"));

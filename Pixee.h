@@ -2,6 +2,7 @@
 #define PIXEE_H
 
 #include <QApplication>
+#include <QTranslator>
 
 #include "Config.h"
 
@@ -16,6 +17,12 @@ public:
     Pixee(int argc, char** argv);
     int run();
     void exit();
+    // Loads the app (and Qt's own) translation for the configured language
+    // and installs it on the QApplication. Called from the constructor
+    // BEFORE the UI is built, because tr() is evaluated at widget-
+    // construction time and installing a translator does not retranslate
+    // already-built widgets.
+    void installTranslators();
     Config* config() const;
     Theme* theme() const;
     ThumbnailCache* thumbnailCache() const;
@@ -34,6 +41,10 @@ private:
     TaskManager* _taskManager;
     QApplication* _app;
     MainWindow* _mainWindow;
+    // Kept as members so they outlive the constructor — QApplication holds
+    // them by pointer for the whole session.
+    QTranslator _translator;    // Pixee's own strings (:/i18n)
+    QTranslator _qtTranslator;  // Qt's built-in strings (standard buttons, etc.)
 };
 
 #endif // PIXEE_H

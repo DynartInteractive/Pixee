@@ -18,6 +18,7 @@ public:
 
     QString displayName() const override;
     QStringList affectedDirs() const override;
+    QStringList producedPaths() const override { return { _dst }; }
 
 protected:
     void run() override;

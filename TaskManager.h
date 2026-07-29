@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 #include <QUuid>
 #include <QVariantMap>
 
@@ -75,6 +76,10 @@ public:
 signals:
     void groupAdded(TaskGroup* group);
     void groupRemoved(QUuid groupId);
+    // Emitted when a group reaches all-terminal, carrying the destination
+    // paths its completed tasks created on disk. The UI uses this to select
+    // freshly-added files. Fires right after groupRemoved for the same group.
+    void groupFinished(QStringList producedPaths);
     void taskStateChanged(QUuid taskId, int state);
     void taskProgress(QUuid taskId, int pct);
     void taskQuestionPosed(QUuid taskId, int kind, QVariantMap context);

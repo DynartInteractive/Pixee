@@ -66,6 +66,11 @@ public:
     // subclasses don't trigger spurious refreshes.
     virtual QStringList affectedDirs() const { return {}; }
 
+    // Files this task created on disk (destination paths). The manager
+    // collects these from a group's completed tasks so the UI can select
+    // freshly-added files. Default none; file-producing subclasses override.
+    virtual QStringList producedPaths() const { return {}; }
+
     // Called from the GUI thread. All thread-safe.
     void requestPause();
     void requestResume();

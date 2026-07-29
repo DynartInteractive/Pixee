@@ -188,9 +188,19 @@ void TaskManager::maybeRemoveGroup(TaskGroup* group) {
     if (!group) return;
     if (!group->allTerminal()) return;
     const QUuid id = group->id();
+
+    // Collect the files the group's completed tasks created, before the
+    // group (and its tasks) are deleted. Skipped/failed/aborted tasks
+    // produced nothing, so filter on Completed.
+    QStringList produced;
+    for (Task* t : group->tasks()) {
+        if (t->state() == Task::Completed) produced += t->producedPaths();
+    }
+
     _groups.removeAll(group);
     for (Task* t : group->tasks()) _taskProgress.remove(t->id());
     emit groupRemoved(id);
+    emit groupFinished(produced);
     group->deleteLater();
 }
 
