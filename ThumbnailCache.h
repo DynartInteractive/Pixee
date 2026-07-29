@@ -24,6 +24,16 @@ public:
     void subscribe(const QString& path, qint64 mtime, qint64 size, int distance = 0);
     void unsubscribe(const QString& path);
     void setPriority(const QString& path, int distance);
+    // Force a fresh decode for a single path, discarding any prior result.
+    // Clears the per-session negative cache (see _failures) and bypasses the
+    // DB lookup — whose stored thumbnail may have been built from an
+    // incomplete file (e.g. a long GIMP export still writing). The caller
+    // passes the file's *current* on-disk mtime/size so the regenerated row
+    // validates against later normal subscribe() calls. Result arrives via
+    // the usual thumbnailReady/thumbnailMiss signals if the path is
+    // subscribed. User-triggered ("Refresh thumbnail"), so it decodes at top
+    // priority.
+    void refreshThumbnail(const QString& path, qint64 mtime, qint64 size);
     // Drop all subscriptions and pending work. Use on folder change to clear
     // the generator queue in one shot rather than per-path. The in-flight
     // decode (if any) still finishes but its result is discarded.

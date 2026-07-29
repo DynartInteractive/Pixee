@@ -10,6 +10,7 @@ CONFIG += c++17
 
 SOURCES += \
     Config.cpp \
+    ConflictDialog.cpp \
     ConvertFormatTask.cpp \
     CopyFileTask.cpp \
     DeleteFileTask.cpp \
@@ -34,6 +35,7 @@ SOURCES += \
     RenameDialog.cpp \
     ScaleImageTask.cpp \
     Task.cpp \
+    TaskConflictPrompter.cpp \
     TaskDockWidget.cpp \
     TaskGroup.cpp \
     TaskGroupWidget.cpp \
@@ -52,6 +54,7 @@ SOURCES += \
 
 HEADERS += \
     Config.h \
+    ConflictDialog.h \
     ConvertFormatTask.h \
     CopyFileTask.h \
     DeleteFileTask.h \
@@ -77,6 +80,7 @@ HEADERS += \
     RenameDialog.h \
     ScaleImageTask.h \
     Task.h \
+    TaskConflictPrompter.h \
     TaskDockWidget.h \
     TaskGroup.h \
     TaskGroupWidget.h \

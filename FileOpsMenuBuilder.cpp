@@ -120,6 +120,19 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
             OpenWithDialog dlg(dialogParent);
             dlg.exec();
         });
+
+        // ---- Refresh thumbnail ----
+        // Rebuilds the thumbnail from the file's current bytes. The escape
+        // hatch for a thumbnail cached from a still-being-written file (a
+        // long export), which the session negative cache would otherwise
+        // never retry.
+        if (_refreshThumbnail) {
+            QAction* refreshThumb = menu->addAction(tr("Refresh thumbnail"));
+            const QStringList paths = _paths;
+            connect(refreshThumb, &QAction::triggered, this,
+                    [this, paths]() { if (_refreshThumbnail) _refreshThumbnail(paths); });
+        }
+
         menu->addSeparator();
     }
 
@@ -221,7 +234,10 @@ void FileOpsMenuBuilder::pasteFromClipboardToFolder(const QString& destFolder,
     if (!clip || !clip->hasUrls()) return;
 
     const bool wasCut = clipboardSaysCut(clip);
-    handleDropOrPaste(clip, destFolder, /*forceMove=*/false, taskManager, dialogParent);
+    // allowSameFolder=true: pasting a file into its own folder should
+    // duplicate it (prompt → Rename), not silently do nothing.
+    handleDropOrPaste(clip, destFolder, /*forceMove=*/false, taskManager, dialogParent,
+                      /*allowSameFolder=*/true);
 
     // After a Cut+Paste, the clipboard's source paths are stale. Mirror
     // Explorer behaviour and clear it so a second paste doesn't try to
@@ -236,7 +252,8 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
                                            const QString& destFolder,
                                            bool forceMove,
                                            TaskManager* taskManager,
-                                           QWidget* dialogParent) {
+                                           QWidget* dialogParent,
+                                           bool allowSameFolder) {
     if (destFolder.isEmpty() || !taskManager) return;
     if (!mime || !mime->hasUrls()) return;
 
@@ -247,13 +264,22 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
     for (const QUrl& url : mime->urls()) {
         if (!url.isLocalFile()) continue;  // skip http/data/etc. URLs
         const QString path = url.toLocalFile();
-        // Silent same-folder skip — dragging a file onto the folder it
-        // already lives in (e.g. list selection onto the tree node of
-        // the currently-viewed folder) is almost always an accidental
-        // gesture. No conflict prompt, no Toast, no TaskGroup row for
-        // these. Mixed selections still process the remaining sources.
+        // Same-folder source handling. Dragging a file onto the folder it
+        // already lives in (e.g. list selection onto the tree node of the
+        // currently-viewed folder) is almost always an accidental gesture,
+        // so it's skipped silently — no conflict prompt, no Toast, no
+        // TaskGroup row. But an explicit paste of a *file* into its own
+        // folder (allowSameFolder) is a deliberate "duplicate this": let it
+        // through so it collides and the user gets the Skip / Overwrite /
+        // Rename prompt (Rename yields the "name (1).ext" copy). Moves and
+        // folders keep the silent skip. Mixed selections still process the
+        // remaining sources.
         const QString parentNorm = QDir::cleanPath(QFileInfo(path).absolutePath());
-        if (parentNorm == destNorm) continue;
+        if (parentNorm == destNorm) {
+            const bool sameFolderDuplicate =
+                allowSameFolder && !isMove && QFileInfo(path).isFile();
+            if (!sameFolderDuplicate) continue;
+        }
         sourcePaths.append(path);
     }
     if (sourcePaths.isEmpty()) return;

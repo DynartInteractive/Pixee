@@ -98,6 +98,22 @@ void ThumbnailCache::setPriority(const QString& path, int distance) {
     }
 }
 
+void ThumbnailCache::refreshThumbnail(const QString& path, qint64 mtime, qint64 size) {
+    // Drop the negative-cache entry so a path that failed to decode earlier
+    // (half-written file) gets another chance now that it's complete.
+    _failures.remove(path);
+
+    // Cancel any in-flight decode for a clean restart, then enqueue a fresh
+    // generation directly — skipping the DB lookup so a stale cached
+    // thumbnail can't win. onGenerated overwrites the (path-keyed) DB row.
+    if (_inGen.contains(path)) emit requestCancelGenerate(path);
+    _inDb.remove(path);
+    _inGen.insert(path);
+    _priorities[path] = 0;  // explicit user request → decode ahead of prefetch
+    _pendingMeta.insert(path, qMakePair(mtime, size));
+    emit requestEnqueueGenerate(path, mtime, size, 0);
+}
+
 void ThumbnailCache::setPaused(bool paused) {
     // Generator runs on the same thread as the cache (GUI thread), so a
     // direct call is safe — no signal hop needed.
@@ -118,6 +134,10 @@ void ThumbnailCache::abandonAll() {
 
 void ThumbnailCache::onFound(QString path, QImage image) {
     _inDb.remove(path);
+    // A manual refreshThumbnail() may have superseded this lookup with a
+    // forced regeneration. Drop the (possibly stale) DB result and leave
+    // _pendingMeta / _priorities in place for the in-flight generation.
+    if (_inGen.contains(path)) return;
     _pendingMeta.remove(path);
     _priorities.remove(path);
     if (_subscribers.contains(path)) {
@@ -127,6 +147,9 @@ void ThumbnailCache::onFound(QString path, QImage image) {
 
 void ThumbnailCache::onNotFound(QString path) {
     _inDb.remove(path);
+    // Superseded by a forced regeneration already in flight (refreshThumbnail
+    // enqueued the generate directly) — don't enqueue a second one.
+    if (_inGen.contains(path)) return;
     if (!_subscribers.contains(path)) {
         _pendingMeta.remove(path);
         return;

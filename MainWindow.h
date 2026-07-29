@@ -25,6 +25,7 @@ class FolderTreeView;
 class ImageLoader;
 class QAction;
 class QMenu;
+class TaskConflictPrompter;
 class TaskDockWidget;
 class TaskStatusWidget;
 class ViewerWidget;
@@ -130,6 +131,9 @@ private:
     QDockWidget* _dockWidget;
     TaskDockWidget* _taskDockWidget;
     TaskStatusWidget* _taskStatusWidget = nullptr;
+    // Surfaces task conflict questions as blocking modal dialogs (one at a
+    // time, queued). Parented to this window, so no manual delete.
+    TaskConflictPrompter* _conflictPrompter = nullptr;
     QAction* _tasksToggleAction = nullptr;
     FileListView* _fileListView;
     FolderTreeView* _folderTreeView;
@@ -178,11 +182,6 @@ private:
     // into a single refresh after a quiet interval.
     QSet<QString> _touchedDirs;
     QTimer _touchedDirsTimer;
-    // Folders that were touched by a task while the user was looking at a
-    // different folder. Refreshed lazily the next time the user navigates
-    // back into one of them, so the model doesn't keep serving the stale
-    // pre-task contents.
-    QSet<QString> _staleDirs;
     // Async path-restore state. _restoreChain holds the remaining absolute
     // paths to descend through (root → leaf); _restoreParent is the last
     // resolved FileItem in the chain. Both clear when restore finishes or

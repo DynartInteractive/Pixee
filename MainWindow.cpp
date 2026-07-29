@@ -36,6 +36,7 @@
 #include "NewFolderDialog.h"
 #include "RenameDialog.h"
 #include "ScaleImageTask.h"
+#include "TaskConflictPrompter.h"
 #include "TaskDockWidget.h"
 #include "Toast.h"
 #include "TaskGroup.h"
@@ -304,23 +305,24 @@ void MainWindow::create() {
                 updateStatusBar(folder);
             });
 
+    // Conflict questions surface as blocking modal dialogs (see
+    // TaskConflictPrompter), not inline in the dock — so a posed question no
+    // longer needs to force the dock open.
+    _conflictPrompter = new TaskConflictPrompter(this, this);
+    connect(_pixee->taskManager(), &TaskManager::taskQuestionPosed,
+            _conflictPrompter, &TaskConflictPrompter::onQuestionPosed);
+    connect(_pixee->taskManager(), &TaskManager::taskStateChanged,
+            _conflictPrompter, &TaskConflictPrompter::onTaskStateChanged);
+    connect(_conflictPrompter, &TaskConflictPrompter::answerProvided,
+            _pixee->taskManager(), &TaskManager::provideAnswer);
+
     // Tasks dock visibility model:
     //   - View → Tasks menu = persistent intent (sticky across runs).
     //   - Status-bar widget click = transient toggle (does NOT touch the
     //     menu).
     //   - Dock X-close = sets persistent intent off (syncs menu).
-    //   - Conflict question posed = force-show the dock so the user can
-    //     answer; doesn't touch the menu, so it's still treated as a
-    //     transient open (subject to the auto-hide-on-finish rule).
     //   - When all tasks finish AND menu is unchecked AND dock is open,
     //     auto-hide the dock so the status-bar peek doesn't linger.
-    connect(_pixee->taskManager(), &TaskManager::taskQuestionPosed,
-            this, [this](QUuid, int, QVariantMap) {
-                if (_taskDockWidget->isVisible()) return;
-                _suppressDockVisibilitySync = true;
-                _taskDockWidget->setVisible(true);
-                _taskDockWidget->raise();
-            });
     connect(_pixee->taskManager(), &TaskManager::groupRemoved,
             this, [this](QUuid) {
                 if (_pixee->taskManager()->hasGroups()) return;
@@ -562,13 +564,13 @@ void MainWindow::navigateTo(FileItem* item) {
     // The central list shows empty until folderPopulated fires; on slow
     // shares this is preferable to freezing the whole UI.
     _fileModel->requestEnumerate(item);
-    // If a task touched this folder while we were elsewhere, the model is
-    // serving stale cached children. Invalidate them now so the user sees
-    // the post-task state on entry, not just after F5.
-    const QString itemNorm = QDir::cleanPath(item->fileInfo().filePath());
-    if (_staleDirs.remove(itemNorm)) {
-        _fileModel->requestRefreshFolder(item);
-    }
+    // Reflect current on-disk contents on entry. An already-populated folder
+    // is served from the model's cache, so files added or removed by another
+    // app (a GIMP export) — or by a task while we were elsewhere — wouldn't
+    // appear until F5. A background diff-refresh on every entry keeps the
+    // view live: it's cheap when nothing changed (empty diff → no visible
+    // work) and no-ops on a folder still awaiting its first enumeration.
+    _fileModel->requestRefreshFolder(item);
     const QModelIndex sourceIdx = _fileModel->indexFor(item);
     const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(sourceIdx);
     _fileListView->setRootIndex(proxyIdx);
@@ -609,23 +611,20 @@ void MainWindow::onTouchedDirsRefreshDue() {
             ? QDir::cleanPath(folder->fileInfo().filePath())
             : QString();
 
-    bool refreshedCurrent = false;
-    for (const QString& dir : _touchedDirs) {
-        const QString dirNorm = QDir::cleanPath(dir);
-        if (!currentNorm.isEmpty() && dirNorm == currentNorm) {
-            if (!refreshedCurrent) {
-                // Async — same reasoning as refreshCurrentFolder. The
-                // user is already looking at this folder, so we want a
-                // refresh, but not at the cost of blocking the GUI on a
-                // slow share for a refresh that often produces no diff.
+    // Only the folder the user is currently looking at needs an immediate
+    // refresh. Folders touched while the user is elsewhere refresh
+    // themselves on the next navigateTo, which always diff-refreshes on
+    // entry — so there's no separate stale-set to track anymore.
+    if (!currentNorm.isEmpty()) {
+        for (const QString& dir : _touchedDirs) {
+            if (QDir::cleanPath(dir) == currentNorm) {
+                // Async — same reasoning as refreshCurrentFolder: the user
+                // is already looking at this folder, so refresh it, but not
+                // by blocking the GUI on a slow share for a diff that's
+                // usually empty.
                 _fileModel->requestRefreshFolder(folder);
-                refreshedCurrent = true;
+                break;
             }
-        } else {
-            // The user isn't looking at this folder right now. Mark it
-            // stale so navigating back into it later forces a fresh read
-            // instead of showing the model's cached pre-task contents.
-            _staleDirs.insert(dirNorm);
         }
     }
     _touchedDirs.clear();
@@ -1306,6 +1305,9 @@ void MainWindow::showFileListContextMenu(const QPoint& pos) {
     builder.setRenameCallback([this](const QString& path) { renameItemAt(path); });
     builder.setCreateFolderCallback(
         [this](const QString& parentDir) { createFolderIn(parentDir); });
+    builder.setRefreshThumbnailCallback([this](const QStringList& paths) {
+        for (const QString& p : paths) _fileModel->refreshThumbnail(p);
+    });
     // The drive list (synthetic root) isn't a real folder and shouldn't
     // accept a paste. currentFolder() returns the drive list as the
     // model's rootItem, which we filter out here.

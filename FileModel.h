@@ -83,6 +83,16 @@ public:
     // Used as a placeholder while the viewer's full-res load is in flight.
     QImage thumbnailFor(const QString& path) const;
 
+    // Force a single image's thumbnail to be rebuilt from its current bytes.
+    // Drops this model's cached state for the path, re-stats the file so the
+    // row's mtime/size are current, and asks the cache to regenerate
+    // (bypassing DB + the session negative cache). The rebuilt thumbnail
+    // arrives via the normal onThumbnailReady path. Used by the "Refresh
+    // thumbnail" menu item to recover a thumbnail that was cached from a
+    // still-being-written file (e.g. a long export) and would otherwise stay
+    // wrong/failed for the whole session. No-op if the path no longer exists.
+    void refreshThumbnail(const QString& path);
+
     // Rename a single item to `newName` within its current parent
     // directory. Performs the on-disk rename via QFile::rename and
     // surgically rekeys the model's caches (_itemsByPath / _thumbnails /

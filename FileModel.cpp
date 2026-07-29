@@ -553,6 +553,33 @@ void FileModel::onThumbnailPending(QString path) {
     emitDataChangedFor(path);
 }
 
+void FileModel::refreshThumbnail(const QString& path) {
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isFile()) return;
+
+    // Clear our own cached state so the row can go back through
+    // pending → ready. Note onThumbnailPending early-returns while _failed
+    // holds the path, so clearing _failed here is what lets the spinner show.
+    _thumbnails.remove(path);
+    _pending.remove(path);
+    _failed.remove(path);
+
+    // Keep the model's cached stat current (the folder may not have been
+    // refreshed since the file finished being written) so the DB row the
+    // cache is about to rebuild will validate on later normal subscribes.
+    if (FileItem* item = itemForPath(path)) item->setFileInfo(info);
+
+    if (_cache) {
+        _cache->refreshThumbnail(path,
+                                 info.lastModified().toSecsSinceEpoch(),
+                                 info.size());
+    }
+
+    emitDataChangedFor(path);
+    // Any folder using this image as its index repaints when the fresh
+    // thumbnail lands (onThumbnailReady already handles the _indexUsers fan-out).
+}
+
 void FileModel::emitDataChangedFor(const QString& path) {
     auto it = _itemsByPath.constFind(path);
     if (it == _itemsByPath.constEnd()) return;

@@ -144,19 +144,6 @@ QProgressBar#taskItemProgress::chunk, QProgressBar#taskGroupAggregate::chunk {
 	background-color: #2b4580;
 	border-radius: 2px;
 }
-QPushButton#taskQuestionButton {
-	color: #ccc;
-	background-color: #444;
-	border: 1px solid #2a2a2a;
-	padding: 2px 6px;
-}
-QPushButton#taskQuestionButton:hover {
-	background-color: #2b4580;
-	color: #fff;
-}
-QPushButton#taskQuestionButton:pressed {
-	background-color: #1f3460;
-}
 
 /* ---- Status-bar progress widget ---- */
 
@@ -172,12 +159,6 @@ QProgressBar#taskStatusBar {
 QProgressBar#taskStatusBar::chunk {
 	background-color: #2b4580;
 	border-radius: 2px;
-}
-
-/* ---- Conflict-question attention pulse on a task row ---- */
-
-#taskItemWidget[blinking="true"] {
-	background-color: #2b4580;
 }
 
 QScrollBar:vertical {

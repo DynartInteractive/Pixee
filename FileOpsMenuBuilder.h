@@ -41,6 +41,10 @@ public:
     // directory (= the same path setPasteDestination was given); the
     // caller shows the dialog and drives FileModel::createFolder.
     using CreateFolderFn = std::function<void(const QString& parentDir)>;
+    // Fires when the user picks Refresh thumbnail. Receives the selected
+    // image paths; the caller drives FileModel::refreshThumbnail per path.
+    // Only offered for image selections (setImageOpsEnabled).
+    using RefreshThumbnailFn = std::function<void(const QStringList& imagePaths)>;
 
     FileOpsMenuBuilder(QStringList sourcePaths,
                        TaskManager* taskManager,
@@ -50,6 +54,7 @@ public:
     void setAdvanceCallback(AdvanceFn fn) { _advance = std::move(fn); }
     void setRenameCallback(RenameFn fn) { _rename = std::move(fn); }
     void setCreateFolderCallback(CreateFolderFn fn) { _createFolder = std::move(fn); }
+    void setRefreshThumbnailCallback(RefreshThumbnailFn fn) { _refreshThumbnail = std::move(fn); }
     // When false, the 'Open with' submenu is suppressed — the caller
     // has decided the selection contains something image-typed actions
     // can't sensibly operate on (a folder, a non-image file, ...).
@@ -120,11 +125,19 @@ public:
     // is MoveAction (the Qt-native signal); the helper still ORs in the
     // Windows 'Preferred DropEffect' MIME so external sources from
     // Explorer that signalled Cut also flow through Move.
+    // `allowSameFolder` lets a source whose parent already IS destFolder
+    // through instead of silently skipping it — set by the clipboard-paste
+    // path so pasting a file into its own folder duplicates it (via the
+    // conflict prompt → Rename) rather than doing nothing. Drops leave it
+    // false: dragging onto the folder a file already lives in is almost
+    // always accidental. Only applies to file copies; moves and folders are
+    // still skipped.
     static void handleDropOrPaste(const QMimeData* mime,
                                   const QString& destFolder,
                                   bool forceMove,
                                   TaskManager* taskManager,
-                                  QWidget* dialogParent);
+                                  QWidget* dialogParent,
+                                  bool allowSameFolder = false);
 
 private:
     void doCopyToClipboard();
@@ -147,6 +160,7 @@ private:
     AdvanceFn _advance;
     RenameFn _rename;
     CreateFolderFn _createFolder;
+    RefreshThumbnailFn _refreshThumbnail;
     bool _imageOpsEnabled = true;
     QString _pasteDestination;
 };

@@ -44,12 +44,24 @@ void CopyFileTask::run() {
         case Skip:
             setSkipped();
             return;
-        case Overwrite:
+        case Overwrite: {
+            // A same-folder paste can hand us a destination that IS the
+            // source (dst == src). "Overwrite" then means replacing the
+            // file with itself — a no-op. We must NOT remove _dst in that
+            // case: it's the very file we're copying, and `in` holds it
+            // open. Detect it via canonical paths (resolves case / symlinks;
+            // empty when the path can't be resolved, so guard against that).
+            const QString srcCanon = QFileInfo(_src).canonicalFilePath();
+            if (!srcCanon.isEmpty()
+                    && srcCanon == QFileInfo(_dst).canonicalFilePath()) {
+                return;  // execute() marks this Completed — nothing to do
+            }
             if (!QFile::remove(_dst)) {
                 setFailed(tr("Cannot remove existing destination: %1").arg(_dst));
                 return;
             }
             break;
+        }
         case Rename:
             _dst = FileOpsHelpers::uniqueRenamedPath(_dst);
             break;

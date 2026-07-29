@@ -67,6 +67,8 @@ Abort/supersede pattern used in `ThumbnailGenerator`, `ImageLoader`, and `FileMo
 
 `abandonAll()` is the fast path used on folder change: drops every subscription and bumps the generator's abort version so in-flight decodes bail.
 
+`refreshThumbnail(path, mtime, size)` is the manual override behind the "Refresh thumbnail" menu item (`FileModel::refreshThumbnail` → here): it clears the `_failures` entry and force-enqueues generation **bypassing step 1–2**, so a thumbnail cached from a still-being-written file (a long export) — which the negative cache would otherwise never retry this session — can be rebuilt from the file's current bytes.
+
 `FileListView` is the heaviest subscriber — it computes a viewport-driven prefetch window (visible rows + a margin), subscribes/unsubscribes diff-only on a debounced timer (`_updateTimer`), bumps priorities by viewport distance, and auto-expands the window once the current batch finishes so background fill of the rest of the folder happens after the visible cells are ready.
 
 ### View layer
@@ -82,7 +84,7 @@ Folder navigation:
 2. Folder-tree `selectionChanged` / list-view `doubleClicked` on a folder → `goToFolderByFileIndex` repoints the central list's `rootIndex`.
 3. `..` routes to the parent of the parent.
 4. Startup restores the saved `lastPath` (or the CLI image's folder) via the async chain descent in `beginPathRestore` / `advancePathRestore`; with no drive list and nothing saved, the fallback target is `QDir::homePath()`.
-5. `F5` triggers `refreshCurrentFolder`. After any task completes, `TaskManager::pathTouched` debounces affected directories through `_touchedDirsTimer` and refreshes them; folders touched while the user is elsewhere are tracked in `_staleDirs` and refreshed lazily on revisit.
+5. `F5` triggers `refreshCurrentFolder`. Every `navigateTo` also fires a background `requestRefreshFolder` on entry (cheap diff; no-op when nothing changed), so a folder re-entered after an external change — a GIMP export, another app — shows current contents without F5. After any task completes, `TaskManager::pathTouched` debounces affected directories through `_touchedDirsTimer` and refreshes the current folder if it's among them; folders touched while the user is elsewhere are picked up by the on-entry refresh (there's no separate stale-set).
 
 Viewer flow: double-click an image (or `Enter`) → `activateImage` swaps the central stack to `ViewerWidget`, builds an image-path list from the current folder, starts an async `ImageLoader` request, and preloads 5-image neighbours into `_viewerImageCache`. Thumbnails act as placeholders until the full-res arrives. Esc / Enter / double-click dismisses; the folder-tree dock visibility is remembered from before the viewer was opened so dismissing doesn't unhide a dock the user had closed.
 
