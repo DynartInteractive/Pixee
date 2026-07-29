@@ -757,12 +757,16 @@ void MainWindow::createMenus() {
 
     QMenu* fileMenu = mb->addMenu(tr("&File"));
     QAction* quitAction = fileMenu->addAction(tr("&Quit"));
-    quitAction->setShortcut(QKeySequence::Quit);
+    // Explicit Ctrl+Q (Cmd+Q on macOS via Qt::CTRL). NOT QKeySequence::Quit:
+    // on Windows that standard key has no real chord and renders in the menu
+    // as the literal word "Exit" in the shortcut column. Same trap for
+    // Preferences below ("Settings").
+    quitAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
     connect(quitAction, &QAction::triggered, this, &MainWindow::close);
 
     QMenu* editMenu = mb->addMenu(tr("&Edit"));
     QAction* settingsAction = editMenu->addAction(tr("&Settings..."));
-    settingsAction->setShortcut(QKeySequence::Preferences);  // Ctrl+, where defined
+    settingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Comma));  // Cmd+, on macOS
     settingsAction->setMenuRole(QAction::PreferencesRole);   // macOS app-menu placement
     connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
 
