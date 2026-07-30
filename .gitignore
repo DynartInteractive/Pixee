@@ -48,6 +48,9 @@ themes/new/
 Pixee-portable/
 Pixee-portable.zip
 
+# Installer output (Inno Setup compiles the portable into dist\).
+dist/
+
 # Prebuilt HEIC/AVIF/PSD/XCF plugins + codec DLLs are intentionally checked
 # in (vcpkg, their build source, is gone) so make-portable.bat can bundle
 # them. Override the blanket *.dll ignore above for this one tree.

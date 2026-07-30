@@ -49,6 +49,18 @@ make            # nmake / mingw32-make on Windows
 
 The build copies the `themes/` directory next to the executable on every build, so the dark theme works out of the box.
 
+### Windows: portable & installer
+
+```cmd
+:: self-contained folder + zip (run from an x64 Native Tools Command Prompt for HEIC/AVIF)
+scripts\make-portable.bat C:\Qt\6.11.1\msvc2022_64
+
+:: the above, then wrapped into dist\Pixee-<ver>-setup.exe (needs Inno Setup 6)
+scripts\build-installer.bat
+```
+
+The installer registers Pixee in Explorer's **Open with…** for the image types it bundles. It's currently **unsigned**, so SmartScreen warns on first run (*More info → Run anyway*). See [`docs/installer.md`](docs/installer.md) for the association details and how to add Azure code-signing.
+
 ## ⌨️ Keyboard
 
 ### File browser

@@ -16,6 +16,30 @@ Pipeline overview:
 make-portable.bat  ->  Pixee-portable\  ->  sign Pixee.exe  ->  Inno Setup  ->  sign setup.exe
 ```
 
+## Status — the installer is implemented
+
+The skeleton below is now a real, working project:
+
+- **`installer\Pixee.iss`** — the full Inno Setup script (stable `AppId` GUID,
+  the Open-With associations for all bundled formats, and the `SHChangeNotify`
+  post-install/uninstall hook).
+- **`scripts\build-installer.bat`** — builds the portable then compiles the
+  installer in one step.
+
+Build it (from an *x64 Native Tools Command Prompt for VS*, so the MSVC runtime
+gets bundled — same requirement as `make-portable.bat`):
+
+```cmd
+scripts\build-installer.bat            :: defaults to the C:\Qt\6.11.1\msvc2022_64 kit
+```
+
+Output: `dist\Pixee-<ver>-setup.exe`. Needs **Inno Setup 6** (`winget install
+JRSoftware.InnoSetup`). The build is currently **unsigned**, so SmartScreen
+shows *"Windows protected your PC" → More info → Run anyway* on first run —
+expected until the Part 3 signing below is wired in. The rest of this document
+is the reference behind those two files; read it when changing the association
+list or turning on signing.
+
 ## Why "Open with…" works at all
 
 `Pixee.exe` accepts an image path as its first argument. `MainWindow.cpp`
@@ -226,10 +250,18 @@ iscc installer\Pixee.iss
 
 ## Open items / TODO
 
-- Generate a stable `AppId` GUID for `Pixee.iss`.
-- Decide the exact extension list to register (drive it from Pixee's actual
-  `supportedImageFormats()` so it tracks the bundled codecs).
-- Confirm Trusted Signing vs Key Vault and fill in the real signer command in
-  `installer\sign.cmd`.
-- Implement the `SHChangeNotify` call in the `[Code]` post-install step.
+- ~~Generate a stable `AppId` GUID for `Pixee.iss`.~~ Done —
+  `{AA5DBE77-8F94-486D-B014-67F1C99E6C6B}`. Keep it stable across versions.
+- ~~Decide the exact extension list to register.~~ Done — the `[Registry]`
+  block registers jpg/jpeg/jpe/jfif, png, gif, bmp/dib, tif/tiff, webp, heic,
+  heif, avif, psd, xcf, svg/svgz, ico, tga. Keep this in sync with the codecs
+  the portable actually bundles (`thirdparty\imageformats\`); it doesn't have
+  to mirror every `supportedImageFormats()` entry.
+- ~~Implement the `SHChangeNotify` call in the `[Code]` post-install step.~~
+  Done — fired on both install and uninstall.
+- Bump `#define AppVersion` in `Pixee.iss` per release (there's no version
+  constant in the code yet to drive it from).
+- **Signing (not yet wired):** confirm Trusted Signing vs Key Vault, add a
+  signer named `azuresign` (Tools → Configure Sign Tools), and uncomment the
+  `SignTool=azuresign` / `SignedUninstaller=yes` lines in `Pixee.iss`.
 ```
