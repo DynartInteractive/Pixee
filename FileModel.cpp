@@ -280,8 +280,6 @@ void FileModel::applyEntries(FileItem* parent, const QFileInfoList& fileList) {
     const int lastRow = firstRow + fileList.size() - 1;
     beginInsertRows(createIndex(parent->row(), 0, parent), firstRow, lastRow);
 
-    QString firstImagePath;  // for the folder index auto-pick
-
     for (const auto& fileInfo : fileList) {
         FileItem* newItem = createItemForFileInfo(fileInfo, parent);
         parent->appendChild(newItem);
@@ -293,28 +291,16 @@ void FileModel::applyEntries(FileItem* parent, const QFileInfoList& fileList) {
             }
         } else if (fileType == FileType::Image) {
             _itemsByPath.insert(fileInfo.filePath(), newItem);
-            if (firstImagePath.isEmpty()) {
-                firstImagePath = fileInfo.filePath();
-            }
-        }
-    }
-
-    // Auto-pick the folder's index image (first image alphabetically). The
-    // user's future "set as index" feature will override this entry.
-    if (!firstImagePath.isEmpty() && parent != _rootItem) {
-        const QString folderPath = parent->fileInfo().filePath();
-        const QString previous = _folderIndexes.value(folderPath);
-        if (previous != firstImagePath) {
-            if (!previous.isEmpty()) {
-                _indexUsers[previous].remove(folderPath);
-                if (_indexUsers[previous].isEmpty()) _indexUsers.remove(previous);
-            }
-            _folderIndexes.insert(folderPath, firstImagePath);
-            _indexUsers[firstImagePath].insert(folderPath);
         }
     }
 
     endInsertRows();
+
+    // Auto-pick the folder's index image via the shared alphabetical rule
+    // (same path the refresh diff uses), so the overlay matches the first
+    // cell the list view shows. The user's future "set as index" feature
+    // will override this entry.
+    repickFolderIndex(parent);
 }
 
 FileModel::FolderRefreshDiff FileModel::computeDiff(
@@ -455,21 +441,30 @@ void FileModel::applyRefreshDiff(FileItem* parent, const FolderRefreshDiff& diff
     repickFolderIndex(parent);
 }
 
+bool FileModel::nameLessThan(const QString& a, const QString& b) {
+    const int c = QString::localeAwareCompare(a.toLower(), b.toLower());
+    if (c != 0) return c < 0;
+    return a < b;  // stable tiebreak for case-only differences
+}
+
 void FileModel::repickFolderIndex(FileItem* parent) {
     if (!parent || parent == _rootItem) return;
     const QString folderPath = parent->fileInfo().filePath();
 
-    // Find the alphabetically-first image among current children. Plain
-    // QString '<' matches QDir::Name's case-sensitive comparison closely
-    // enough; the proxy's locale-aware sort is for display, while this
-    // pick is logical/persistent.
+    // Find the alphabetically-first image among current children using the
+    // SAME ordering the list view uses (locale-aware, case-insensitive), so
+    // the folder overlay always matches the first cell shown on open. This is
+    // deliberately independent of the user's chosen list sort — the index is
+    // always alphabetical.
     QString firstImagePath;
+    QString firstImageName;
     for (int i = 0; i < parent->childCount(); ++i) {
         FileItem* child = parent->child(i);
         if (!child || child->fileType() != FileType::Image) continue;
-        const QString p = child->fileInfo().filePath();
-        if (firstImagePath.isEmpty() || p < firstImagePath) {
-            firstImagePath = p;
+        const QString name = child->fileInfo().fileName();
+        if (firstImagePath.isEmpty() || nameLessThan(name, firstImageName)) {
+            firstImageName = name;
+            firstImagePath = child->fileInfo().filePath();
         }
     }
 

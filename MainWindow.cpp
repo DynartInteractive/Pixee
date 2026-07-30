@@ -76,6 +76,18 @@ void MainWindow::create() {
     _fileFilterModel->setAcceptedFileTypes({ FileType::Folder, FileType::Image, FileType::File });
     _fileFilterModel->setShowDotDot(true);
     _fileFilterModel->sort(0, Qt::AscendingOrder);
+    // Restore the user's list-view sort (key + direction). The proxy is kept
+    // in AscendingOrder; direction is handled inside FileFilterModel::lessThan
+    // so ".." / folders-first never invert. The folder tree stays name-sorted.
+    {
+        const QString by = QSettings().value(AppSettings::kSortBy, "name").toString();
+        FileFilterModel::SortKey key = FileFilterModel::SortKey::Name;
+        if (by == "created")       key = FileFilterModel::SortKey::Created;
+        else if (by == "modified") key = FileFilterModel::SortKey::Modified;
+        _fileFilterModel->setSortKey(key);
+        _fileFilterModel->setSortAscending(
+            QSettings().value(AppSettings::kSortOrder, "asc").toString() != "desc");
+    }
 
     // Widgets
 
@@ -774,6 +786,48 @@ void MainWindow::createMenus() {
     QAction* refreshAction = viewMenu->addAction(tr("&Refresh"));
     refreshAction->setShortcut(QKeySequence::Refresh);  // F5 on most platforms
     connect(refreshAction, &QAction::triggered, this, &MainWindow::refreshCurrentFolder);
+
+    viewMenu->addSeparator();
+
+    // Sort by: two exclusive groups (key, then direction), Explorer-style.
+    // Affects the central file list only — the folder tree and the folder
+    // index-image overlay are always name-ascending.
+    QMenu* sortMenu = viewMenu->addMenu(tr("&Sort by"));
+
+    QActionGroup* sortKeyGroup = new QActionGroup(this);
+    sortKeyGroup->setExclusive(true);
+    auto addSortKey = [&](const QString& text, FileFilterModel::SortKey key,
+                          const char* settingValue) {
+        QAction* a = sortMenu->addAction(text);
+        a->setCheckable(true);
+        a->setActionGroup(sortKeyGroup);
+        a->setChecked(_fileFilterModel->sortKey() == key);
+        connect(a, &QAction::triggered, this, [this, key, settingValue]() {
+            _fileFilterModel->setSortKey(key);
+            QSettings().setValue(AppSettings::kSortBy, QString::fromLatin1(settingValue));
+        });
+    };
+    addSortKey(tr("&Alphabetical"),  FileFilterModel::SortKey::Name,     "name");
+    addSortKey(tr("&Created date"),  FileFilterModel::SortKey::Created,  "created");
+    addSortKey(tr("&Modified date"), FileFilterModel::SortKey::Modified, "modified");
+
+    sortMenu->addSeparator();
+
+    QActionGroup* sortOrderGroup = new QActionGroup(this);
+    sortOrderGroup->setExclusive(true);
+    auto addSortOrder = [&](const QString& text, bool ascending,
+                            const char* settingValue) {
+        QAction* a = sortMenu->addAction(text);
+        a->setCheckable(true);
+        a->setActionGroup(sortOrderGroup);
+        a->setChecked(_fileFilterModel->sortAscending() == ascending);
+        connect(a, &QAction::triggered, this, [this, ascending, settingValue]() {
+            _fileFilterModel->setSortAscending(ascending);
+            QSettings().setValue(AppSettings::kSortOrder, QString::fromLatin1(settingValue));
+        });
+    };
+    addSortOrder(tr("As&cending"),  true,  "asc");
+    addSortOrder(tr("&Descending"), false, "desc");
 
     viewMenu->addSeparator();
     // Manual QAction with two-way binding to the dock's visibility. We don't

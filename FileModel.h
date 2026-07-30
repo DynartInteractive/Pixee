@@ -79,6 +79,12 @@ public:
     // Source image used to represent a folder's index thumbnail. Empty
     // if no image was found (or no index assigned).
     QString folderIndexSource(const QString& folderPath) const;
+    // Name ordering shared with FileFilterModel so a folder's auto-picked
+    // index image is always the file the list view shows first: locale-aware
+    // and case-insensitive, with a case-sensitive tiebreak for stability.
+    // The folder index is ALWAYS alphabetical, independent of the user's
+    // chosen list sort (which may be by date).
+    static bool nameLessThan(const QString& a, const QString& b);
     // Latest in-memory thumbnail for an image path (empty QImage if none).
     // Used as a placeholder while the viewer's full-res load is in flight.
     QImage thumbnailFor(const QString& path) const;

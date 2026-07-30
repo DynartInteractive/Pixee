@@ -16,6 +16,15 @@ constexpr const char* kSelectAddedFiles = "fileOps/selectAddedFiles";
 // installed, before any UI is built.
 constexpr const char* kLanguage = "general/language";
 
+// string — list-view sort key: "name" (default), "created", or "modified".
+// The folder tree and the folder index-image overlay are always name-sorted;
+// this affects only the central file list.
+constexpr const char* kSortBy = "view/sortBy";
+
+// string — list-view sort direction: "asc" (default) or "desc". Applies to
+// the leaf comparison only ("..", and folders-before-files, never invert).
+constexpr const char* kSortOrder = "view/sortOrder";
+
 }  // namespace AppSettings
 
 #endif // APPSETTINGS_H
