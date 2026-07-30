@@ -11,9 +11,16 @@
 #include "TaskManager.h"
 #include "MainWindow.h"
 
+// APP_VERSION comes from the VERSION file via Pixee.pro. The fallback keeps
+// non-qmake builds (e.g. an IDE that skips the DEFINES) compiling.
+#ifndef APP_VERSION
+#define APP_VERSION "0.0.0-dev"
+#endif
+
 Pixee::Pixee(int argc, char** argv) : _argc(argc) {
     QCoreApplication::setOrganizationName("Dynart");
     QCoreApplication::setApplicationName("Pixee");
+    QCoreApplication::setApplicationVersion(QStringLiteral(APP_VERSION));
 
     // _argc, not the by-value parameter — see the comment in Pixee.h.
     _app = new QApplication(_argc, argv);

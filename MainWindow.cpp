@@ -888,8 +888,9 @@ void MainWindow::createMenus() {
 
 void MainWindow::showAbout() {
     QMessageBox::about(this, tr("About Pixee"),
-        tr("<b>Pixee</b><br><br>An image manager built on Qt 6."
-           "<br><a href=\"https://github.com/DynartInteractive/Pixee\">Pixee on GitHub</a>"));
+        tr("<b>Pixee</b> %1<br><br>An image manager built on Qt 6."
+           "<br><a href=\"https://github.com/DynartInteractive/Pixee\">Pixee on GitHub</a>")
+            .arg(QApplication::applicationVersion()));
 }
 
 void MainWindow::expandFolderTreeTo(FileItem* item) {

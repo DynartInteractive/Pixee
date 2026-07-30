@@ -4,6 +4,16 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
 
+# Single source of truth for the app version: the repo-root VERSION.txt file.
+# (The .txt extension matters — an extensionless "VERSION" at the repo root,
+# which is on the compiler include path, shadows the C++ <version> header on
+# case-insensitive Windows and breaks the build.) qmake's VERSION also stamps
+# the Windows .exe file-properties resource (FILEVERSION/PRODUCTVERSION);
+# APP_VERSION exposes the same string to the code (About dialog, --version).
+# The installer reads the same file — keep this the only place the number lives.
+VERSION = $$cat($$PWD/VERSION.txt)
+DEFINES += APP_VERSION=\\\"$$VERSION\\\"
+
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0

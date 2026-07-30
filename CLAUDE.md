@@ -8,6 +8,10 @@ Pixee is a Qt 6 / C++17 image-browser desktop app (qmake project, `Pixee.pro`). 
 
 The `README.md` is the authoritative feature/keyboard list — when adding or changing user-visible behavior, update it.
 
+### Versioning
+
+The version is **single-sourced from the repo-root `VERSION.txt`** (SemVer; pre-1.0 while unreleased, so features bump minor / fixes bump patch). To release: edit that one line, build, `git tag v<version>`. It flows to: `Pixee.pro` (`VERSION = $$cat($$PWD/VERSION.txt)` → the `.exe` file-properties resource, plus `DEFINES += APP_VERSION=...`), the code (`APP_VERSION`, with a `"0.0.0-dev"` fallback — Help→About and `main.cpp`'s `--version`/`-v`), and the installer (`build-installer.bat` passes `/DAppVersion` to ISCC; a direct `iscc` reads `VERSION.txt` via `SourcePath`). The `.txt` extension is load-bearing: an extensionless `VERSION` at the repo root (which is on the compiler include path) shadows the C++ `<version>` header on case-insensitive Windows and breaks the build.
+
 ## Build / Run
 
 Qt 6.6+ via qmake:

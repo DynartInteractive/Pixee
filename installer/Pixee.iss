@@ -9,7 +9,12 @@
 ; SignTool= line noted below.
 
 #define AppName      "Pixee"
-#define AppVersion   "1.0.0"
+; Version: single source is the repo-root VERSION.txt file. build-installer.bat
+; passes it via /DAppVersion=...; a direct `iscc` run reads it here instead
+; (SourcePath is this .iss's folder, so "..\VERSION.txt" is the repo root).
+#ifndef AppVersion
+  #define AppVersion Trim(FileRead(FileOpen(SourcePath + "..\VERSION.txt")))
+#endif
 #define AppPublisher "DynartInteractive"
 #define AppExe       "Pixee.exe"
 ; Folder produced by scripts\make-portable.bat (build it with the MSVC kit for

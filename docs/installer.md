@@ -259,8 +259,11 @@ iscc installer\Pixee.iss
   to mirror every `supportedImageFormats()` entry.
 - ~~Implement the `SHChangeNotify` call in the `[Code]` post-install step.~~
   Done — fired on both install and uninstall.
-- Bump `#define AppVersion` in `Pixee.iss` per release (there's no version
-  constant in the code yet to drive it from).
+- Version is single-sourced from the repo-root **`VERSION.txt`** — bump that
+  one file per release and everything follows: the app (`APP_VERSION` →
+  About dialog + `--version` + the `.exe` file-properties, via `Pixee.pro`)
+  and the installer (`build-installer.bat` passes it to ISCC; a direct `iscc`
+  run reads `VERSION.txt` itself). Tag the release too: `git tag v<version>`.
 - **Signing (not yet wired):** confirm Trusted Signing vs Key Vault, add a
   signer named `azuresign` (Tools → Configure Sign Tools), and uncomment the
   `SignTool=azuresign` / `SignedUninstaller=yes` lines in `Pixee.iss`.

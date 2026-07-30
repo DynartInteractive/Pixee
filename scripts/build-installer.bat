@@ -43,9 +43,13 @@ if not exist "%ISCC%" (
 )
 
 REM ---- 3. Compile the installer ---------------------------------------------
+REM Version: single source is the repo-root VERSION file. Read its first line
+REM and hand it to ISCC so the setup filename/metadata match the app exactly.
+set "APPVER="
+set /p APPVER=<"%~dp0..\VERSION.txt"
 echo(
-echo === Compiling installer with Inno Setup ===
-"%ISCC%" "%~dp0..\installer\Pixee.iss"
+echo === Compiling installer with Inno Setup (v%APPVER%) ===
+"%ISCC%" /DAppVersion=%APPVER% "%~dp0..\installer\Pixee.iss"
 if errorlevel 1 (
     echo *** Installer compile FAILED. ***
     exit /b 1
