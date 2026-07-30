@@ -73,6 +73,15 @@ bool FileFilterModel::lessThan(const QModelIndex& left, const QModelIndex& right
         return leftIsDir; // Directories come first
     }
 
+    // Folders always sort alphabetically A→Z — the SortKey and direction
+    // apply to files only, so the folder block stays a stable index at the
+    // top regardless of how the files below are ordered.
+    if (leftIsDir && rightIsDir) {
+        const QString leftName  = fileModel->data(left,  Qt::DisplayRole).toString();
+        const QString rightName = fileModel->data(right, Qt::DisplayRole).toString();
+        return FileModel::nameLessThan(leftName, rightName);
+    }
+
     // Within the same group, compare on the chosen key. `c < 0` means left
     // sorts before right in ascending order; the direction flag flips the
     // final result without touching the ".." / folders-first invariants above.
