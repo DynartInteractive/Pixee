@@ -4,9 +4,10 @@ setlocal enabledelayedexpansion
 REM ===========================================================================
 REM  make-portable.bat  --  Build a self-contained, portable Pixee for Windows.
 REM
-REM  Produces  <repo>\Pixee-portable\        (folder that runs with no Qt
-REM                                            installed) and a matching
-REM            <repo>\Pixee-portable.zip      archive.
+REM  Produces  <repo>\Pixee-portable\           (folder that runs with no Qt
+REM                                               installed) and a matching
+REM            <repo>\Pixee-<ver>-portable.zip   archive, where <ver> is read
+REM                                               from the repo-root VERSION.txt.
 REM
 REM  Usage:
 REM      scripts\make-portable.bat [QtKitDir]
@@ -41,9 +42,15 @@ pushd "%~dp0.."
 set "REPO_ROOT=%CD%"
 popd
 
+REM Version: single source is the repo-root VERSION.txt, so the zip name matches
+REM the app and the installer. Fall back to 0.0.0 if the file is somehow missing.
+set "APPVER="
+if exist "%REPO_ROOT%\VERSION.txt" set /p APPVER=<"%REPO_ROOT%\VERSION.txt"
+if not defined APPVER set "APPVER=0.0.0"
+
 set "WORK_DIR=%REPO_ROOT%\build-portable-work"
 set "OUT_DIR=%REPO_ROOT%\Pixee-portable"
-set "ZIP_FILE=%REPO_ROOT%\Pixee-portable.zip"
+set "ZIP_FILE=%REPO_ROOT%\Pixee-%APPVER%-portable.zip"
 REM qmake is happiest with forward slashes in DESTDIR.
 set "OUT_DIR_FS=%OUT_DIR:\=/%"
 

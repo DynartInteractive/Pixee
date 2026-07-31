@@ -46,7 +46,7 @@ themes/new/
 
 # Portable distribution (Qt deploy output + its zip, not source).
 Pixee-portable/
-Pixee-portable.zip
+Pixee-*-portable.zip
 
 # Installer output (Inno Setup compiles the portable into dist\).
 dist/
