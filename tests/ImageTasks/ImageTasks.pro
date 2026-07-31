@@ -5,27 +5,27 @@ CONFIG   -= app_bundle
 TEMPLATE = app
 TARGET   = tst_ImageTasks
 
-INCLUDEPATH += $$PWD/.. $$PWD/../..
+INCLUDEPATH += $$PWD/.. $$PWD/../../src
 
 SOURCES += \
     tst_ImageTasks.cpp \
     $$PWD/../TestHelpers.cpp \
     $$PWD/../TaskTestFixture.cpp \
-    $$PWD/../../FileOpsHelpers.cpp \
-    $$PWD/../../Task.cpp \
-    $$PWD/../../TaskGroup.cpp \
-    $$PWD/../../TaskRunner.cpp \
-    $$PWD/../../TaskManager.cpp \
-    $$PWD/../../ScaleImageTask.cpp \
-    $$PWD/../../ConvertFormatTask.cpp
+    $$PWD/../../src/FileOpsHelpers.cpp \
+    $$PWD/../../src/Task.cpp \
+    $$PWD/../../src/TaskGroup.cpp \
+    $$PWD/../../src/TaskRunner.cpp \
+    $$PWD/../../src/TaskManager.cpp \
+    $$PWD/../../src/ScaleImageTask.cpp \
+    $$PWD/../../src/ConvertFormatTask.cpp
 
 HEADERS += \
     $$PWD/../TestHelpers.h \
     $$PWD/../TaskTestFixture.h \
-    $$PWD/../../FileOpsHelpers.h \
-    $$PWD/../../Task.h \
-    $$PWD/../../TaskGroup.h \
-    $$PWD/../../TaskRunner.h \
-    $$PWD/../../TaskManager.h \
-    $$PWD/../../ScaleImageTask.h \
-    $$PWD/../../ConvertFormatTask.h
+    $$PWD/../../src/FileOpsHelpers.h \
+    $$PWD/../../src/Task.h \
+    $$PWD/../../src/TaskGroup.h \
+    $$PWD/../../src/TaskRunner.h \
+    $$PWD/../../src/TaskManager.h \
+    $$PWD/../../src/ScaleImageTask.h \
+    $$PWD/../../src/ConvertFormatTask.h

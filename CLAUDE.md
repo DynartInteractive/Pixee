@@ -8,9 +8,11 @@ Pixee is a Qt 6 / C++17 image-browser desktop app (qmake project, `Pixee.pro`). 
 
 The `README.md` is the authoritative feature/keyboard list — when adding or changing user-visible behavior, update it.
 
+**Source layout:** all C++ (`*.cpp` / `*.h`) lives under `src/`. Build files and assets stay at the repo root: `Pixee.pro`, `resources.qrc`, `VERSION.txt`, and the `Pixee_*.ts` translations, plus the `resources/`, `themes/`, `docs/`, `installer/`, `scripts/`, and `tests/` trees. Includes are flat (`#include "Config.h"`, no path prefix) — they resolve within `src/`, so adding a source file just means listing it in `Pixee.pro`'s `SOURCES`/`HEADERS` with the `src/` prefix.
+
 ### Versioning
 
-The version is **single-sourced from the repo-root `VERSION.txt`** (SemVer; pre-1.0 while unreleased, so features bump minor / fixes bump patch). To release: edit that one line, build, `git tag v<version>`. It flows to: `Pixee.pro` (`VERSION = $$cat($$PWD/VERSION.txt)` → the `.exe` file-properties resource, plus `DEFINES += APP_VERSION=...`), the code (`APP_VERSION`, with a `"0.0.0-dev"` fallback — Help→About and `main.cpp`'s `--version`/`-v`), and the installer (`build-installer.bat` passes `/DAppVersion` to ISCC; a direct `iscc` reads `VERSION.txt` via `SourcePath`). The `.txt` extension is load-bearing: an extensionless `VERSION` at the repo root (which is on the compiler include path) shadows the C++ `<version>` header on case-insensitive Windows and breaks the build.
+The version is **single-sourced from the repo-root `VERSION.txt`** (SemVer; pre-1.0 while unreleased, so features bump minor / fixes bump patch). To release: edit that one line, build, `git tag v<version>`. It flows to: `Pixee.pro` (`VERSION = $$cat($$PWD/VERSION.txt)` → the `.exe` file-properties resource, plus `DEFINES += APP_VERSION=...`), the code (`APP_VERSION`, with a `"0.0.0-dev"` fallback — Help→About and `main.cpp`'s `--version`/`-v`), and the installer (`build-installer.bat` passes `/DAppVersion` to ISCC; a direct `iscc` reads `VERSION.txt` via `SourcePath`). The `.txt` extension is load-bearing: keep it. An extensionless `VERSION` file shadows the C++ `<version>` header on case-insensitive Windows whenever its directory lands on the compiler include path, breaking the build — this bit us when the sources sat at the repo root, and would again if a `VERSION` file ever appeared in `src/`. The `.txt` suffix sidesteps it everywhere.
 
 ## Build / Run
 
@@ -34,7 +36,7 @@ qmake tests.pro && make
 ./CopyFileTask/tst_CopyFileTask   # or any other tst_*
 ```
 
-Suites are split per binary on purpose so a crash in one doesn't take the others down. To add a suite: create `tests/<Name>/tst_<Name>.cpp` + `.pro`, then list `<Name>` in `tests/tests.pro` `SUBDIRS`. Each `.pro` pulls source files from `..` directly (no library build); copy an existing `.pro` as a template. Shared fixtures are `tests/TaskTestFixture.{h,cpp}` and `tests/TestHelpers.{h,cpp}`.
+Suites are split per binary on purpose so a crash in one doesn't take the others down. To add a suite: create `tests/<Name>/tst_<Name>.cpp` + `.pro`, then list `<Name>` in `tests/tests.pro` `SUBDIRS`. Each `.pro` pulls app source files from `../../src/` directly (no library build) and shared fixtures from `../`; copy an existing `.pro` as a template. Shared fixtures are `tests/TaskTestFixture.{h,cpp}` and `tests/TestHelpers.{h,cpp}`.
 
 There are tests for the task layer (Copy/Move/Delete/FolderCleanup/Group/Image tasks) and folder expansion. There are no UI tests.
 

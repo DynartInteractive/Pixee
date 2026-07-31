@@ -5,25 +5,25 @@ CONFIG   -= app_bundle
 TEMPLATE = app
 TARGET   = tst_DeleteFileTask
 
-INCLUDEPATH += $$PWD/.. $$PWD/../..
+INCLUDEPATH += $$PWD/.. $$PWD/../../src
 
 SOURCES += \
     tst_DeleteFileTask.cpp \
     $$PWD/../TestHelpers.cpp \
     $$PWD/../TaskTestFixture.cpp \
-    $$PWD/../../FileOpsHelpers.cpp \
-    $$PWD/../../Task.cpp \
-    $$PWD/../../TaskGroup.cpp \
-    $$PWD/../../TaskRunner.cpp \
-    $$PWD/../../TaskManager.cpp \
-    $$PWD/../../DeleteFileTask.cpp
+    $$PWD/../../src/FileOpsHelpers.cpp \
+    $$PWD/../../src/Task.cpp \
+    $$PWD/../../src/TaskGroup.cpp \
+    $$PWD/../../src/TaskRunner.cpp \
+    $$PWD/../../src/TaskManager.cpp \
+    $$PWD/../../src/DeleteFileTask.cpp
 
 HEADERS += \
     $$PWD/../TestHelpers.h \
     $$PWD/../TaskTestFixture.h \
-    $$PWD/../../FileOpsHelpers.h \
-    $$PWD/../../Task.h \
-    $$PWD/../../TaskGroup.h \
-    $$PWD/../../TaskRunner.h \
-    $$PWD/../../TaskManager.h \
-    $$PWD/../../DeleteFileTask.h
+    $$PWD/../../src/FileOpsHelpers.h \
+    $$PWD/../../src/Task.h \
+    $$PWD/../../src/TaskGroup.h \
+    $$PWD/../../src/TaskRunner.h \
+    $$PWD/../../src/TaskManager.h \
+    $$PWD/../../src/DeleteFileTask.h

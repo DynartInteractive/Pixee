@@ -30,7 +30,7 @@ tests/tests.pro                        TEMPLATE = subdirs
 └── FolderExpand/                      expandToFiles + recursive copy/move integration
 ```
 
-- The app's `Pixee.pro` stays standalone — no `TEMPLATE = subdirs` restructure. The test tree lives entirely under `tests/` and references app source files via relative paths in each subdir's `.pro` (`SOURCES += $$PWD/../../FileOpsHelpers.cpp`). Less invasive: no `.pro.user` invalidation, no binary path changes.
+- The app's `Pixee.pro` stays standalone — no `TEMPLATE = subdirs` restructure. The test tree lives entirely under `tests/` and references app source files via relative paths in each subdir's `.pro` (`SOURCES += $$PWD/../../src/FileOpsHelpers.cpp`). Less invasive: no `.pro.user` invalidation, no binary path changes.
 - Each `tst_*.cpp` is a separate `QTEST_GUILESS_MAIN`. One binary per file means a crash in one suite doesn't take down the others, and CI failure isolation is per-file.
 - Tests link the same `.cpp` files the app does — no static lib, no shared object — so a refactor across the app/test boundary is a single edit.
 - Async waits use `QSignalSpy::wait(timeoutMs)` (returns false on timeout). No `QTest::qWait` sleeps — they make tests flaky and hide deadlocks.

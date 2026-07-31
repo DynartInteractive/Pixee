@@ -6,14 +6,14 @@ TEMPLATE = app
 TARGET   = tst_FileOpsHelpers
 
 # `..` for the shared test fixtures (TestHelpers.h);
-# `../..` for the app source tree (FileOpsHelpers.h).
-INCLUDEPATH += $$PWD/.. $$PWD/../..
+# `../../src` for the app source tree (FileOpsHelpers.h).
+INCLUDEPATH += $$PWD/.. $$PWD/../../src
 
 SOURCES += \
     tst_FileOpsHelpers.cpp \
     $$PWD/../TestHelpers.cpp \
-    $$PWD/../../FileOpsHelpers.cpp
+    $$PWD/../../src/FileOpsHelpers.cpp
 
 HEADERS += \
     $$PWD/../TestHelpers.h \
-    $$PWD/../../FileOpsHelpers.h
+    $$PWD/../../src/FileOpsHelpers.h
