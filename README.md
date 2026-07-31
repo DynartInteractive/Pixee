@@ -11,6 +11,16 @@
 
 ![Pixee screenshot](docs/screenshot-v1.jpg)
 
+## ⬇️ Download
+
+**Windows** — [**Installer** (`Pixee-0.1.0-setup.exe`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.1.0/Pixee-0.1.0-setup.exe) · [**Portable** (`Pixee-0.1.0-portable.zip`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.1.0/Pixee-0.1.0-portable.zip)
+
+The installer registers Pixee in Explorer's **Open with…**; the portable is a self-contained folder — unzip and run `Pixee.exe`. Both are **unsigned** for now, so SmartScreen warns on first run (*More info → Run anyway*).
+
+**Linux / macOS** — no prebuilt binaries yet; [build from source](#-building) (it's quick with Qt 6.6+).
+
+See [all releases](https://github.com/DynartInteractive/Pixee/releases) for other versions.
+
 ## ✨ Features
 
 - **Folder browsing** with multi-drive root, async directory enumeration off the GUI thread, and `..` always sorted first. On Linux and macOS, where there is only ever one drive, the `/` row is hidden — the folder tree starts at the contents of `/` and Pixee opens in your home folder unless a previous session or a command-line image says otherwise. Other volumes (`/media`, `/mnt`, `/Volumes`) stay reachable by browsing. Entering a folder re-scans it in the background (a cheap diff), so files added or removed by another app show up without a manual `F5`.
