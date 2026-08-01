@@ -10,7 +10,7 @@ Pixie is the older project. Pixee is the in-development successor. The two live 
 | C++ | C++11 | C++17 |
 | Extra modules | needs `QT += sql` for SQLite cache | none yet (cache not wired) |
 | Build | `qmake -makefile` then `make` | same |
-| Translations | none | `Pixee_en_US.ts` (empty placeholder, `lrelease`/`embed_translations` already wired) |
+| Translations | none | `translations/Pixee_en_US.ts` (empty placeholder, `lrelease`/`embed_translations` already wired) |
 
 ## File model — the core difference
 
