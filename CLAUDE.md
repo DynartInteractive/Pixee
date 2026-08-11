@@ -8,6 +8,12 @@ Pixee is a Qt 6 / C++17 image-browser desktop app (qmake project, `Pixee.pro`). 
 
 The `README.md` is the authoritative feature/keyboard list — when adding or changing user-visible behavior, update it.
 
+### Target display & UI density
+
+**Pixee must run without issues at 1280×720** — that's the baseline resolution the UI is designed for (a small laptop / a modest window, not a maximised 4K desktop). Treat it as a hard constraint, not an aspiration: every window, dialog, dock, and menu has to be fully usable at that size.
+
+The main practical consequence is **UI density** — especially **context (right-click) menus**. A right-click menu must fit comfortably within 720px tall without scrolling or running off-screen (Qt will scroll an over-tall menu, which is a poor experience). So when adding actions to the shared `FileOpsMenuBuilder` / viewer / list menus, **count the rows**: if a flat menu starts pushing ~15+ items, restructure — group related actions into submenus (e.g. a "Rotate ▸", "Copy to ▸" pattern), promote the common few to the top level and tuck the rest under a submenu, or split by separators. The same applies to settings pages, toolbars, and any list that grows unbounded. When a change would make a menu or panel exceed the 1280×720 budget, prefer restructuring over just letting it grow.
+
 **Source layout:** all C++ (`*.cpp` / `*.h`) lives under `src/`. Build files and assets stay at the repo root: `Pixee.pro`, `resources.qrc`, and `VERSION.txt`, plus the `translations/` (the `Pixee_*.ts` catalogues), `resources/`, `themes/`, `docs/`, `installer/`, `scripts/`, and `tests/` trees. Includes are flat (`#include "Config.h"`, no path prefix) — they resolve within `src/`, so adding a source file just means listing it in `Pixee.pro`'s `SOURCES`/`HEADERS` with the `src/` prefix.
 
 ### Versioning
