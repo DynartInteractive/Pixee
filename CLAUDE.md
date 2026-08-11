@@ -53,6 +53,7 @@ Cross-thread communication is **always** via Qt signals/slots with queued connec
 - **Folder enumeration thread** (`FileModel::_enumThread`) — `FolderEnumerator`, initial-load directory reads.
 - **Folder refresh thread** (`FileModel::_refreshThread`) — `FolderRefresher`, separate from enumeration so a slow refresh doesn't queue behind an initial load.
 - **Viewer image-loader thread** (`MainWindow::_imageLoaderThread`) — `ImageLoader`, chunked full-resolution decode for the viewer with cooperative abort via a version counter.
+- **Metadata reader thread** (`MainWindow::_metadataThread`) — `MetadataReader`, off-thread read for the info panel with the same version-counter supersede as `ImageLoader`. Emits a plain `ImageMetadata` struct (registered metatype); Exiv2 stays inside `MetadataReader.cpp`.
 - **Task worker pool** (`TaskManager`) — N `TaskRunner`s (one thread each, `Config::taskWorkerCount()` = 2) for Copy/Move/Delete/FolderCleanup/Scale/Convert.
 
 Abort/supersede pattern used in `ThumbnailGenerator`, `ImageLoader`, and `FileModel::_refreshVersions`: a `QAtomicInt` version is bumped when a snapshot is invalidated; workers compare their dispatch-time snapshot against the live counter and bail with an `aborted` signal if they differ.
@@ -82,6 +83,7 @@ Abort/supersede pattern used in `ThumbnailGenerator`, `ImageLoader`, and `FileMo
 - **`FolderTreeView`** (`QTreeView`) — left dock; shows the folder hierarchy via `_folderFilterModel`. Accepts external drops onto folders (routed through `TaskManager`).
 - **`FileListView`** (`QListView`) — central widget; icon-mode grid driven by `_fileFilterModel` with a custom `FileListViewDelegate` that paints the thumbnail + label per cell. Handles thumbnail-cache subscriptions, drag-out (`startDrag`), and drag-in (`drop*Event`).
 - **`ViewerWidget`** — image viewer in the central `QStackedWidget`. Phase 3+: fit / 1:1 / discrete zoom (`kZoomLevels` 0.1×–8×), pan with `Space+LMB` or `Middle-drag`, 90° rotate, fullscreen, lockable view state (zoom/pan/fit survive prev/next when `lockZoom()` is on; rotation always resets per-image). Cached thumbnail is shown as a placeholder while the full-res load is in flight.
+- **`MetadataPanel`** — read-only info dock (`View → Metadata`, right side, hidden by default, sticky in `QSettings` `metadataDockEnabled`). Renders the `ImageMetadata` from the off-thread `MetadataReader` in a grouped two-column `QTreeWidget`. Driven for the **focused image**: the viewer's current image while the viewer is up, otherwise the file list's current row (via `currentChanged`, debounced ~120 ms). Reads are **gated on the dock being visible** (no disk I/O when hidden) and superseded by an abort-version counter. Pure Qt — no Exiv2 dependency; the EXIF/IPTC/XMP fields are populated only in a `PIXEE_HAVE_EXIV2` build (see `docs/metadata.md`), otherwise it shows Qt-only basics. Note `ImageLoader` already sets `QImageReader::setAutoTransform(true)`, so the viewer already honours EXIF orientation; the panel just reports the tag.
 
 ### Navigation & viewer flow (`MainWindow.cpp`)
 

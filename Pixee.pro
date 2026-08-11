@@ -14,6 +14,21 @@ CONFIG += c++17
 VERSION = $$cat($$PWD/VERSION.txt)
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
+# Optional Exiv2 metadata backend for the Info panel. OFF by default: the app
+# builds and shows Qt-only basics (dimensions/format/size) without it. To turn
+# it on, drop the prebuilt Exiv2 MSVC binaries into thirdparty/exiv2/ (see
+# docs/metadata.md for the exact files) and build with PIXEE_HAVE_EXIV2=1:
+#     qmake PIXEE_HAVE_EXIV2=1 Pixee.pro
+# The MetadataReader's EXIF/IPTC/XMP parse is guarded by the same define, so it
+# only compiles when the headers are actually present. Exiv2 is GPLv2+ — see
+# the licence note in docs/metadata.md before shipping.
+!isEmpty(PIXEE_HAVE_EXIV2) {
+    DEFINES     += PIXEE_HAVE_EXIV2
+    INCLUDEPATH += $$PWD/thirdparty/exiv2/include
+    LIBS        += -L$$PWD/thirdparty/exiv2/lib -lexiv2
+    message("Exiv2 metadata backend: ENABLED")
+}
+
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
@@ -38,6 +53,8 @@ SOURCES += \
     src/IcoUtils.cpp \
     src/ImageLoader.cpp \
     src/MainWindow.cpp \
+    src/MetadataPanel.cpp \
+    src/MetadataReader.cpp \
     src/MoveFileTask.cpp \
     src/NewFolderDialog.cpp \
     src/OpenWithDialog.cpp \
@@ -84,7 +101,10 @@ HEADERS += \
     src/FolderTreeView.h \
     src/IcoUtils.h \
     src/ImageLoader.h \
+    src/ImageMetadata.h \
     src/MainWindow.h \
+    src/MetadataPanel.h \
+    src/MetadataReader.h \
     src/MoveFileTask.h \
     src/NewFolderDialog.h \
     src/OpenWithDialog.h \

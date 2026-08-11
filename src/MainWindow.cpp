@@ -34,6 +34,8 @@
 #include "ConvertFormatTask.h"
 #include "FileOpsMenuBuilder.h"
 #include "ImageLoader.h"
+#include "MetadataPanel.h"
+#include "MetadataReader.h"
 #include "MoveFileTask.h"
 #include "NewFolderDialog.h"
 #include "RenameDialog.h"
@@ -264,6 +266,28 @@ void MainWindow::create() {
     // not gate any subsystem from any other.
     _imageLoaderThread.setPriority(QThread::HighPriority);
 
+    // Metadata reader — same off-thread + supersede pattern as the image
+    // loader. ImageMetadata crosses the queued connection, so register it.
+    qRegisterMetaType<ImageMetadata>("ImageMetadata");
+    _metadataAbortVersion.storeRelease(0);
+    _metadataReader = new MetadataReader(&_metadataAbortVersion);
+    _metadataReader->moveToThread(&_metadataThread);
+    QObject::connect(&_metadataThread, &QThread::finished,
+                     _metadataReader, &QObject::deleteLater);
+    QObject::connect(this, &MainWindow::requestMetadataRead,
+                     _metadataReader, &MetadataReader::read);
+    QObject::connect(_metadataReader, &MetadataReader::ready,
+                     this, &MainWindow::onMetadataReady);
+    QObject::connect(_metadataReader, &MetadataReader::failed,
+                     this, &MainWindow::onMetadataReadFailed);
+    _metadataThread.start();
+
+    // Debounce browser-selection reads (arrow-key scrubbing) into one read.
+    _metadataDebounce.setSingleShot(true);
+    _metadataDebounce.setInterval(120);
+    connect(&_metadataDebounce, &QTimer::timeout, this,
+            [this] { requestMetadataFor(_pendingMetadataPath); });
+
     // Browser "page" — path edit + file grid in a vertical layout. This is
     // the entire chrome that's visible in normal browsing. The viewer is a
     // sibling page in the same stack, so swapping pages naturally hides the
@@ -289,6 +313,23 @@ void MainWindow::create() {
     _dockWidget->setWidget(_folderTreeView);
     _dockWidget->setFeatures(QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
     addDockWidget(Qt::LeftDockWidgetArea, _dockWidget);
+
+    _metadataPanel = new MetadataPanel();
+    _metadataDock = new QDockWidget(tr("Metadata"));
+    _metadataDock->setObjectName("metadataDockWidget");
+    _metadataDock->setWidget(_metadataPanel);
+    _metadataDock->setFeatures(QDockWidget::DockWidgetClosable
+                               | QDockWidget::DockWidgetFloatable
+                               | QDockWidget::DockWidgetMovable);
+    addDockWidget(Qt::RightDockWidgetArea, _metadataDock);
+    // Hidden by default — opt-in via View → Metadata; sticky across runs.
+    _metadataDock->setVisible(QSettings().value("metadataDockEnabled", false).toBool());
+    // Reading is gated on the dock being visible, so refresh the current
+    // context whenever the user reveals it.
+    connect(_metadataDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) {
+                if (visible) requestMetadataFor(currentContextImagePath());
+            });
 
     _taskDockWidget = new TaskDockWidget(_pixee->taskManager());
     addDockWidget(Qt::BottomDockWidgetArea, _taskDockWidget);
@@ -478,6 +519,16 @@ void MainWindow::create() {
     // Right-click on the central file list — copy / move / delete.
     QObject::connect(_fileListView, &QListView::customContextMenuRequested,
                      this, &MainWindow::showFileListContextMenu);
+
+    // Keep the metadata panel in sync with the focused file-list item while
+    // browsing. currentChanged tracks single-click / arrow navigation; the
+    // viewer drives the panel on its own, so ignore this while it's up.
+    QObject::connect(
+        _fileListView->selectionModel(), &QItemSelectionModel::currentChanged,
+        this, [this](const QModelIndex&, const QModelIndex&) {
+            if (_centerStack->currentWidget() == _viewerWidget) return;
+            scheduleMetadataForSelection();
+        });
 
     // Pick up an image path from the command line (e.g. "Pixee photo.jpg"
     // or a shell association). First existing file wins; non-existing args
@@ -855,6 +906,23 @@ void MainWindow::createMenus() {
             });
     viewMenu->addAction(foldersToggle);
 
+    // Metadata dock toggle — same two-way binding as Folders, persisted so the
+    // panel stays shown/hidden across runs.
+    _metadataToggleAction = new QAction(tr("&Metadata"), this);
+    _metadataToggleAction->setCheckable(true);
+    _metadataToggleAction->setChecked(_metadataDock->isVisible());
+    connect(_metadataToggleAction, &QAction::toggled, this, [this](bool on) {
+        QSettings().setValue("metadataDockEnabled", on);
+        _metadataDock->setVisible(on);
+        if (on) _metadataDock->raise();
+    });
+    connect(_metadataDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) {
+                const QSignalBlocker block(_metadataToggleAction);
+                _metadataToggleAction->setChecked(visible);
+            });
+    viewMenu->addAction(_metadataToggleAction);
+
     _tasksToggleAction = new QAction(tr("&Tasks"), this);
     _tasksToggleAction->setCheckable(true);
     _tasksToggleAction->setChecked(_userTasksDockEnabled);
@@ -1151,6 +1219,9 @@ void MainWindow::showViewerImageAt(int index) {
 
     setWindowTitle(QStringLiteral("Pixee - %1").arg(displayPath(path)));
 
+    // Update the info panel for the newly-shown image (no-op if hidden).
+    requestMetadataFor(path);
+
     // Always preload neighbours after the current image is queued, so
     // navigation feels instant when the user moves to one we've cached.
     preloadViewerNeighbors(index, taskVersion);
@@ -1210,6 +1281,61 @@ void MainWindow::onImageLoadFailed(QString path) {
 void MainWindow::onImageLoadAborted(QString /*path*/) {
     // Expected — happens when the user navigates between images faster
     // than the previous one finishes loading.
+}
+
+QString MainWindow::currentContextImagePath() const {
+    // Viewer up → describe the viewed image; otherwise the file list's
+    // current row when it's an image.
+    if (_centerStack && _centerStack->currentWidget() == _viewerWidget) {
+        if (_viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size())
+            return _viewerImagePaths.at(_viewerIndex);
+        return QString();
+    }
+    if (!_fileListView || !_fileFilterModel) return QString();
+    const QModelIndex cur = _fileListView->currentIndex();
+    if (!cur.isValid()) return QString();
+    const QModelIndex src = _fileFilterModel->mapToSource(cur);
+    if (!src.isValid()) return QString();
+    auto* item = static_cast<FileItem*>(src.internalPointer());
+    if (!item || item->fileType() != FileType::Image) return QString();
+    return item->fileInfo().filePath();
+}
+
+void MainWindow::scheduleMetadataForSelection() {
+    if (!_metadataDock || !_metadataDock->isVisible()) return;
+    _pendingMetadataPath = currentContextImagePath();
+    _metadataDebounce.start();  // coalesces rapid selection changes
+}
+
+void MainWindow::requestMetadataFor(const QString& path) {
+    // Skip the disk read entirely when nobody's looking at the panel.
+    if (!_metadataDock || !_metadataDock->isVisible()) return;
+
+    // Bump the abort version so any in-flight read for a previous path
+    // self-aborts instead of racing this one onto the panel.
+    const int taskVersion = _metadataAbortVersion.fetchAndAddRelease(1) + 1;
+
+    if (path.isEmpty()) {
+        if (_metadataPanel) _metadataPanel->clearMetadata();
+        return;
+    }
+    if (_metadataPanel) _metadataPanel->showLoading(path);
+    emit requestMetadataRead(path, taskVersion);
+}
+
+void MainWindow::onMetadataReady(QString path, ImageMetadata metadata) {
+    // Only render if it still matches what the panel should be showing —
+    // guards against a slow read landing after the user moved on.
+    if (!_metadataPanel || !_metadataDock || !_metadataDock->isVisible()) return;
+    if (path != currentContextImagePath()) return;
+    _metadataPanel->setMetadata(metadata);
+}
+
+void MainWindow::onMetadataReadFailed(QString path) {
+    qWarning() << "Metadata: read failed for" << path;
+    if (!_metadataPanel || !_metadataDock || !_metadataDock->isVisible()) return;
+    if (path != currentContextImagePath()) return;
+    _metadataPanel->clearMetadata();
 }
 
 void MainWindow::toggleFullscreen() {
@@ -1451,6 +1577,11 @@ void MainWindow::exit() {
     _imageAbortVersion.fetchAndAddRelease(1);
     _imageLoaderThread.quit();
     _imageLoaderThread.wait();
+
+    // Stop the metadata reader thread cleanly.
+    _metadataAbortVersion.fetchAndAddRelease(1);
+    _metadataThread.quit();
+    _metadataThread.wait();
 }
 
 MainWindow::~MainWindow() {}

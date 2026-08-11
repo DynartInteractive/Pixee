@@ -18,12 +18,15 @@
 
 #include "FileModel.h"
 #include "FileFilterModel.h"
+#include "ImageMetadata.h"
 #include "Pixee.h"
 
 class FileItem;
 class FileListView;
 class FolderTreeView;
 class ImageLoader;
+class MetadataPanel;
+class MetadataReader;
 class QAction;
 class QMenu;
 class SettingsDialog;
@@ -64,6 +67,9 @@ private slots:
     void onImageLoaded(QString path, QImage image);
     void onImageLoadFailed(QString path);
     void onImageLoadAborted(QString path);
+    // MetadataReader results for the info panel (queued from its thread).
+    void onMetadataReady(QString path, ImageMetadata metadata);
+    void onMetadataReadFailed(QString path);
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
     void populateViewerZoomMenu(QMenu* zoomMenu);
@@ -90,6 +96,7 @@ private slots:
 
 signals:
     void requestImageLoad(QString path, int taskVersion);
+    void requestMetadataRead(QString path, int taskVersion);
 
 private:
     void navigateTo(FileItem* item);
@@ -133,6 +140,16 @@ private:
     void advanceViewerAfterRemoval();
     void preloadViewerNeighbors(int currentIndex, int taskVersion);
     void touchViewerCache(const QString& path);
+    // Metadata panel plumbing. requestMetadataFor supersedes any in-flight
+    // read and kicks off a fresh one (no-op when the dock is hidden, to save
+    // disk I/O on shares). currentContextImagePath returns the image the panel
+    // should describe: the viewed image when the viewer is up, otherwise the
+    // file list's current image (empty for none). scheduleMetadataForSelection
+    // is the debounced entry point used while browsing so arrow-key scrubbing
+    // doesn't fire a read per row.
+    void requestMetadataFor(const QString& path);
+    QString currentContextImagePath() const;
+    void scheduleMetadataForSelection();
     QString displayPath(const QString& storedPath) const;
     FileItem* currentFolder() const;
 
@@ -185,6 +202,19 @@ private:
     // Bounded by count; LRU-evicted via _viewerCacheOrder.
     QHash<QString, QImage> _viewerImageCache;
     QStringList _viewerCacheOrder;
+    // Metadata info panel (right dock) + its off-thread reader. Same
+    // supersede-on-navigate pattern as the image loader: _metadataAbortVersion
+    // is bumped per request so a slow read of a superseded file self-aborts.
+    QDockWidget* _metadataDock = nullptr;
+    MetadataPanel* _metadataPanel = nullptr;
+    QAction* _metadataToggleAction = nullptr;
+    QThread _metadataThread;
+    MetadataReader* _metadataReader = nullptr;
+    QAtomicInt _metadataAbortVersion;
+    // Debounce for browser-selection-driven reads; _pendingMetadataPath is the
+    // path the debounce will read when it fires.
+    QTimer _metadataDebounce;
+    QString _pendingMetadataPath;
     // Fullscreen restore state — remembered when entering, applied on exit.
     bool _fsMenuBarVisible = true;
     bool _fsStatusBarVisible = true;

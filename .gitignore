@@ -56,3 +56,7 @@ dist/
 # them. Override the blanket *.dll ignore above for this one tree.
 !thirdparty/imageformats/codecs/*.dll
 !thirdparty/imageformats/plugins/*.dll
+
+# Exiv2 metadata backend (optional, GPLv2+): binaries stay local, not in the
+# repo — drop them here per docs/metadata.md to build with PIXEE_HAVE_EXIV2=1.
+thirdparty/exiv2/
