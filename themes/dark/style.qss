@@ -176,4 +176,22 @@ QScrollBar::handle {
 	background-color: #666;
 	min-height: 64px;
 }
- 
+
+/* ---- Metadata panel ---- */
+
+/* File-name / status line above the metadata table. */
+#metadataHeader {
+	color: #fff;
+}
+
+/* Table headers (global — only the metadata table shows one). Slightly
+   lighter dark gray than the tree body, white text, and just a bottom
+   border rather than the default full box. */
+QHeaderView::section {
+	background-color: #444;
+	color: #fff;
+	border: none;
+	border-bottom: 1px solid #555;
+	padding: 4px 6px;
+}
+
