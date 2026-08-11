@@ -11,7 +11,8 @@ The panel works in **two builds**:
   install; the panel just omits the camera/exposure/location groups and notes
   that EXIF isn't available in this build.
 - **Exiv2 build:** the full metadata. This needs the Exiv2 library present at
-  build time and its DLL bundled at run time (Windows/MSVC).
+  build time and its DLL bundled at run time (Windows/MSVC). Verified with
+  Exiv2 **0.28.8**; covered by the `tests/Metadata` round-trip suite.
 
 Everything below is about turning on the Exiv2 build.
 
@@ -90,22 +91,16 @@ qmake prints `Exiv2 metadata backend: ENABLED` when the flag is picked up. The
 guarded block in `Pixee.pro` adds the include path, links `exiv2.lib`, and
 defines `PIXEE_HAVE_EXIV2`.
 
-## 4. Bundle the DLLs in the portable
+## 4. Portable / installer bundling (automatic)
 
-For the portable/installer to run on a clean machine, `exiv2.dll` (+ its
-dependency DLLs) must sit next to `Pixee.exe`. Add a copy step to
-`scripts/make-portable.bat` alongside the kimg-codec copy, e.g.:
+Once the drop-in is in place, **no extra steps** — `scripts/make-portable.bat`
+auto-detects `thirdparty/exiv2/lib/exiv2.lib`, builds with `PIXEE_HAVE_EXIV2=1`,
+and bundles `exiv2.dll` (+ any deps) and the Exiv2 licence
+(`COPYING → Exiv2-COPYING.txt`) next to `Pixee.exe`. `build-installer.bat` runs
+the same portable build, so the installer picks all of it up too. The About
+dialog shows an Exiv2 GPLv2+ credit whenever the backend is compiled in.
 
-```bat
-REM ---- Exiv2 metadata backend (MSVC builds with PIXEE_HAVE_EXIV2) ----------
-if exist "%~dp0..\thirdparty\exiv2\bin\exiv2.dll" (
-    copy /Y "%~dp0..\thirdparty\exiv2\bin\*.dll" "%OUT_DIR%\" >nul
-    echo   Bundled Exiv2 runtime DLLs.
-)
-```
-
-Then add the Exiv2 licence file to the installer's `licenses/` and a credit in
-the About dialog.
+Without the drop-in, all of this is skipped and the panel shows Qt-only basics.
 
 ## Verifying
 

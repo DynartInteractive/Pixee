@@ -34,10 +34,8 @@ void readBasic(const QString& path, ImageMetadata& md) {
 #ifdef PIXEE_HAVE_EXIV2
 // ---------------------------------------------------------------------------
 // Exiv2 parse. Compiled only when the Exiv2 headers/libs are present (see
-// Pixee.pro's guarded block and docs/metadata.md). This block is dead code in
-// the default build, so enabling it is a mechanical step — but smoke-test it
-// against the installed Exiv2 version when you first flip PIXEE_HAVE_EXIV2,
-// as a couple of these calls (toInt64, Rational access) are 0.28-era APIs.
+// Pixee.pro's guarded block and docs/metadata.md). Verified against Exiv2
+// 0.28.8; the tests/Metadata round-trip covers the fields extracted here.
 
 QString qstr(const std::string& s) { return QString::fromStdString(s); }
 
