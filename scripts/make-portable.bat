@@ -89,10 +89,23 @@ if exist "%OUT_DIR%"  rmdir /s /q "%OUT_DIR%"
 if exist "%ZIP_FILE%" del /q "%ZIP_FILE%"
 mkdir "%WORK_DIR%"
 
+REM ---- Enable the Exiv2 metadata backend if its lib is present --------------
+REM Auto-detect the drop-in (thirdparty\exiv2\, per docs\metadata.md). When
+REM present we build with PIXEE_HAVE_EXIV2=1 so the portable ships full
+REM EXIF/IPTC/XMP; otherwise the panel shows Qt-only basics. The matching DLL
+REM copy + licence bundling happen after the build (see below).
+set "EXIV2_QMAKE="
+if exist "%REPO_ROOT%\thirdparty\exiv2\lib\exiv2.lib" (
+    set "EXIV2_QMAKE=PIXEE_HAVE_EXIV2=1"
+    echo   Exiv2 metadata backend: ENABLED
+) else (
+    echo   Exiv2 metadata backend: not present - metadata panel shows basics only.
+)
+
 REM ---- Configure + build (release only, straight into OUT_DIR) ---------------
 pushd "%WORK_DIR%"
 echo [1/4] qmake...
-qmake "%REPO_ROOT%\Pixee.pro" "CONFIG+=release" "CONFIG-=debug_and_release" "DESTDIR=%OUT_DIR_FS%"
+qmake "%REPO_ROOT%\Pixee.pro" "CONFIG+=release" "CONFIG-=debug_and_release" "DESTDIR=%OUT_DIR_FS%" %EXIV2_QMAKE%
 if errorlevel 1 ( popd & goto :error )
 
 echo [2/4] %MAKE_TOOL%...
@@ -162,7 +175,11 @@ set "EXIV2_BIN=%REPO_ROOT%\thirdparty\exiv2\bin"
 if exist "%EXIV2_BIN%\exiv2.dll" (
     copy /Y "%EXIV2_BIN%\*.dll" "%OUT_DIR%\" >nul
     if errorlevel 1 goto :error
-    echo   Bundled Exiv2 runtime DLLs.
+    REM Exiv2 is GPLv2+; ship its licence next to the exe (see docs\metadata.md).
+    if exist "%REPO_ROOT%\thirdparty\exiv2\COPYING" (
+        copy /Y "%REPO_ROOT%\thirdparty\exiv2\COPYING" "%OUT_DIR%\Exiv2-COPYING.txt" >nul
+    )
+    echo   Bundled Exiv2 runtime DLLs + licence.
 ) else (
     echo   Skipped: no thirdparty\exiv2\bin\exiv2.dll - metadata panel shows basics only.
 )
