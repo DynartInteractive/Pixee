@@ -3,6 +3,7 @@
 #include <QAtomicInt>
 #include <QImage>
 #include <QImageWriter>
+#include <QMap>
 #include <QSize>
 #include <QTemporaryDir>
 
@@ -57,6 +58,28 @@ private slots:
         QCOMPARE(md.pixelSize, QSize(120, 80));
         QVERIFY(md.fileBytes > 0);
         QVERIFY(md.fileModified.isValid());
+    }
+
+    void pngTextChunks() {
+        // ComfyUI/A1111 embed generation data as PNG tEXt chunks; the reader
+        // must surface them via Qt regardless of the Exiv2 backend.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString p = dir.filePath("gen.png");
+        QImage img(32, 32, QImage::Format_RGB32);
+        img.fill(Qt::black);
+        QImageWriter writer(p, "png");
+        writer.setText("prompt", "{\"3\":{\"class_type\":\"KSampler\"}}");
+        writer.setText("workflow", "{\"nodes\":[]}");
+        QVERIFY(writer.write(img));
+
+        const ImageMetadata md = readSync(p);
+        QCOMPARE(md.format, QStringLiteral("PNG"));
+        QMap<QString, QString> got;
+        for (const auto& kv : md.textChunks) got.insert(kv.first, kv.second);
+        QVERIFY2(got.contains("prompt"), "prompt text chunk missing");
+        QVERIFY(got.value("prompt").contains("KSampler"));
+        QVERIFY2(got.contains("workflow"), "workflow text chunk missing");
     }
 
     void missingFileYieldsEmptyBasics() {

@@ -44,6 +44,12 @@ struct ImageMetadata {
     double  gpsLon = 0.0;
     QString gpsText;            // preformatted "47.497913, 19.040236"
 
+    // PNG/embedded text chunks read via Qt (tEXt/zTXt/iTXt), independent of
+    // Exiv2 — this is where AI-tool generation data lives: ComfyUI writes
+    // `prompt` + `workflow`, Automatic1111 writes `parameters`. Also standard
+    // keys like Description/Software/Comment. Populated in every build.
+    QList<QPair<QString, QString>> textChunks;
+
     // Full tag dump for the power-user expandable view: (key, value) pairs
     // like ("Exif.Image.Make", "Canon"). Empty in the basic-only build.
     QList<QPair<QString, QString>> allTags;

@@ -29,6 +29,15 @@ void readBasic(const QString& path, ImageMetadata& md) {
     if (sz.isValid()) md.pixelSize = sz;
     const QByteArray fmt = reader.format();
     if (!fmt.isEmpty()) md.format = QString::fromLatin1(fmt).toUpper();
+
+    // Embedded text chunks (PNG tEXt/zTXt/iTXt, etc.) — this is where AI-tool
+    // generation data lives (ComfyUI `prompt`/`workflow`, A1111 `parameters`).
+    // Qt exposes these without a full decode when they precede the pixel data,
+    // which is how those tools write them.
+    for (const QString& key : reader.textKeys()) {
+        const QString value = reader.text(key);
+        if (!value.isEmpty()) md.textChunks.append({key, value});
+    }
 }
 
 #ifdef PIXEE_HAVE_EXIV2

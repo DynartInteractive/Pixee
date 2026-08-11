@@ -31,9 +31,16 @@ public slots:
     // Empty state (no image focused).
     void clearMetadata();
 
+private slots:
+    void showTreeContextMenu(const QPoint& pos);
+
 private:
     QTreeWidgetItem* addGroup(const QString& title);
     void addRow(QTreeWidgetItem* group, const QString& key, const QString& value);
+    // Copy the selected rows to the clipboard. withKey=false copies just the
+    // values (each row's full value, not the elided cell text — important for
+    // long AI-generation blobs); withKey=true copies "Key\tValue" lines.
+    void copySelected(bool withKey);
 
     QLabel*      _header;   // file name / status line above the tree
     QTreeWidget* _tree;
