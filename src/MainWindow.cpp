@@ -1417,7 +1417,7 @@ void MainWindow::populateViewerZoomMenu(QMenu* zoomMenu) {
     zoomMenu->addSeparator();
 
     const int currentPct = viewer->currentZoomPercent();  // 0 in any fit mode
-    constexpr int kPercents[] = { 1600, 1200, 800, 600, 400, 200, 100, 75, 50, 25, 10 };
+    constexpr int kPercents[] = { 1600, 1200, 800, 600, 400, 200, 150, 125, 100, 75, 50, 25, 10 };
     for (int pct : kPercents) {
         QString text = QStringLiteral("%1%").arg(pct);
         if (pct == 100) text += QStringLiteral("\t*");

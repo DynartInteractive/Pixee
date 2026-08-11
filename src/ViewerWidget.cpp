@@ -9,7 +9,7 @@
 
 namespace {
 constexpr double kZoomLevels[] = {
-    0.10, 0.25, 0.50, 0.75, 1.0, 2.0, 4.0, 6.0, 8.0, 12.0, 16.0
+    0.10, 0.25, 0.50, 0.75, 1.0, 1.25, 1.50, 2.0, 4.0, 6.0, 8.0, 12.0, 16.0
 };
 constexpr int kZoomCount = static_cast<int>(sizeof(kZoomLevels) / sizeof(double));
 constexpr int kZoomIndex100 = 4;  // index of 1.0 above
