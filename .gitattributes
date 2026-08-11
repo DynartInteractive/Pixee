@@ -1,0 +1,10 @@
+# Normalize text files to LF in the repository by default.
+* text=auto
+
+# Windows-only scripts MUST have CRLF in the working tree, or cmd.exe
+# mis-parses them (an LF-only .bat corrupts the first bytes of each line:
+# `setlocal` → `tlocal`). With core.autocrlf=input these would otherwise
+# check out as LF and fail to run. Force CRLF regardless of user config.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.iss text eol=crlf
