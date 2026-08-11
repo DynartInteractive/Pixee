@@ -41,13 +41,23 @@ void readBasic(const QString& path, ImageMetadata& md) {
 
 QString qstr(const std::string& s) { return QString::fromStdString(s); }
 
-// Human-readable interpreted value for a tag (e.g. "1/250 s", "f/2.8"),
-// falling back to the raw string. `print()` needs the owning container to
-// resolve some tag interpretations.
-template <typename Datum, typename Data>
-QString interp(const Datum& d, const Data* container) {
+// Human-readable interpreted value for any datum (e.g. "1/250 s", "f/2.8"),
+// falling back to the raw string. Works for EXIF / IPTC / XMP — Metadatum::print
+// is virtual and takes an optional ExifData* (only EXIF uses it), so the base
+// no-arg call is correct for all three containers.
+QString interp(const Exiv2::Metadatum& d) {
     try {
-        return qstr(d.print(container));
+        return qstr(d.print());
+    } catch (...) {
+        try { return qstr(d.toString()); } catch (...) { return QString(); }
+    }
+}
+
+// EXIF variant: pass the owning ExifData so tags that cross-reference others
+// (MakerNote-derived lens, etc.) resolve to their interpreted form.
+QString interpExif(const Exiv2::Exifdatum& d, const Exiv2::ExifData& exif) {
+    try {
+        return qstr(d.print(&exif));
     } catch (...) {
         try { return qstr(d.toString()); } catch (...) { return QString(); }
     }
@@ -57,7 +67,7 @@ QString interp(const Datum& d, const Data* container) {
 QString exifVal(Exiv2::ExifData& exif, const char* key) {
     try {
         auto it = exif.findKey(Exiv2::ExifKey(key));
-        if (it != exif.end()) return interp(*it, &exif);
+        if (it != exif.end()) return interpExif(*it, exif);
     } catch (...) {}
     return QString();
 }
@@ -127,16 +137,16 @@ void readExiv2(const QString& path, ImageMetadata& md) {
             }
 
             for (const auto& d : exif)
-                md.allTags.append({qstr(d.key()), interp(d, &exif)});
+                md.allTags.append({qstr(d.key()), interpExif(d, exif)});
         }
 
         Exiv2::IptcData& iptc = image->iptcData();
         for (const auto& d : iptc)
-            md.allTags.append({qstr(d.key()), interp(d, &iptc)});
+            md.allTags.append({qstr(d.key()), interp(d)});
 
         Exiv2::XmpData& xmp = image->xmpData();
         for (const auto& d : xmp)
-            md.allTags.append({qstr(d.key()), interp(d, &xmp)});
+            md.allTags.append({qstr(d.key()), interp(d)});
     } catch (const std::exception& e) {
         qWarning() << "MetadataReader: Exiv2 failed for" << path << ":" << e.what();
     } catch (...) {

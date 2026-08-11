@@ -43,9 +43,13 @@ Exiv2-enabled binaries.
 ## 1. Get the prebuilt Exiv2 (MSVC x64)
 
 Download the Windows MSVC build from the Exiv2 releases:
-<https://github.com/Exiv2/exiv2/releases> — pick the **0.28.x** asset named like
-`exiv2-0.28.x-2022msvc64.zip` (MSVC 2022, x64). Match the toolchain Pixee is
-built with (`msvc2022_64`).
+<https://github.com/Exiv2/exiv2/releases> — pick the **`2022msvc-AMD64`** asset
+(MSVC 2022, x64), matching Pixee's `msvc2022_64` kit. As of this writing the
+current release is **v0.28.8**:
+
+<https://github.com/Exiv2/exiv2/releases/download/v0.28.8/exiv2-0.28.8-2022msvc-AMD64.zip>
+
+Don't grab the `Linux`/`Darwin` tarballs, a MinGW build, or a 32-bit one.
 
 > MinGW note: like the extra image-format plugins, the MSVC Exiv2 build won't
 > link into a MinGW Pixee. The shipped portable/installer is MSVC, so this is
