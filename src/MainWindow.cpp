@@ -955,10 +955,16 @@ void MainWindow::createMenus() {
 }
 
 void MainWindow::showAbout() {
-    QMessageBox::about(this, tr("About Pixee"),
+    QString body =
         tr("<b>Pixee</b> %1<br><br>An image manager built on Qt 6."
            "<br><a href=\"https://github.com/DynartInteractive/Pixee\">Pixee on GitHub</a>")
-            .arg(QApplication::applicationVersion()));
+            .arg(QApplication::applicationVersion());
+#ifdef PIXEE_HAVE_EXIV2
+    // Exiv2 is GPLv2+; when it's linked in, credit it (see docs/metadata.md).
+    body += tr("<br><br>Metadata by <a href=\"https://exiv2.org/\">Exiv2</a> "
+               "(GPLv2+).");
+#endif
+    QMessageBox::about(this, tr("About Pixee"), body);
 }
 
 void MainWindow::expandFolderTreeTo(FileItem* item) {

@@ -153,6 +153,20 @@ if errorlevel 1 goto :error
 echo   Bundled kimg plugins + codec DLLs.
 :after_extra
 
+REM ---- Exiv2 metadata backend (only if built with PIXEE_HAVE_EXIV2) ---------
+REM exiv2.dll (+ any dependency DLLs) must sit next to Pixee.exe for the
+REM metadata panel's rich EXIF/IPTC/XMP. The binaries are a local drop-in
+REM (thirdparty\exiv2\, git-ignored) — see docs\metadata.md. No-op when
+REM absent, so a plain build without Exiv2 just skips this.
+set "EXIV2_BIN=%REPO_ROOT%\thirdparty\exiv2\bin"
+if exist "%EXIV2_BIN%\exiv2.dll" (
+    copy /Y "%EXIV2_BIN%\*.dll" "%OUT_DIR%\" >nul
+    if errorlevel 1 goto :error
+    echo   Bundled Exiv2 runtime DLLs.
+) else (
+    echo   Skipped: no thirdparty\exiv2\bin\exiv2.dll - metadata panel shows basics only.
+)
+
 REM ---- Zip it up (tar ships with Windows 10 1803+) --------------------------
 where tar >nul 2>&1
 if not errorlevel 1 (
