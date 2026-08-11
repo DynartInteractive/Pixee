@@ -192,6 +192,9 @@ QHeaderView::section {
 	color: #fff;
 	border: none;
 	border-bottom: 1px solid #555;
+	/* 1px gap between sections — coloured like the body so it reads as
+	   spacing rather than a divider line. */
+	border-right: 1px solid #333;
 	padding: 4px 6px;
 }
 
