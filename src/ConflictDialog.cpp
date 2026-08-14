@@ -11,6 +11,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QStyle>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include "ThumbnailCache.h"
@@ -19,6 +20,10 @@ namespace {
 // Preview box edge in px. Two of these side by side stay well within the
 // 1280×720 budget (~500px wide dialog).
 constexpr int kPreviewPx = 180;
+// Grace period before the synchronous disk fallback kicks in — long enough for
+// an already-cached thumbnail to arrive via the cache, short enough to feel
+// instant when it doesn't.
+constexpr int kFallbackMs = 200;
 }  // namespace
 
 ConflictDialog::ConflictDialog(int kind, const QVariantMap& context,
@@ -99,6 +104,10 @@ ConflictDialog::ConflictDialog(int kind, const QVariantMap& context,
     line->setFrameShadow(QFrame::Sunken);
     layout->addWidget(line);
     layout->addLayout(buttonRow);
+
+    // Anything the cache hasn't filled shortly gets a direct disk decode. Bound
+    // to `this`, so it's auto-cancelled if the user answers first.
+    QTimer::singleShot(kFallbackMs, this, &ConflictDialog::fillMissingFromDisk);
 }
 
 ConflictDialog::~ConflictDialog() {
@@ -124,7 +133,7 @@ QWidget* ConflictDialog::buildPane(const QString& title, const QString& path) {
     image->setFixedSize(kPreviewPx, kPreviewPx);
     image->setAlignment(Qt::AlignCenter);
     image->setFrameShape(QFrame::StyledPanel);
-    // Placeholder: the standard file icon until (and unless) a thumbnail lands.
+    // Placeholder: the standard file icon until a thumbnail lands.
     image->setPixmap(style()->standardIcon(QStyle::SP_FileIcon).pixmap(kPreviewPx / 2,
                                                                        kPreviewPx / 2));
     col->addWidget(image, 0, Qt::AlignHCenter);
@@ -132,10 +141,11 @@ QWidget* ConflictDialog::buildPane(const QString& title, const QString& path) {
     // Caption: "W × H · size" then the modified date. Both are header-only /
     // stat reads (QImageReader::size(), QFileInfo) — cheap even on a share.
     const QFileInfo fi(path);
-    QImageReader reader(path);
-    const QSize dim = reader.size();  // invalid for non-images
+    QImageReader probe(path);
+    const QSize dim = probe.size();  // invalid for non-images
+    const bool isImage = dim.isValid();
     QStringList spec;
-    if (dim.isValid())
+    if (isImage)
         spec << tr("%1 × %2").arg(dim.width()).arg(dim.height());
     if (fi.size() > 0)
         spec << QLocale().formattedDataSize(fi.size(), 1, QLocale::DataSizeTraditionalFormat);
@@ -151,26 +161,53 @@ QWidget* ConflictDialog::buildPane(const QString& title, const QString& path) {
     meta->setText(lines.join(QLatin1Char('\n')));
     col->addWidget(meta);
 
-    // Async thumbnail for images only, reusing the shared cache. Results arrive
-    // via thumbnailReady during exec()'s nested loop. mtime uses the same
-    // toSecsSinceEpoch() convention as FileListView so a still-valid cached
-    // row is a hit rather than a needless regeneration.
-    if (_thumbs && dim.isValid() && !_panes.contains(path)) {
+    _panes.append({ path, image, isImage, false });
+
+    // Fast path: reuse the shared cache for images. Subscribe once per unique
+    // path (a copy-onto-self makes both panes the same path). mtime uses the
+    // same toSecsSinceEpoch() convention as FileListView so a still-valid
+    // cached row is a hit rather than a needless regeneration.
+    if (_thumbs && isImage && !_subscribed.contains(path)) {
         if (_subscribed.isEmpty())  // connect once, on the first subscription
             connect(_thumbs, &ThumbnailCache::thumbnailReady,
                     this, &ConflictDialog::onThumbnailReady);
-        _panes.insert(path, image);
-        _subscribed << path;
+        _subscribed.insert(path);
         _thumbs->subscribe(path, fi.lastModified().toSecsSinceEpoch(), fi.size(), 0);
     }
     return pane;
 }
 
-void ConflictDialog::onThumbnailReady(const QString& path, const QImage& image) {
-    QLabel* label = _panes.value(path);
+void ConflictDialog::setPaneImage(QLabel* label, const QImage& image) {
     if (!label || image.isNull()) return;
     label->setPixmap(QPixmap::fromImage(image).scaled(
         label->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+}
+
+void ConflictDialog::onThumbnailReady(const QString& path, const QImage& image) {
+    for (Pane& p : _panes) {
+        if (p.loaded || p.path != path) continue;
+        setPaneImage(p.label, image);
+        p.loaded = true;
+    }
+}
+
+void ConflictDialog::fillMissingFromDisk() {
+    for (Pane& p : _panes) {
+        if (p.loaded || !p.isImage) continue;
+        // Decode straight from disk, scaled down so a large source isn't fully
+        // materialised. The worker is parked on this dialog, so a brief GUI-
+        // thread read here is fine.
+        QImageReader reader(p.path);
+        reader.setAutoTransform(true);  // honour EXIF orientation, like the viewer
+        const QSize orig = reader.size();
+        if (orig.isValid() && !orig.isEmpty())
+            reader.setScaledSize(orig.scaled(kPreviewPx, kPreviewPx, Qt::KeepAspectRatio));
+        const QImage img = reader.read();
+        if (!img.isNull()) {
+            setPaneImage(p.label, img);
+            p.loaded = true;
+        }
+    }
 }
 
 void ConflictDialog::chooseAndAccept(Task::ConflictAnswer answer) {
