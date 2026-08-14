@@ -3,8 +3,9 @@
 #include "ConflictDialog.h"
 #include "Task.h"
 
-TaskConflictPrompter::TaskConflictPrompter(QWidget* dialogParent, QObject* parent)
-    : QObject(parent), _dialogParent(dialogParent) {}
+TaskConflictPrompter::TaskConflictPrompter(QWidget* dialogParent, ThumbnailCache* thumbs,
+                                           QObject* parent)
+    : QObject(parent), _dialogParent(dialogParent), _thumbs(thumbs) {}
 
 void TaskConflictPrompter::onQuestionPosed(QUuid taskId, int kind, QVariantMap context) {
     _queue.append({ taskId, kind, context });
@@ -32,7 +33,7 @@ void TaskConflictPrompter::processQueue() {
     while (!_queue.isEmpty()) {
         const Pending p = _queue.takeFirst();
 
-        ConflictDialog dialog(p.kind, p.context, _dialogParent);
+        ConflictDialog dialog(p.kind, p.context, _thumbs, _dialogParent);
         dialog.exec();
 
         emit answerProvided(p.taskId, p.kind,

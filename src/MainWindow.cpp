@@ -378,7 +378,7 @@ void MainWindow::create() {
     // Conflict questions surface as blocking modal dialogs (see
     // TaskConflictPrompter), not inline in the dock — so a posed question no
     // longer needs to force the dock open.
-    _conflictPrompter = new TaskConflictPrompter(this, this);
+    _conflictPrompter = new TaskConflictPrompter(this, _pixee->thumbnailCache(), this);
     connect(_pixee->taskManager(), &TaskManager::taskQuestionPosed,
             _conflictPrompter, &TaskConflictPrompter::onQuestionPosed);
     connect(_pixee->taskManager(), &TaskManager::taskStateChanged,

@@ -177,6 +177,18 @@ QScrollBar::handle {
 	min-height: 64px;
 }
 
+/* ---- Conflict dialog previews ---- */
+
+/* The Existing/Incoming thumbnail boxes. */
+#conflictPreview {
+	background-color: #2a2a2a;
+	border: 1px solid #555;
+}
+/* Dimensions / size / date caption under each preview — muted. */
+#conflictMeta {
+	color: #aaa;
+}
+
 /* ---- Metadata panel ---- */
 
 /* File-name / status line above the metadata table. */

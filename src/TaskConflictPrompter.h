@@ -7,6 +7,7 @@
 #include <QVariantMap>
 
 class QWidget;
+class ThumbnailCache;
 
 // GUI-thread controller that turns a task's conflict question into a blocking
 // modal ConflictDialog. Replaces the old inline question strip in the task
@@ -22,8 +23,10 @@ class TaskConflictPrompter : public QObject {
     Q_OBJECT
 public:
     // dialogParent is used to centre / own the modal dialog (typically the
-    // MainWindow). Not owned.
-    explicit TaskConflictPrompter(QWidget* dialogParent, QObject* parent = nullptr);
+    // MainWindow). thumbs is passed to each ConflictDialog for its side-by-side
+    // image previews (may be null). Neither is owned.
+    explicit TaskConflictPrompter(QWidget* dialogParent, ThumbnailCache* thumbs,
+                                  QObject* parent = nullptr);
 
 public slots:
     void onQuestionPosed(QUuid taskId, int kind, QVariantMap context);
@@ -43,6 +46,7 @@ private:
     };
 
     QWidget* _dialogParent;
+    ThumbnailCache* _thumbs;
     QList<Pending> _queue;
     bool _busy = false;
 };
