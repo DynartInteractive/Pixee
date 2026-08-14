@@ -162,6 +162,9 @@ void TaskManager::onTaskFinished(QUuid taskId) {
     // task by definition didn't change anything on disk. finished() also
     // fires for Skipped, so we have to filter here.
     if (t && t->state() == Task::Completed) {
+        // pathMoved first: the rekey must land before the folder refresh that
+        // pathTouched triggers, so the re-subscribed new path is a cache hit.
+        for (const auto& mv : t->movedPaths()) emit pathMoved(mv.first, mv.second);
         for (const QString& dir : t->affectedDirs()) emit pathTouched(dir);
     }
     onTaskTerminal(taskId);

@@ -102,3 +102,25 @@ void ThumbnailDatabase::save(QString path, qint64 mtime, qint64 size, int width,
         qWarning() << "ThumbnailDatabase: save failed for" << path << ":" << q.lastError().text();
     }
 }
+
+void ThumbnailDatabase::rekey(QString oldPath, QString newPath, qint64 newMtime, qint64 newSize) {
+    if (!_db.isOpen() || oldPath == newPath) {
+        return;
+    }
+    QSqlQuery q(_db);
+    // UPDATE OR REPLACE: if a row already exists at newPath (the overwrite
+    // case — the incoming file replaced an existing one), it is dropped rather
+    // than colliding on the PRIMARY KEY. mtime/size are refreshed to the moved
+    // file's current on-disk values so later subscribe() calls validate fresh
+    // (a cross-volume move rewrites the file and bumps its mtime).
+    q.prepare("UPDATE OR REPLACE pixee_thumbnails "
+              "SET path = ?, mtime = ?, size = ? WHERE path = ?");
+    q.addBindValue(newPath);
+    q.addBindValue(newMtime);
+    q.addBindValue(newSize);
+    q.addBindValue(oldPath);
+    if (!q.exec()) {
+        qWarning() << "ThumbnailDatabase: rekey failed for" << oldPath << "->" << newPath
+                   << ":" << q.lastError().text();
+    }
+}

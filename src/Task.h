@@ -2,8 +2,10 @@
 #define TASK_H
 
 #include <QAtomicInt>
+#include <QList>
 #include <QMutex>
 #include <QObject>
+#include <QPair>
 #include <QString>
 #include <QStringList>
 #include <QUuid>
@@ -70,6 +72,12 @@ public:
     // collects these from a group's completed tasks so the UI can select
     // freshly-added files. Default none; file-producing subclasses override.
     virtual QStringList producedPaths() const { return {}; }
+
+    // Old→new path pairs where the file's byte content is preserved (a rename
+    // or same-content move), so a cached thumbnail can be repointed to the new
+    // path instead of regenerated. Collected by the manager on successful
+    // completion and turned into TaskManager::pathMoved. Default none.
+    virtual QList<QPair<QString, QString>> movedPaths() const { return {}; }
 
     // Called from the GUI thread. All thread-safe.
     void requestPause();

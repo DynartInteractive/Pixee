@@ -19,6 +19,10 @@ public:
     QString displayName() const override;
     QStringList affectedDirs() const override;
     QStringList producedPaths() const override { return { _dst }; }
+    // The move preserves the file's bytes, so the manager repoints its cached
+    // thumbnail (src → dst) rather than letting the refresh regenerate it.
+    // Only collected on Completed, so Skip never reports a move.
+    QList<QPair<QString, QString>> movedPaths() const override { return { { _src, _dst } }; }
 
 protected:
     void run() override;

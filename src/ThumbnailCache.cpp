@@ -1,5 +1,8 @@
 #include "ThumbnailCache.h"
 
+#include <QDateTime>
+#include <QFileInfo>
+
 #include "Config.h"
 #include "ThumbnailDatabase.h"
 #include "ThumbnailGenerator.h"
@@ -18,6 +21,7 @@ ThumbnailCache::ThumbnailCache(Config* config, QObject* parent)
     connect(this, &ThumbnailCache::requestConnect, _db, &ThumbnailDatabase::connectDatabase);
     connect(this, &ThumbnailCache::requestLookup, _db, &ThumbnailDatabase::lookup);
     connect(this, &ThumbnailCache::requestSave, _db, &ThumbnailDatabase::save);
+    connect(this, &ThumbnailCache::requestRekey, _db, &ThumbnailDatabase::rekey);
     connect(_db, &ThumbnailDatabase::found, this, &ThumbnailCache::onFound);
     connect(_db, &ThumbnailDatabase::notFound, this, &ThumbnailCache::onNotFound);
 
@@ -71,6 +75,20 @@ void ThumbnailCache::subscribe(const QString& path, qint64 mtime, qint64 size, i
         // Already past DB and queued in generator — push priority update.
         emit requestEnqueueGenerate(path, mtime, size, distance);
     }
+}
+
+void ThumbnailCache::moveThumbnail(const QString& oldPath, const QString& newPath) {
+    if (oldPath == newPath) return;
+    const QFileInfo fi(newPath);
+    if (fi.exists()) {
+        // Repoint the persistent row on the DB thread, stamping the moved
+        // file's current mtime/size so it validates against later subscribes.
+        emit requestRekey(oldPath, newPath,
+                          fi.lastModified().toSecsSinceEpoch(), fi.size());
+    }
+    // The new path starts with a clean slate in the per-session negative cache
+    // (a stale "failed" entry keyed on the old path must not shadow it).
+    _failures.remove(oldPath);
 }
 
 void ThumbnailCache::unsubscribe(const QString& path) {

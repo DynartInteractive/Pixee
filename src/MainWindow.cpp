@@ -66,6 +66,10 @@ void MainWindow::create() {
     _fileModel = new FileModel(_pixee->config(), _pixee->theme(), _pixee->thumbnailCache());
     QObject::connect(_fileModel, &FileModel::pathRenamed,
                      this, &MainWindow::onPathRenamed);
+    // A single-file rename keeps the bytes — repoint its cached thumbnail to
+    // the new path instead of regenerating it. Harmless for folders (no row).
+    QObject::connect(_fileModel, &FileModel::pathRenamed,
+                     _pixee->thumbnailCache(), &ThumbnailCache::moveThumbnail);
 
     _folderFilterModel = new FileFilterModel();
     _folderFilterModel->setSourceModel(_fileModel);
@@ -385,6 +389,11 @@ void MainWindow::create() {
             _conflictPrompter, &TaskConflictPrompter::onTaskStateChanged);
     connect(_conflictPrompter, &TaskConflictPrompter::answerProvided,
             _pixee->taskManager(), &TaskManager::provideAnswer);
+
+    // A move/rename task preserves the file's bytes — repoint its cached
+    // thumbnail (old → new path) rather than regenerating after the refresh.
+    connect(_pixee->taskManager(), &TaskManager::pathMoved,
+            _pixee->thumbnailCache(), &ThumbnailCache::moveThumbnail);
 
     // Tasks dock visibility model:
     //   - View → Tasks menu = persistent intent (sticky across runs).

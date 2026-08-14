@@ -34,6 +34,12 @@ public:
     // subscribed. User-triggered ("Refresh thumbnail"), so it decodes at top
     // priority.
     void refreshThumbnail(const QString& path, qint64 mtime, qint64 size);
+    // Repoint a cached thumbnail after a rename/move (old → new path), so a
+    // file operation reuses the existing thumbnail instead of regenerating it.
+    // Stats newPath for its current mtime/size and hands the rekey to the DB
+    // thread; also drops any stale per-session negative-cache entry for the old
+    // path. Cheap no-op when the paths match or newPath is gone.
+    void moveThumbnail(const QString& oldPath, const QString& newPath);
     // Drop all subscriptions and pending work. Use on folder change to clear
     // the generator queue in one shot rather than per-path. The in-flight
     // decode (if any) still finishes but its result is discarded.
@@ -53,6 +59,7 @@ signals:
     void requestConnect();
     void requestLookup(QString path, qint64 mtime, qint64 size);
     void requestSave(QString path, qint64 mtime, qint64 size, int width, int height, QByteArray jpegBytes);
+    void requestRekey(QString oldPath, QString newPath, qint64 mtime, qint64 size);
     void requestEnqueueGenerate(QString path, qint64 mtime, qint64 size, int priority);
     void requestCancelGenerate(QString path);
     void requestAbandonAll();

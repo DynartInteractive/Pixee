@@ -86,6 +86,11 @@ signals:
     // Emitted once per directory the just-completed task says was affected.
     // The UI debounces these and refreshes the corresponding folder.
     void pathTouched(QString dir);
+    // Emitted once per old→new pair a just-completed task moved/renamed, so
+    // the thumbnail cache can repoint the DB row instead of regenerating.
+    // Fired before pathTouched for the same task so the rekey lands ahead of
+    // the folder refresh that would otherwise re-subscribe the new path.
+    void pathMoved(QString oldPath, QString newPath);
 
 private slots:
     void onRunnerIdle();

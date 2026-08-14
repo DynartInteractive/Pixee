@@ -17,6 +17,10 @@ public slots:
     void connectDatabase();
     void lookup(QString path, qint64 mtime, qint64 size);
     void save(QString path, qint64 mtime, qint64 size, int width, int height, QByteArray jpegBytes);
+    // Repoint a cached thumbnail from oldPath to newPath after a rename/move.
+    // The image bytes are unchanged (same file content); only the key and the
+    // freshness fields move. No-op if oldPath has no row.
+    void rekey(QString oldPath, QString newPath, qint64 newMtime, qint64 newSize);
 
 signals:
     void found(QString path, QImage image);
