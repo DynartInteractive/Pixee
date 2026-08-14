@@ -94,13 +94,25 @@ REM Auto-detect the drop-in (thirdparty\exiv2\, per docs\metadata.md). When
 REM present we build with PIXEE_HAVE_EXIV2=1 so the portable ships full
 REM EXIF/IPTC/XMP; otherwise the panel shows Qt-only basics. The matching DLL
 REM copy + licence bundling happen after the build (see below).
+REM
+REM MSVC-ONLY: the drop-in is the prebuilt MSVC Exiv2 (see docs\metadata.md).
+REM Its C++ ABI / name-mangling is incompatible with MinGW's, so linking it
+REM into a MinGW build fails with "undefined reference to __imp__ZN5Exiv2...".
+REM Same story as the kimg plugins below - so gate it on the kit, exactly like
+REM them, rather than letting a MinGW build trip the linker.
+REM Flat goto-guard on purpose: a three-way if/else trips the batch parser.
 set "EXIV2_QMAKE="
+if defined KIT_IS_MINGW (
+    echo   Exiv2 metadata backend: skipped - MinGW build ^(the thirdparty\exiv2 drop-in is MSVC-only^). Metadata panel shows basics only.
+    goto :after_exiv2_cfg
+)
 if exist "%REPO_ROOT%\thirdparty\exiv2\lib\exiv2.lib" (
     set "EXIV2_QMAKE=PIXEE_HAVE_EXIV2=1"
     echo   Exiv2 metadata backend: ENABLED
 ) else (
     echo   Exiv2 metadata backend: not present - metadata panel shows basics only.
 )
+:after_exiv2_cfg
 
 REM ---- Configure + build (release only, straight into OUT_DIR) ---------------
 pushd "%WORK_DIR%"
@@ -176,6 +188,9 @@ REM exiv2.dll (+ any dependency DLLs) must sit next to Pixee.exe for the
 REM metadata panel's rich EXIF/IPTC/XMP. The binaries are a local drop-in
 REM (thirdparty\exiv2\, git-ignored) — see docs\metadata.md. No-op when
 REM absent, so a plain build without Exiv2 just skips this.
+REM MinGW builds never enable Exiv2 (see above), so shipping the MSVC exiv2.dll
+REM would be dead weight the exe doesn't even link against - skip it.
+if defined KIT_IS_MINGW goto :after_exiv2_bundle
 set "EXIV2_BIN=%REPO_ROOT%\thirdparty\exiv2\bin"
 if exist "%EXIV2_BIN%\exiv2.dll" (
     copy /Y "%EXIV2_BIN%\*.dll" "%OUT_DIR%\" >nul
@@ -188,6 +203,7 @@ if exist "%EXIV2_BIN%\exiv2.dll" (
 ) else (
     echo   Skipped: no thirdparty\exiv2\bin\exiv2.dll - metadata panel shows basics only.
 )
+:after_exiv2_bundle
 
 REM ---- Zip it up (tar ships with Windows 10 1803+) --------------------------
 where tar >nul 2>&1
