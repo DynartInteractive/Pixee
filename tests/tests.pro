@@ -11,4 +11,5 @@ SUBDIRS = \
     TaskGroup \
     ImageTasks \
     FolderExpand \
-    Metadata
+    Metadata \
+    BatchRename

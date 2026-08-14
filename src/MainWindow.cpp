@@ -39,6 +39,9 @@
 #include "MoveFileTask.h"
 #include "NewFolderDialog.h"
 #include "RenameDialog.h"
+#include "BatchRenameDialog.h"
+#include "BatchRenamePlan.h"
+#include "RenameTask.h"
 #include "AppSettings.h"
 #include "ScaleImageTask.h"
 #include "SettingsDialog.h"
@@ -795,6 +798,38 @@ void MainWindow::openSettings() {
     _settingsDialog->show();
 }
 
+void MainWindow::openBatchRename() {
+    const FileListView::Selection sel = _fileListView->selectionPaths();
+    if (sel.paths.isEmpty()) {
+        Toast::show(this, tr("Select one or more files to rename first."),
+                    Toast::Info);
+        return;
+    }
+
+    BatchRenameDialog dlg(sel.paths, this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    const QList<QPair<QString, QString>> renames = dlg.renames();
+    if (renames.isEmpty()) return;
+
+    // Order the renames so none clobbers a file still waiting to move. A true
+    // swap cycle (a↔b) has no safe plain-rename order — refuse rather than lose
+    // data (rare; the user can insert an intermediate name).
+    const BatchRename::Plan plan = BatchRename::planRenameSteps(renames);
+    if (plan.hasCycle) {
+        Toast::show(this,
+                    tr("These names swap around in a cycle — rename in two "
+                       "passes, or use an intermediate name."),
+                    Toast::Error);
+        return;
+    }
+
+    auto* group = new TaskGroup(tr("Rename %1 file(s)").arg(plan.steps.size()));
+    for (const BatchRename::Step& s : plan.steps)
+        group->addTask(new RenameTask(s.from, s.to, group));
+    _pixee->taskManager()->enqueueGroup(group);
+}
+
 void MainWindow::updateViewerStatusBar(const QSize& size) {
     if (!size.isValid()) {
         statusBar()->clearMessage();
@@ -957,6 +992,10 @@ void MainWindow::createMenus() {
                 _tasksToggleAction->setChecked(visible);
             });
     viewMenu->addAction(_tasksToggleAction);
+
+    QMenu* toolsMenu = mb->addMenu(tr("&Tools"));
+    QAction* batchRenameAction = toolsMenu->addAction(tr("&Batch rename..."));
+    connect(batchRenameAction, &QAction::triggered, this, &MainWindow::openBatchRename);
 
     QMenu* helpMenu = mb->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About"));

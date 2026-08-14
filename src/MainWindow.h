@@ -59,6 +59,7 @@ private slots:
     // they can be selected once the folder refresh inserts their rows.
     void onGroupFinished(QStringList producedPaths);
     void openSettings();
+    void openBatchRename();
     void showAbout();
     void dismissViewer();
     void viewerPrev();

@@ -53,9 +53,12 @@ SOURCES += \
     src/IcoUtils.cpp \
     src/ImageLoader.cpp \
     src/MainWindow.cpp \
+    src/BatchRenameDialog.cpp \
+    src/BatchRenamePlan.cpp \
     src/MetadataPanel.cpp \
     src/MetadataReader.cpp \
     src/MoveFileTask.cpp \
+    src/RenameTask.cpp \
     src/NewFolderDialog.cpp \
     src/OpenWithDialog.cpp \
     src/Pixee.cpp \
@@ -100,12 +103,15 @@ HEADERS += \
     src/FolderRefresher.h \
     src/FolderTreeView.h \
     src/IcoUtils.h \
+    src/BatchRenameDialog.h \
+    src/BatchRenamePlan.h \
     src/ImageLoader.h \
     src/ImageMetadata.h \
     src/MainWindow.h \
     src/MetadataPanel.h \
     src/MetadataReader.h \
     src/MoveFileTask.h \
+    src/RenameTask.h \
     src/NewFolderDialog.h \
     src/OpenWithDialog.h \
     src/Pixee.h \
