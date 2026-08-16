@@ -128,22 +128,27 @@ REM DLLs (observed empty on Qt 6.11), so the portable would fault on any clean
 REM machine without the VC++ redistributable. Copy them straight from the
 REM toolset's redist dir (VCToolsRedistDir is set by vcvars). MinGW self-
 REM contains its runtime via windeployqt, so this is MSVC-only.
-REM Flat goto-guards on purpose: nested if() blocks trip the batch parser.
+REM Flat goto-guards on purpose: nested if() blocks trip the batch parser --
+REM and doubly so here, because a VS Build Tools install under
+REM "C:\Program Files (x86)\..." puts a literal ")" (from "(x86)") into
+REM %VCToolsRedistDir%. Echoing that path inside a parenthesised if-block
+REM closes the block early ("\Microsoft was unexpected at this time."), so
+REM every guard below is a flat goto with no ( ) body and paths stay quoted.
 if defined KIT_IS_MINGW goto :after_crt
-if not defined VCToolsRedistDir (
-    echo   WARNING: VCToolsRedistDir unset - VC++ runtime NOT bundled.
-    echo            Run from an x64 Native Tools Command Prompt to include it.
-    goto :after_crt
-)
+if not defined VCToolsRedistDir goto :crt_no_env
 set "CRT_DIR=%VCToolsRedistDir%\x64\Microsoft.VC143.CRT"
-if not exist "%CRT_DIR%\vcruntime140.dll" (
-    echo   WARNING: CRT not found under %CRT_DIR% - VC++ runtime NOT bundled.
-    goto :after_crt
-)
+if not exist "%CRT_DIR%\vcruntime140.dll" goto :crt_missing
 copy /Y "%CRT_DIR%\vcruntime140.dll"   "%OUT_DIR%\" >nul
 copy /Y "%CRT_DIR%\vcruntime140_1.dll" "%OUT_DIR%\" >nul
 copy /Y "%CRT_DIR%\msvcp140.dll"       "%OUT_DIR%\" >nul
 echo   Bundled MSVC runtime (VC143 CRT).
+goto :after_crt
+:crt_no_env
+echo   WARNING: VCToolsRedistDir unset - VC++ runtime NOT bundled.
+echo            Run from an x64 Native Tools Command Prompt to include it.
+goto :after_crt
+:crt_missing
+echo   WARNING: CRT not found under "%CRT_DIR%" - VC++ runtime NOT bundled.
 :after_crt
 
 REM ---- Extra image formats: HEIC / AVIF / PSD / XCF (MSVC builds only) -------
