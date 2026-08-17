@@ -62,8 +62,10 @@ The build copies the `themes/` directory next to the executable on every build, 
 
 ### Windows: portable & installer
 
+Build with the **MSVC 2022 64-bit** Qt kit (not MinGW), from an **x64 Native Tools Command Prompt for VS** — so `nmake`/`cl` are on `PATH` and the VC++ runtime gets bundled:
+
 ```cmd
-:: self-contained folder + zip (run from an x64 Native Tools Command Prompt for HEIC/AVIF)
+:: self-contained folder + zip
 scripts\make-portable.bat C:\Qt\6.11.1\msvc2022_64
 
 :: the above, then wrapped into dist\Pixee-<ver>-setup.exe (needs Inno Setup 6)
@@ -71,6 +73,15 @@ scripts\build-installer.bat
 ```
 
 The installer registers Pixee in Explorer's **Open with…** for the image types it bundles. It's currently **unsigned**, so SmartScreen warns on first run (*More info → Run anyway*). See [`docs/installer.md`](docs/installer.md) for the association details and how to add Azure code-signing.
+
+#### Extra image formats (HEIC / AVIF / PSD / XCF / WebP)
+
+Two independent plugin sets, both **MSVC-only** — the kit must be `msvc2022_64`, as these plugins won't load into a MinGW build:
+
+- **HEIC/HEIF, AVIF, PSD, XCF** — prebuilt KDE [kimageformats](https://invent.kde.org/frameworks/kimageformats) plugins are committed in [`thirdparty\imageformats\`](thirdparty/imageformats/README.md). `make-portable.bat` bundles them **automatically** on an MSVC build (plugins → `imageformats\`, codec DLLs → next to `Pixee.exe`). No extra step — just build with the MSVC kit as above.
+- **WebP** (plus TIFF, TGA, ICNS, …) — Qt's own *Qt Image Formats* add-on, which is **not installed by default**. Add it once via the Qt Maintenance Tool → *Add or remove components* → **Qt 6.11.1 → MSVC 2022 64-bit → Qt Image Formats**. `windeployqt` then bundles `qwebp.dll` into the portable automatically on the next build.
+
+To regenerate the prebuilt kimageformats plugins from source (e.g. after upgrading Qt), see [`docs/windows-extra-image-formats.md`](docs/windows-extra-image-formats.md).
 
 ## ⌨️ Keyboard
 
