@@ -17,6 +17,7 @@
 #include <QtTest>
 
 #include "ConvertFormatTask.h"
+#include "SaveImageTask.h"
 #include "ScaleImageTask.h"
 #include "Task.h"
 #include "TaskGroup.h"
@@ -33,6 +34,10 @@ private slots:
     void scale_skip_conflict_leaves_dest_untouched();
     void convert_png_to_jpg_produces_valid_jpeg();
     void convert_skip_conflict_leaves_dest_untouched();
+    void save_writes_in_memory_image_to_disk();
+    void save_null_image_fails();
+    void save_overwrite_flag_bypasses_prompt();
+    void save_skip_conflict_leaves_dest_untouched();
 };
 
 namespace {
@@ -48,6 +53,14 @@ ConvertFormatTask* addConvert(TaskGroup* group, const QString& src,
                               const QString& dst, const QByteArray& fmt,
                               int q = 92) {
     auto* t = new ConvertFormatTask(src, dst, fmt, q, group);
+    group->addTask(t);
+    return t;
+}
+
+SaveImageTask* addSave(TaskGroup* group, const QImage& img, const QString& dst,
+                       const QByteArray& fmt, int q = 92,
+                       bool overwrite = false) {
+    auto* t = new SaveImageTask(img, dst, fmt, q, group, nullptr, overwrite);
     group->addTask(t);
     return t;
 }
@@ -160,6 +173,100 @@ void TstImageTasks::convert_skip_conflict_leaves_dest_untouched() {
 
     auto* group = new TaskGroup(QStringLiteral("Convert"));
     auto* task = addConvert(group, src, dst, "jpg");
+    const QUuid id = task->id();
+
+    f.mgr.enqueueGroup(group);
+
+    QUuid askedId; int kind = -1; QVariantMap ctx;
+    QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
+    f.mgr.provideAnswer(id, kind, int(Task::Skip), false);
+    QVERIFY(f.waitForGroupRemoved());
+
+    QCOMPARE(f.lastStateOf(id), int(Task::Skipped));
+    QFile after(dst);
+    QVERIFY(after.open(QIODevice::ReadOnly));
+    QCOMPARE(after.readAll(), dstBefore);
+}
+
+void TstImageTasks::save_writes_in_memory_image_to_disk() {
+    // The core case: an image that exists only in memory (an edit) is written
+    // out — no source file to decode.
+    TaskTestFixture f;
+    const QString dst = f.path("edited.png");
+    QImage img(120, 80, QImage::Format_RGB32);
+    img.fill(Qt::red);
+
+    auto* group = new TaskGroup(QStringLiteral("Save"));
+    auto* task = addSave(group, img, dst, "png");
+    QSignalSpy finishedSpy(task, &Task::finished);
+
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved(10000));
+
+    QCOMPARE(finishedSpy.count(), 1);
+    QVERIFY(QFile::exists(dst));
+    QImageReader reader(dst);
+    QVERIFY2(reader.canRead(), qPrintable(reader.errorString()));
+    QCOMPARE(reader.size(), QSize(120, 80));
+    QCOMPARE(reader.read().pixelColor(0, 0), QColor(Qt::red));
+}
+
+void TstImageTasks::save_null_image_fails() {
+    TaskTestFixture f;
+    const QString dst = f.path("nope.png");
+
+    auto* group = new TaskGroup(QStringLiteral("Save"));
+    auto* task = addSave(group, QImage(), dst, "png");
+    const QUuid id = task->id();
+    QSignalSpy failedSpy(task, &Task::failed);
+
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved(10000));
+
+    QCOMPARE(failedSpy.count(), 1);
+    QCOMPARE(f.lastStateOf(id), int(Task::Failed));
+    QVERIFY(!QFile::exists(dst));
+}
+
+void TstImageTasks::save_overwrite_flag_bypasses_prompt() {
+    // With overwriteExisting=true the task must NOT ask — it just replaces the
+    // file. If it wrongly prompted, no answer is ever provided and the group
+    // would hang, so waitForGroupRemoved timing out is the failure signal.
+    TaskTestFixture f;
+    const QString dst = f.path("target.png");
+    TestHelpers::writeImage(dst, 40, 40, "png");   // pre-existing, different size
+
+    QImage img(120, 80, QImage::Format_RGB32);
+    img.fill(Qt::blue);
+
+    auto* group = new TaskGroup(QStringLiteral("Save"));
+    auto* task = addSave(group, img, dst, "png", 92, /*overwrite=*/true);
+    const QUuid id = task->id();
+
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved(10000));
+
+    QCOMPARE(f.lastStateOf(id), int(Task::Completed));
+    QImageReader reader(dst);
+    QCOMPARE(reader.size(), QSize(120, 80));   // new content won
+}
+
+void TstImageTasks::save_skip_conflict_leaves_dest_untouched() {
+    // Default (overwriteExisting=false): existing dst triggers the prompt,
+    // and Skip leaves the file byte-for-byte unchanged.
+    TaskTestFixture f;
+    const QString dst = f.path("target.png");
+    TestHelpers::writeImage(dst, 40, 40, "png");
+    QFile dstFile(dst);
+    QVERIFY(dstFile.open(QIODevice::ReadOnly));
+    const QByteArray dstBefore = dstFile.readAll();
+    dstFile.close();
+
+    QImage img(120, 80, QImage::Format_RGB32);
+    img.fill(Qt::green);
+
+    auto* group = new TaskGroup(QStringLiteral("Save"));
+    auto* task = addSave(group, img, dst, "png");
     const QUuid id = task->id();
 
     f.mgr.enqueueGroup(group);

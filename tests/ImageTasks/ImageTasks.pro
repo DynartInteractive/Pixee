@@ -17,7 +17,8 @@ SOURCES += \
     $$PWD/../../src/TaskRunner.cpp \
     $$PWD/../../src/TaskManager.cpp \
     $$PWD/../../src/ScaleImageTask.cpp \
-    $$PWD/../../src/ConvertFormatTask.cpp
+    $$PWD/../../src/ConvertFormatTask.cpp \
+    $$PWD/../../src/SaveImageTask.cpp
 
 HEADERS += \
     $$PWD/../TestHelpers.h \
@@ -28,4 +29,5 @@ HEADERS += \
     $$PWD/../../src/TaskRunner.h \
     $$PWD/../../src/TaskManager.h \
     $$PWD/../../src/ScaleImageTask.h \
-    $$PWD/../../src/ConvertFormatTask.h
+    $$PWD/../../src/ConvertFormatTask.h \
+    $$PWD/../../src/SaveImageTask.h

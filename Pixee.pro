@@ -56,6 +56,7 @@ SOURCES += \
     src/BatchRenameDialog.cpp \
     src/BatchRenamePlan.cpp \
     src/SaveAsDialog.cpp \
+    src/SaveImageTask.cpp \
     src/MetadataPanel.cpp \
     src/MetadataReader.cpp \
     src/MoveFileTask.cpp \
@@ -107,6 +108,7 @@ HEADERS += \
     src/BatchRenameDialog.h \
     src/BatchRenamePlan.h \
     src/SaveAsDialog.h \
+    src/SaveImageTask.h \
     src/ImageLoader.h \
     src/ImageMetadata.h \
     src/MainWindow.h \
