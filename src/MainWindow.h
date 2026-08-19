@@ -60,6 +60,12 @@ private slots:
     void onGroupFinished(QStringList producedPaths);
     void openSettings();
     void openBatchRename();
+    // File → Save As…: convert/export the focused image to a chosen folder /
+    // name / format via a ConvertFormatTask. File → Save: overwrite the
+    // original in place — dormant until an editing op marks the viewer image
+    // dirty (see ViewerWidget::isModified), so today it's always disabled.
+    void saveImage();
+    void saveImageAs();
     void showAbout();
     void dismissViewer();
     void viewerPrev();
@@ -112,6 +118,12 @@ private:
     void advancePathRestore();
     void cancelPathRestore();
     void createMenus();
+    // Re-evaluate the enabled state of the File → Save / Save As actions from
+    // the current context: Save As needs a single focused image (the viewer's
+    // image, or exactly one image selected in the list); Save additionally
+    // needs the viewer up and its image marked modified. Called whenever that
+    // context can change (viewer show/dismiss, image loaded, list selection).
+    void updateSaveActions();
     void updateStatusBar(FileItem* folder);
     // Shows "Width: w | Height: h" in the status bar while the viewer is
     // active. Pass an invalid QSize() to clear (e.g. while the full-res
@@ -165,6 +177,8 @@ private:
     // time, queued). Parented to this window, so no manual delete.
     TaskConflictPrompter* _conflictPrompter = nullptr;
     QAction* _tasksToggleAction = nullptr;
+    QAction* _saveAction = nullptr;
+    QAction* _saveAsAction = nullptr;
     FileListView* _fileListView;
     FolderTreeView* _folderTreeView;
     QLineEdit* _pathLineEdit;

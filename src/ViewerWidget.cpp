@@ -31,8 +31,16 @@ ViewerWidget::ViewerWidget(QWidget* parent)
     _zoomIndex = kZoomIndex100;
 }
 
+void ViewerWidget::setModified(bool on) {
+    if (_modified == on) return;
+    _modified = on;
+    emit modifiedChanged(_modified);
+}
+
 void ViewerWidget::setImage(const QImage& image) {
     _image = image;
+    // A new image starts clean; any pending edit belonged to the old one.
+    setModified(false);
     // Rotation is per-image regardless of lockZoom — it's a transform on
     // the image data, not a property of the view.
     _rotation = 0;
@@ -51,6 +59,7 @@ void ViewerWidget::setImage(const QImage& image) {
 
 void ViewerWidget::setPlaceholder(const QImage& image) {
     _image = image;
+    setModified(false);
     _rotation = 0;
     _rotatedImage = QImage();
     if (!_lockZoom) {
@@ -70,6 +79,7 @@ void ViewerWidget::updateImage(const QImage& image) {
 
 void ViewerWidget::clear() {
     _image = QImage();
+    setModified(false);
     _rotatedImage = QImage();
     _rotation = 0;
     _translate = QPoint();

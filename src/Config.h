@@ -9,6 +9,11 @@ public:
     Config();
     const QStringList imageExtensions();
     const QStringList imageFileNameFilters();
+    // Extensions Qt can actually WRITE (from QImageWriter), lowercased and
+    // de-duplicated — the source of truth for the Save As format dropdown, so
+    // we only ever offer formats we can encode. Distinct from imageExtensions()
+    // (which is read-side: QImageReader supports strictly more formats).
+    const QStringList writableImageFormats();
     int thumbnailSize();
     const QString thumbnailsPath();
     bool useBackslash();
@@ -25,6 +30,7 @@ private:
     void _setUpUserFolder();
     QStringList _imageExtensions;
     QStringList _imageFileNameFilters;
+    QStringList _writableFormats;
     int _thumbnailSize;
     QString _thumbnailsPath;
     QString _cacheFolder;

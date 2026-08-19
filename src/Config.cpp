@@ -1,5 +1,6 @@
 #include "Config.h"
 #include <QImageReader>
+#include <QImageWriter>
 #include <QDir>
 #include <QDebug>
 #include <QThreadPool>
@@ -54,6 +55,10 @@ const QStringList Config::imageFileNameFilters() {
     return _imageFileNameFilters;
 }
 
+const QStringList Config::writableImageFormats() {
+    return _writableFormats;
+}
+
 int Config::thumbnailSize() {
     return _thumbnailSize;
 }
@@ -87,6 +92,12 @@ void Config::_setUpImageExtensions() {
         _imageFileNameFilters.append("*." + extension);
     }
     qDebug() << "Supported image formats:" << _imageExtensions;
+
+    foreach (auto format, QImageWriter::supportedImageFormats()) {
+        _writableFormats << QString::fromLatin1(format).toLower();
+    }
+    _writableFormats.removeDuplicates();
+    qDebug() << "Writable image formats:" << _writableFormats;
 }
 
 void Config::_setUpUserFolder() {

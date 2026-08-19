@@ -40,6 +40,7 @@
 #include "NewFolderDialog.h"
 #include "RenameDialog.h"
 #include "BatchRenameDialog.h"
+#include "SaveAsDialog.h"
 #include "BatchRenamePlan.h"
 #include "RenameTask.h"
 #include "AppSettings.h"
@@ -129,6 +130,9 @@ void MainWindow::create() {
                      this, &MainWindow::viewerPrev);
     QObject::connect(_viewerWidget, &ViewerWidget::nextRequested,
                      this, &MainWindow::viewerNext);
+    // A future edit op marking the image dirty re-enables File → Save.
+    QObject::connect(_viewerWidget, &ViewerWidget::modifiedChanged,
+                     this, [this](bool) { updateSaveActions(); });
     QObject::connect(_viewerWidget, &QWidget::customContextMenuRequested,
                      this, &MainWindow::showViewerContextMenu);
 
@@ -425,6 +429,7 @@ void MainWindow::create() {
 
     // Menu bar + status bar
     createMenus();
+    updateSaveActions();   // set the initial Save / Save As enabled state
     statusBar();  // force-create so it appears even when empty
     // Disable the bottom-right resize grip — the main window resizes
     // fine via its frame, and the grip shows up as a stray light line
@@ -539,7 +544,16 @@ void MainWindow::create() {
         _fileListView->selectionModel(), &QItemSelectionModel::currentChanged,
         this, [this](const QModelIndex&, const QModelIndex&) {
             if (_centerStack->currentWidget() == _viewerWidget) return;
+            updateSaveActions();   // list selection drives Save As enablement
             scheduleMetadataForSelection();
+        });
+    // Multi-select changes (rubber-band / Ctrl-click) may not move the current
+    // index, but they change the selection size that Save As gates on.
+    QObject::connect(
+        _fileListView->selectionModel(), &QItemSelectionModel::selectionChanged,
+        this, [this](const QItemSelection&, const QItemSelection&) {
+            if (_centerStack->currentWidget() == _viewerWidget) return;
+            updateSaveActions();
         });
 
     // Pick up an image path from the command line (e.g. "Pixee photo.jpg"
@@ -830,6 +844,59 @@ void MainWindow::openBatchRename() {
     _pixee->taskManager()->enqueueGroup(group);
 }
 
+void MainWindow::saveImage() {
+    // Overwrite the original in place. There's no editing op yet, so nothing
+    // ever marks the viewer image modified and this action stays disabled —
+    // the guard below is belt-and-braces. The real overwrite logic (lossless
+    // EXIF-orientation write for a pure rotate; re-encode + confirm for a
+    // pixel edit) lands with the Crop / Flip / Rotate round.
+    if (_centerStack->currentWidget() != _viewerWidget) return;
+    if (!_viewerWidget->isModified()) return;
+    // TODO(edit-round): write currentContextImagePath() from the edited image.
+}
+
+void MainWindow::saveImageAs() {
+    const QString src = currentContextImagePath();
+    if (src.isEmpty()) return;   // action is disabled in this case anyway
+
+    SaveAsDialog dlg(src, _pixee->config()->writableImageFormats(), this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    const QString dst = dlg.destPath();
+    if (dst.isEmpty()) return;
+
+    // This round Save As converts from the file on disk (no in-memory edits
+    // exist yet). It runs through the task pipeline, so it inherits the
+    // side-by-side conflict prompt if the target already exists, the progress
+    // dock, and produced-file selection.
+    auto* group = new TaskGroup(tr("Save %1").arg(QFileInfo(dst).fileName()));
+    group->addTask(new ConvertFormatTask(src, dst, dlg.format(), dlg.quality(), group));
+    _pixee->taskManager()->enqueueGroup(group);
+}
+
+void MainWindow::updateSaveActions() {
+    if (!_saveAction || !_saveAsAction) return;
+
+    const bool viewerUp =
+        _centerStack && _centerStack->currentWidget() == _viewerWidget;
+
+    bool canSaveAs = false;
+    if (viewerUp) {
+        canSaveAs = _viewerWidget->hasImage()
+                    && _viewerIndex >= 0
+                    && _viewerIndex < _viewerImagePaths.size();
+    } else if (_fileListView) {
+        // Exactly one image selected — Save As acts on a single focused image.
+        const FileListView::Selection sel = _fileListView->selectionPaths();
+        canSaveAs = sel.imageOpsAllowed && sel.paths.size() == 1;
+    }
+    _saveAsAction->setEnabled(canSaveAs);
+
+    // Save overwrites the original, which only makes sense for an edited viewer
+    // image. isModified() is always false until the editing ops land.
+    _saveAction->setEnabled(viewerUp && _viewerWidget->isModified());
+}
+
 void MainWindow::updateViewerStatusBar(const QSize& size) {
     if (!size.isValid()) {
         statusBar()->clearMessage();
@@ -863,6 +930,20 @@ void MainWindow::createMenus() {
     QMenuBar* mb = menuBar();
 
     QMenu* fileMenu = mb->addMenu(tr("&File"));
+
+    // Save / Save As. Explicit chords, NOT QKeySequence::Save — on Windows the
+    // standard Save key has no real chord and paints the literal word "Save" in
+    // the shortcut column (same trap as Quit/Preferences below).
+    _saveAction = fileMenu->addAction(tr("&Save"));
+    _saveAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
+    connect(_saveAction, &QAction::triggered, this, &MainWindow::saveImage);
+
+    _saveAsAction = fileMenu->addAction(tr("Save &As..."));
+    _saveAsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
+    connect(_saveAsAction, &QAction::triggered, this, &MainWindow::saveImageAs);
+
+    fileMenu->addSeparator();
+
     QAction* quitAction = fileMenu->addAction(tr("&Quit"));
     // Explicit Ctrl+Q (Cmd+Q on macOS via Qt::CTRL). NOT QKeySequence::Quit:
     // on Windows that standard key has no real chord and renders in the menu
@@ -1286,6 +1367,8 @@ void MainWindow::showViewerImageAt(int index) {
     if (!_viewerMultiSelect) {
         syncFileListSelectionTo(path, /*scroll=*/false);
     }
+
+    updateSaveActions();
 }
 
 void MainWindow::preloadViewerNeighbors(int currentIndex, int taskVersion) {
@@ -1325,6 +1408,7 @@ void MainWindow::onImageLoaded(QString path, QImage image) {
             && path == _viewerImagePaths.at(_viewerIndex)) {
         _viewerWidget->setImage(image);
         updateViewerStatusBar(image.size());
+        updateSaveActions();   // hasImage() is now true for the viewed image
     }
 }
 
@@ -1565,6 +1649,8 @@ void MainWindow::dismissViewer() {
     if (!lastViewed.isEmpty()) {
         syncFileListSelectionTo(lastViewed, /*scroll=*/true);
     }
+
+    updateSaveActions();
 }
 
 void MainWindow::goToPathFromLineEdit() {

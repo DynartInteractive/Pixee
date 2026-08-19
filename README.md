@@ -34,6 +34,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **SMB-friendly** — chunked file reads with cooperative abort, off-GUI directory enumeration, no `QFileSystemModel` / `QFileDialog` for browsing. Designed for image folders sitting on a network share.
 - **File operations** — Copy / Cut / Paste / Move / Rename / Delete / New folder, batched through a task pipeline. The conflict prompt shows the two clashing files **side by side** — Existing vs Incoming, each with a thumbnail and dimensions / size / date — so you pick Skip / Rename / Overwrite by eye rather than by path. Moves and renames **keep the cached thumbnail** (the database row is repointed, not regenerated). When a batch finishes, the files it added to the current folder are selected and scrolled into view (toggle in Settings).
 - **Batch rename** (`Tools → Batch rename…`) — renames the whole selection at once: find & replace, a `{name}` / `{n}` pattern (prefix, suffix and zero-padded sequential numbering all fall out of it, with a configurable Start / Step), and keep-extension. A live before→after table previews every name and flags clashes — two files heading for the same name (blocked) versus a name that already exists on disk (allowed; you're prompted per file). Runs through the same task pipeline, so it gets the progress dock and undo-friendly conflict handling.
+- **Save As** (`File → Save As…`, `Ctrl+Shift+S`) — export the focused image (the one in the viewer, or a single selected thumbnail) to any folder, name, and format. The format list offers only what your Qt build can actually **write**, with a quality slider for the lossy ones (JPEG / WebP). Runs through the task pipeline, so it gets the side-by-side conflict prompt if the target already exists. (`File → Save` is present but reserved for the upcoming in-viewer editing — it stays greyed until an edit is made.)
 - **Settings window** (`Edit → Settings…`) — a non-modal, always-on-top panel: searchable settings (type to filter any label), groups in an icon sidebar, Save / Cancel. Currently: *Select added files* and *Language*.
 - **Languages** — English plus Hungarian / German / French / Spanish scaffolding; pick one in Settings (restart to apply) or follow the OS locale. Untranslated strings fall back to English.
 - **Themable** — Qt stylesheet (`style.qss`) plus an INI for non-CSS values (`style.ini`). User overrides drop in at `~/.pixee/themes/<name>/`. Dark theme included.
@@ -96,6 +97,7 @@ To regenerate the prebuilt kimageformats plugins from source (e.g. after upgradi
 | `Ctrl + C` | Copy selection to the clipboard |
 | `Ctrl + X` | Cut selection to the clipboard (next paste moves) |
 | `Ctrl + V` | Paste into the current folder |
+| `Ctrl + Shift + S` | Save As… (export the selected image) |
 | `Ctrl + Q` | Quit |
 
 ### Image viewer
@@ -113,6 +115,7 @@ To regenerate the prebuilt kimageformats plugins from source (e.g. after upgradi
 | `F11` | Toggle fullscreen |
 | `Esc` / `Enter` / Double-click | Return to the file list |
 | `Ctrl + C` / `Ctrl + X` / `Ctrl + V` | Copy / Cut / Paste the current image |
+| `Ctrl + Shift + S` | Save As… (export the current image) |
 | Right-click | Context menu — rotate left / right, **Copy to…** |
 
 ## 🎨 Theming

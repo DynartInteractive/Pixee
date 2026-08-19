@@ -50,6 +50,14 @@ public:
     void clear();
     bool hasImage() const { return !_image.isNull(); }
 
+    // Dirty-state plumbing for File → Save. No editing op exists yet, so this
+    // is always false today — the Save action stays greyed. When Crop / Flip /
+    // Rotate land, they call setModified(true) after mutating the image, and
+    // setImage()/clear() reset it to false on image change. modifiedChanged()
+    // lets MainWindow re-evaluate the Save action's enabled state.
+    bool isModified() const { return _modified; }
+    void setModified(bool on);
+
     void zoomIn();
     void zoomOut();
     void rotateLeft();
@@ -69,6 +77,8 @@ signals:
     void dismissed();
     void prevRequested();
     void nextRequested();
+    // Emitted when the dirty flag flips (see isModified()).
+    void modifiedChanged(bool modified);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -96,6 +106,7 @@ private:
     void endPanIfDone();
 
     QImage _image;
+    bool _modified = false;      // unsaved pixel/orientation edit pending (see isModified())
     QImage _rotatedImage;        // cached _image rotated by _rotation, when != 0
     int _rotation = 0;           // 0/90/180/270; per-image, resets on setImage
     FitMode _fitMode = FitMode::FitLargeOnly;
