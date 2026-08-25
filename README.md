@@ -104,6 +104,16 @@ scripts\build-installer.bat
 
 The installer registers Pixee in Explorer's **Open with…** for the image types it bundles. It's currently **unsigned**, so SmartScreen warns on first run (*More info → Run anyway*). See [`docs/installer.md`](docs/installer.md) for the association details and how to add Azure code-signing.
 
+### Linux: portable
+
+```sh
+scripts/make-portable.sh            # --help for options
+```
+
+Produces the self-contained `Pixee-portable/` folder plus `Pixee-<ver>-portable.tar.gz`. There is no `windeployqt` on Linux, so the script does the deploy itself: it walks the binary's shared-library dependencies, bundles everything that isn't part of a base Linux system into `lib/`, copies the Qt plugins the app actually uses into `plugins/` (image formats, the SQLite driver behind the thumbnail cache, the xcb/wayland platform plugins), and repeats the walk over those plugins.
+
+Run it with either `./Pixee` (the binary carries an `$ORIGIN/lib` RPATH) or `./Pixee.sh` (a launcher that sets `LD_LIBRARY_PATH`/`QT_PLUGIN_PATH`). The GL, X11, glib and fontconfig stacks are deliberately **not** bundled — those must come from the host to work with its drivers.
+
 #### Extra image formats (HEIC / AVIF / PSD / XCF / WebP)
 
 Two independent plugin sets, both **MSVC-only** — the kit must be `msvc2022_64`, as these plugins won't load into a MinGW build:
