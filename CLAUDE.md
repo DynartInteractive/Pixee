@@ -86,6 +86,14 @@ Abort/supersede pattern used in `ThumbnailGenerator`, `ImageLoader`, and `FileMo
 
 `FileListView` is the heaviest subscriber — it computes a viewport-driven prefetch window (visible rows + a margin), subscribes/unsubscribes diff-only on a debounced timer (`_updateTimer`), bumps priorities by viewport distance, and auto-expands the window once the current batch finishes so background fill of the rest of the folder happens after the visible cells are ready.
 
+**The background fill is a chain reaction, and every link has to be kept alive.** Each subscribe adds the path to `_activeJobs`; each `thumbnailReady`/`thumbnailMiss` removes one; `onCacheJobDone` grows the window (`kExpansionStep` = 100 rows) only when that set drains. So the fill dies silently — window still short of the folder's ends — in three ways, all of which were live bugs and are now guarded:
+
+- **A subscribed path that never emits.** `ThumbnailCache::subscribe` short-circuits on the per-session negative cache (`_failures`), which deliberately outlives `abandonAll()`. It must still emit `thumbnailMiss`, or one undecodable file wedges that folder for the session on the *second* visit (the first gets a genuine miss from `onGenerationFailed`). The emit is queued, not direct: `subscribe()` runs inside `updateSubscriptions`' row loop and a direct emit re-enters it via `onCacheJobDone`.
+- **An expansion that queues nothing.** No job means no completion means nothing calls `tryExpandWindow` again, so it loops rather than taking a single step whenever a pass adds no work — the central list's rows include plain files and index-less folders, so a 100-row stretch with nothing to fetch is ordinary.
+- **A first pass that queues nothing.** Both guards above only matter once the chain is *running*. A folder whose first screenful holds no images (documents sorting before photos) never started at all, so `updateSubscriptions` kicks the window itself when a pass queues nothing and nothing is outstanding.
+
+When touching this, remember the invariant rather than the individual fixes: **anything that puts a path into `_activeJobs` owes it a terminating signal, and any pass that queues no work owes the window a kick.**
+
 ### View layer
 
 - **`FolderTreeView`** (`QTreeView`) — left dock; shows the folder hierarchy via `_folderFilterModel`. Accepts external drops onto folders (routed through `TaskManager`).

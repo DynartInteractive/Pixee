@@ -99,6 +99,10 @@ private:
     // True when the current window already covers the whole folder, so
     // tryExpandWindow knows to stop.
     bool _windowCoversFolder = false;
+    // Whether the last updateSubscriptions pass queued at least one new job.
+    // A pass that queues nothing produces no completion signal, and job
+    // completion is what drives tryExpandWindow — see the loop there.
+    bool _lastPassAddedJobs = false;
 };
 
 #endif // FILELISTVIEW_H

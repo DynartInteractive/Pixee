@@ -177,6 +177,10 @@ void FileListView::scheduleSubscriptionUpdate() {
 void FileListView::updateSubscriptions() {
     if (!_cache || !model()) return;
 
+    // Reset per-pass; set when a new subscription is queued below. The early
+    // returns leave it false on purpose — a pass that bailed queued nothing.
+    _lastPassAddedJobs = false;
+
     const QModelIndex root = rootIndex();
     const int totalRows = model()->rowCount(root);
     if (totalRows == 0) {
@@ -299,6 +303,7 @@ void FileListView::updateSubscriptions() {
                               subscribeInfo.size(),
                               distance);
             _activeJobs.insert(subscribePath);
+            _lastPassAddedJobs = true;
         }
     }
 
@@ -310,6 +315,19 @@ void FileListView::updateSubscriptions() {
     }
 
     _lastSubscribed = wanted;
+
+    // This pass queued nothing and nothing is outstanding, so no completion
+    // signal is coming — and onCacheJobDone is the only thing that advances
+    // the window. Without this kick the background fill never even starts
+    // whenever the first screenful holds no images (a folder of documents
+    // with the photos further down sorts exactly that way), and stops dead
+    // any time the window's leading edge lands on a run of non-image rows.
+    // Queued: this runs inside tryExpandWindow's own loop as well as from
+    // the debounce timer, so a direct call would recurse.
+    if (!_lastPassAddedJobs && _activeJobs.isEmpty() && !_windowCoversFolder) {
+        QMetaObject::invokeMethod(this, [this] { tryExpandWindow(); },
+                                  Qt::QueuedConnection);
+    }
 }
 
 void FileListView::onRowsAboutToBeRemoved(const QModelIndex& parent, int first, int last) {
@@ -605,6 +623,23 @@ void FileListView::tryExpandWindow() {
         // an invalid rootIndex if the user hasn't navigated yet.
         if (rootIndex().isValid() == false) return;
     }
-    _windowExpansion += kExpansionStep;
-    updateSubscriptions();
+
+    // Loop rather than take a single step. This is only ever called from
+    // onCacheJobDone when the active batch drains, so an expansion that
+    // queues nothing ends the background fill for good: no job means no
+    // completion, and no completion means nothing calls us again. That
+    // happens whenever the next stretch of rows holds nothing to fetch —
+    // a run of plain files, or folders with no index image — since the
+    // central list's rows include non-images too.
+    //
+    // Terminates: the radius grows by a fixed step each round, so the
+    // window reaches the folder's ends in a bounded number of rounds. The
+    // guard also covers updateSubscriptions' early returns (no rows yet,
+    // nothing visible), which leave _windowCoversFolder untouched.
+    const int totalRows = model()->rowCount(rootIndex());
+    int guard = totalRows / kExpansionStep + 2;
+    do {
+        _windowExpansion += kExpansionStep;
+        updateSubscriptions();
+    } while (!_windowCoversFolder && !_lastPassAddedJobs && --guard > 0);
 }

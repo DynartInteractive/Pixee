@@ -56,7 +56,24 @@ void ThumbnailCache::subscribe(const QString& path, qint64 mtime, qint64 size, i
     // Negative cache: a path the generator has already failed on stays failed
     // for the rest of the session. Counter still tracks subscribers so
     // unsubscribe stays balanced, but we don't kick off a new pipeline.
+    //
+    // Still answer the subscriber. FileListView counts every subscribe as an
+    // active job and only advances its background-fill window once that set
+    // drains, so returning silently here wedges the whole folder: the first
+    // visit emits a real thumbnailMiss from onGenerationFailed, but every
+    // later re-subscribe (folder re-entry, or the file scrolling out of the
+    // window and back) hit this branch and left a job that could never
+    // complete. _failures deliberately outlives abandonAll(), so one
+    // undecodable file used to stop prefetching for that folder all session.
+    //
+    // Deferred, not emitted inline: subscribe() is called from inside
+    // FileListView::updateSubscriptions' row loop, and a direct emit would
+    // re-enter it through onCacheJobDone -> tryExpandWindow.
     if (_failures.contains(path)) {
+        QMetaObject::invokeMethod(this, [this, path] {
+            // Re-check: the subscriber may have gone away while queued.
+            if (_subscribers.contains(path)) emit thumbnailMiss(path);
+        }, Qt::QueuedConnection);
         return;
     }
 
