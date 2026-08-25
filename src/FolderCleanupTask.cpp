@@ -51,12 +51,18 @@ void FolderCleanupTask::run() {
     std::sort(dirs.begin(), dirs.end(),
               [](const QString& a, const QString& b) { return a.size() > b.size(); });
 
+    // Remove each by absolute path rather than QDir(d).rmdir("."). The
+    // latter asks the OS to remove "<dir>/.", which POSIX requires to fail
+    // with EINVAL -- so on Linux every rmdir here silently no-opped and
+    // cleanup never removed anything. Win32 tolerates the trailing ".",
+    // which is why it worked on the primary dev platform.
     for (const QString& d : dirs) {
         if (!checkPauseStop()) return;
-        QDir(d).rmdir(".");  // succeeds only if empty; otherwise silently no-ops
+        // Succeeds only if empty; otherwise silently no-ops.
+        QDir().rmdir(QFileInfo(d).absoluteFilePath());
     }
     // Finally try to remove the root itself.
-    QDir(_root).rmdir(".");
+    QDir().rmdir(QFileInfo(_root).absoluteFilePath());
 
     emitProgress(100);
 }

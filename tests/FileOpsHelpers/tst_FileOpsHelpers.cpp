@@ -93,8 +93,17 @@ void TstFileOpsHelpers::destIsSourceOrDescendant_identical_paths() {
     QVERIFY(destIsSourceOrDescendant("C:/foo", "C:/foo"));
     QVERIFY(destIsSourceOrDescendant("C:/foo/", "C:/foo"));
     QVERIFY(destIsSourceOrDescendant("C:/foo/.", "C:/foo"));
-    // Mixed separators normalise via cleanPath().
+    // Mixed separators are a platform question, not a normalisation one.
+    // Windows treats '\' as a separator, so C:\foo and C:/foo are one path.
+    // On Unix '\' is an ordinary filename character, so "C:\foo" is a
+    // single-segment name that must NOT match -- collapsing it would make
+    // the guard reject an unrelated file that happens to have a backslash
+    // in its name.
+#ifdef Q_OS_WIN
     QVERIFY(destIsSourceOrDescendant("C:\\foo", "C:/foo"));
+#else
+    QVERIFY(!destIsSourceOrDescendant("C:\\foo", "C:/foo"));
+#endif
 }
 
 void TstFileOpsHelpers::destIsSourceOrDescendant_descendants() {
