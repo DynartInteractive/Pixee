@@ -41,6 +41,7 @@
 #include "RenameDialog.h"
 #include "BatchRenameDialog.h"
 #include "SaveAsDialog.h"
+#include "SaveImageTask.h"
 #include "BatchRenamePlan.h"
 #include "RenameTask.h"
 #include "AppSettings.h"
@@ -124,15 +125,30 @@ void MainWindow::create() {
 
     _viewerWidget = new ViewerWidget();
     _viewerWidget->setObjectName("viewerWidget");
+    // Dismiss goes through the unsaved-changes guard so a pending edit isn't
+    // silently dropped when Esc/Enter/double-click leaves the viewer.
     QObject::connect(_viewerWidget, &ViewerWidget::dismissed,
-                     this, &MainWindow::dismissViewer);
+                     this, [this]() { if (maybeDiscardEdits()) dismissViewer(); });
     QObject::connect(_viewerWidget, &ViewerWidget::prevRequested,
                      this, &MainWindow::viewerPrev);
     QObject::connect(_viewerWidget, &ViewerWidget::nextRequested,
                      this, &MainWindow::viewerNext);
-    // A future edit op marking the image dirty re-enables File → Save.
+    // An edit op marking the image dirty re-enables File → Save.
     QObject::connect(_viewerWidget, &ViewerWidget::modifiedChanged,
                      this, [this](bool) { updateSaveActions(); });
+    // Keep the status-bar dimensions in step with rotate/flip/crop, and show a
+    // one-line how-to while a crop marquee is active.
+    QObject::connect(_viewerWidget, &ViewerWidget::imageEdited,
+                     this, [this](QSize s) { updateViewerStatusBar(s); });
+    QObject::connect(_viewerWidget, &ViewerWidget::cropModeChanged,
+                     this, [this](bool active) {
+                         if (active) {
+                             statusBar()->showMessage(
+                                 tr("Crop: drag to select — Enter applies, Esc cancels"));
+                         } else {
+                             updateViewerStatusBar(_viewerWidget->editedImage().size());
+                         }
+                     });
     QObject::connect(_viewerWidget, &QWidget::customContextMenuRequested,
                      this, &MainWindow::showViewerContextMenu);
 
@@ -845,14 +861,81 @@ void MainWindow::openBatchRename() {
 }
 
 void MainWindow::saveImage() {
-    // Overwrite the original in place. There's no editing op yet, so nothing
-    // ever marks the viewer image modified and this action stays disabled —
-    // the guard below is belt-and-braces. The real overwrite logic (lossless
-    // EXIF-orientation write for a pure rotate; re-encode + confirm for a
-    // pixel edit) lands with the Crop / Flip / Rotate round.
+    // Overwrite the original in place with the viewer's edited buffer. Only
+    // reachable when the viewer is up and an edit is pending (the action is
+    // otherwise disabled); the guards are belt-and-braces.
     if (_centerStack->currentWidget() != _viewerWidget) return;
     if (!_viewerWidget->isModified()) return;
-    // TODO(edit-round): write currentContextImagePath() from the edited image.
+    const QString path = currentContextImagePath();
+    if (path.isEmpty()) return;
+
+    // Confirm — this replaces the original, and re-encoding a lossy format
+    // (JPEG/WebP) costs a little quality every save.
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    const bool lossy = (suffix == "jpg" || suffix == "jpeg" || suffix == "webp");
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Question);
+    box.setWindowTitle(tr("Save"));
+    box.setText(tr("Overwrite the original file?"));
+    QString info = tr("%1 will be replaced with your edited version.")
+                       .arg(QFileInfo(path).fileName());
+    if (lossy) {
+        info += QStringLiteral("\n\n") +
+                tr("This is a lossy format, so re-saving may slightly reduce "
+                   "image quality. Use Save As to keep the original.");
+    }
+    box.setInformativeText(info);
+    box.setStandardButtons(QMessageBox::Save | QMessageBox::Cancel);
+    box.setDefaultButton(QMessageBox::Save);
+    if (box.exec() != QMessageBox::Save) return;
+
+    saveEditedOverOriginal();
+}
+
+bool MainWindow::saveEditedOverOriginal() {
+    if (_centerStack->currentWidget() != _viewerWidget) return false;
+    if (!_viewerWidget->isModified()) return true;   // nothing to do
+    const QString path = currentContextImagePath();
+    if (path.isEmpty()) return false;
+    const QImage edited = _viewerWidget->editedImage();
+    if (edited.isNull()) return false;
+
+    // Format follows the original file's extension so a JPEG stays a JPEG etc.
+    const QByteArray fmt = QFileInfo(path).suffix().toLower().toLatin1();
+
+    // overwriteExisting bypasses the conflict prompt — the user already
+    // committed to replacing the original (via the confirm dialog or the
+    // unsaved-changes guard). The task holds its own copy of the pixels, so
+    // navigating away while it writes is safe.
+    auto* group = new TaskGroup(tr("Save %1").arg(QFileInfo(path).fileName()));
+    group->addTask(new SaveImageTask(edited, path, fmt, /*quality=*/92, group,
+                                     nullptr, /*overwriteExisting=*/true));
+    _pixee->taskManager()->enqueueGroup(group);
+
+    // The edit is now committed to disk; clear the dirty flag so navigation
+    // doesn't re-prompt. The on-disk refresh picks up the rewritten bytes.
+    _viewerWidget->setModified(false);
+    return true;
+}
+
+bool MainWindow::maybeDiscardEdits() {
+    if (_centerStack->currentWidget() != _viewerWidget) return true;
+    if (!_viewerWidget->isModified()) return true;
+
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(tr("Unsaved changes"));
+    box.setText(tr("This image has unsaved edits."));
+    box.setInformativeText(tr("Save your changes, or discard them?"));
+    box.setStandardButtons(QMessageBox::Save | QMessageBox::Discard
+                           | QMessageBox::Cancel);
+    box.setDefaultButton(QMessageBox::Save);
+    const int choice = box.exec();
+    if (choice == QMessageBox::Cancel) return false;
+    if (choice == QMessageBox::Save) return saveEditedOverOriginal();
+    // Discard — drop the edit so we don't ask again, then let the caller go.
+    _viewerWidget->setModified(false);
+    return true;
 }
 
 void MainWindow::saveImageAs() {
@@ -865,13 +948,29 @@ void MainWindow::saveImageAs() {
     const QString dst = dlg.destPath();
     if (dst.isEmpty()) return;
 
-    // This round Save As converts from the file on disk (no in-memory edits
-    // exist yet). It runs through the task pipeline, so it inherits the
-    // side-by-side conflict prompt if the target already exists, the progress
-    // dock, and produced-file selection.
+    // When the viewer holds an in-memory edit, Save As writes those edited
+    // pixels via SaveImageTask; otherwise it converts straight from the file
+    // on disk via ConvertFormatTask. Either way it runs through the task
+    // pipeline, inheriting the side-by-side conflict prompt if the target
+    // already exists, the progress dock, and produced-file selection.
+    const bool viewerUp = _centerStack->currentWidget() == _viewerWidget;
+    const bool haveEdit = viewerUp && _viewerWidget->isModified();
+
     auto* group = new TaskGroup(tr("Save %1").arg(QFileInfo(dst).fileName()));
-    group->addTask(new ConvertFormatTask(src, dst, dlg.format(), dlg.quality(), group));
+    if (haveEdit) {
+        const QImage edited = _viewerWidget->editedImage();
+        group->addTask(new SaveImageTask(edited, dst, dlg.format(), dlg.quality(),
+                                         group));
+    } else {
+        group->addTask(new ConvertFormatTask(src, dst, dlg.format(), dlg.quality(),
+                                             group));
+    }
     _pixee->taskManager()->enqueueGroup(group);
+
+    // The user has saved their edited pixels to a file, so treat the pending
+    // edit as resolved — the original on disk is untouched, and re-entering the
+    // folder reloads it clean, so this stays consistent.
+    if (haveEdit) _viewerWidget->setModified(false);
 }
 
 void MainWindow::updateSaveActions() {
@@ -1516,9 +1615,31 @@ void MainWindow::showViewerContextMenu(const QPoint& pos) {
     QMenu menu(this);
     QMenu* zoomMenu = menu.addMenu(tr("Zoom"));
     populateViewerZoomMenu(zoomMenu);
+    QMenu* editMenu = menu.addMenu(tr("Edit"));
+    populateViewerEditMenu(editMenu);
     menu.addSeparator();
     builder.populate(&menu);
     menu.exec(_viewerWidget->mapToGlobal(pos));
+}
+
+void MainWindow::populateViewerEditMenu(QMenu* editMenu) {
+    auto* viewer = _viewerWidget;
+    const bool enabled = viewer->hasImage();
+    // The accelerator text is a hint only — the real shortcuts live in
+    // ViewerWidget::keyPressEvent (single keys, no menu QAction needed).
+    auto addEdit = [&](const QString& text, const QString& accel,
+                       void (ViewerWidget::*slot)()) {
+        QAction* a = editMenu->addAction(text + QStringLiteral("\t") + accel);
+        a->setEnabled(enabled);
+        QObject::connect(a, &QAction::triggered, viewer, slot);
+    };
+    addEdit(tr("Rotate right"),    QStringLiteral("R"),       &ViewerWidget::rotateRight);
+    addEdit(tr("Rotate left"),     QStringLiteral("Shift+R"), &ViewerWidget::rotateLeft);
+    editMenu->addSeparator();
+    addEdit(tr("Flip horizontal"), QStringLiteral("H"),       &ViewerWidget::flipHorizontal);
+    addEdit(tr("Flip vertical"),   QStringLiteral("V"),       &ViewerWidget::flipVertical);
+    editMenu->addSeparator();
+    addEdit(tr("Crop..."),         QStringLiteral("C"),       &ViewerWidget::beginCrop);
 }
 
 void MainWindow::populateViewerZoomMenu(QMenu* zoomMenu) {
@@ -1597,7 +1718,9 @@ void MainWindow::advanceViewerAfterRemoval() {
 }
 
 void MainWindow::viewerPrev() {
-    if (_viewerIndex > 0) showViewerImageAt(_viewerIndex - 1);
+    if (_viewerIndex <= 0) return;
+    if (!maybeDiscardEdits()) return;   // pending edit → Save / Discard / Cancel
+    showViewerImageAt(_viewerIndex - 1);
 }
 
 void MainWindow::navigateUp() {
@@ -1609,9 +1732,9 @@ void MainWindow::navigateUp() {
 }
 
 void MainWindow::viewerNext() {
-    if (_viewerIndex >= 0 && _viewerIndex + 1 < _viewerImagePaths.size()) {
-        showViewerImageAt(_viewerIndex + 1);
-    }
+    if (_viewerIndex < 0 || _viewerIndex + 1 >= _viewerImagePaths.size()) return;
+    if (!maybeDiscardEdits()) return;   // pending edit → Save / Discard / Cancel
+    showViewerImageAt(_viewerIndex + 1);
 }
 
 void MainWindow::dismissViewer() {

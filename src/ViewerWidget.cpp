@@ -5,6 +5,7 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QStyle>
+#include <QTransform>
 #include <QWheelEvent>
 
 namespace {
@@ -39,12 +40,11 @@ void ViewerWidget::setModified(bool on) {
 
 void ViewerWidget::setImage(const QImage& image) {
     _image = image;
+    _placeholder = false;
     // A new image starts clean; any pending edit belonged to the old one.
+    _edited = QImage();
     setModified(false);
-    // Rotation is per-image regardless of lockZoom — it's a transform on
-    // the image data, not a property of the view.
-    _rotation = 0;
-    _rotatedImage = QImage();
+    cancelCrop();
     if (!_lockZoom) {
         // Fresh-image defaults: FitLargeOnly + 100% baseline + centered.
         // (When locked, keep the user's current fit mode, zoom, and pan;
@@ -59,9 +59,10 @@ void ViewerWidget::setImage(const QImage& image) {
 
 void ViewerWidget::setPlaceholder(const QImage& image) {
     _image = image;
+    _placeholder = true;
+    _edited = QImage();
     setModified(false);
-    _rotation = 0;
-    _rotatedImage = QImage();
+    cancelCrop();
     if (!_lockZoom) {
         _fitMode = FitMode::Fit;
         _zoomIndex = kZoomIndex100;
@@ -72,46 +73,125 @@ void ViewerWidget::setPlaceholder(const QImage& image) {
 
 void ViewerWidget::updateImage(const QImage& image) {
     _image = image;
-    // Refresh the rotated cache for the new pixels (no-op when rotation == 0).
-    invalidateRotation();
+    _placeholder = false;
     update();
 }
 
 void ViewerWidget::clear() {
     _image = QImage();
+    _edited = QImage();
+    _placeholder = false;
     setModified(false);
-    _rotatedImage = QImage();
-    _rotation = 0;
+    cancelCrop();
     _translate = QPoint();
     update();
 }
 
 const QImage& ViewerWidget::currentImage() const {
-    return (_rotation != 0 && !_rotatedImage.isNull()) ? _rotatedImage : _image;
+    return _edited.isNull() ? _image : _edited;
 }
 
-void ViewerWidget::invalidateRotation() {
-    if (_rotation == 0 || _image.isNull()) {
-        _rotatedImage = QImage();
-        return;
-    }
-    QTransform xform;
-    xform.rotate(_rotation);
-    _rotatedImage = _image.transformed(xform, Qt::SmoothTransformation);
+void ViewerWidget::commitEdit(const QImage& img) {
+    if (img.isNull()) return;
+    _edited = img;
+    setModified(true);
+    _translate = QPoint();   // aspect / bounds changed; recenter
+    update();
+    emit imageEdited(img.size());
 }
 
 void ViewerWidget::rotateLeft() {
-    _rotation = (_rotation + 270) % 360;  // -90, normalised
-    invalidateRotation();
-    _translate = QPoint();                // reset pan; aspect changed
-    update();
+    if (_placeholder || currentImage().isNull()) return;
+    QTransform xform;
+    xform.rotate(-90);
+    commitEdit(currentImage().transformed(xform, Qt::SmoothTransformation));
 }
 
 void ViewerWidget::rotateRight() {
-    _rotation = (_rotation + 90) % 360;
-    invalidateRotation();
-    _translate = QPoint();
+    if (_placeholder || currentImage().isNull()) return;
+    QTransform xform;
+    xform.rotate(90);
+    commitEdit(currentImage().transformed(xform, Qt::SmoothTransformation));
+}
+
+void ViewerWidget::flipHorizontal() {
+    if (_placeholder || currentImage().isNull()) return;
+    commitEdit(currentImage().mirrored(/*horizontal=*/true, /*vertical=*/false));
+}
+
+void ViewerWidget::flipVertical() {
+    if (_placeholder || currentImage().isNull()) return;
+    commitEdit(currentImage().mirrored(/*horizontal=*/false, /*vertical=*/true));
+}
+
+void ViewerWidget::beginCrop() {
+    if (_placeholder || currentImage().isNull() || _cropMode) return;
+    _cropMode = true;
+    _cropDragging = false;
+    _cropRect = QRect();
+    // Pan makes no sense mid-crop; drop any drag state and switch the cursor.
+    _spaceDown = _midDown = _panning = false;
+    setCursor(Qt::CrossCursor);
     update();
+    emit cropModeChanged(true);
+}
+
+void ViewerWidget::cancelCrop() {
+    if (!_cropMode) return;
+    _cropMode = false;
+    _cropDragging = false;
+    _cropRect = QRect();
+    updateCursor();
+    update();
+    emit cropModeChanged(false);
+}
+
+void ViewerWidget::applyCrop() {
+    if (!_cropMode) return;
+    const QRect sel = _cropRect.normalized().intersected(imageRectOnWidget());
+    // Too small a selection is treated as "no crop" — just leave crop mode.
+    if (sel.width() < 4 || sel.height() < 4) {
+        cancelCrop();
+        return;
+    }
+    const QRect imgRect = mapWidgetRectToImage(sel);
+    if (imgRect.width() < 1 || imgRect.height() < 1) {
+        cancelCrop();
+        return;
+    }
+    const QImage cropped = currentImage().copy(imgRect);
+    // Leave crop mode first so commitEdit's repaint doesn't draw the overlay.
+    _cropMode = false;
+    _cropDragging = false;
+    _cropRect = QRect();
+    updateCursor();
+    commitEdit(cropped);          // bakes the crop, marks modified, repaints
+    emit cropModeChanged(false);  // after commit so listeners see the new size
+}
+
+QRect ViewerWidget::imageRectOnWidget() const {
+    const QImage& img = currentImage();
+    if (img.isNull()) return QRect();
+    const QSize ds = currentDrawSize();
+    if (ds.isEmpty()) return QRect();
+    const QPoint center(width() / 2, height() / 2);
+    const QPoint topLeft(
+        center.x() - ds.width()  / 2 + _translate.x(),
+        center.y() - ds.height() / 2 + _translate.y());
+    return QRect(topLeft, ds);
+}
+
+QRect ViewerWidget::mapWidgetRectToImage(const QRect& widgetRect) const {
+    const QRect dst = imageRectOnWidget();
+    const QImage& img = currentImage();
+    if (dst.isEmpty() || img.isNull()) return QRect();
+    const double sx = double(img.width())  / dst.width();
+    const double sy = double(img.height()) / dst.height();
+    const int x = qRound((widgetRect.x() - dst.x()) * sx);
+    const int y = qRound((widgetRect.y() - dst.y()) * sy);
+    const int w = qRound(widgetRect.width()  * sx);
+    const int h = qRound(widgetRect.height() * sy);
+    return QRect(x, y, w, h).intersected(img.rect());
 }
 
 QSize ViewerWidget::currentDrawSize() const {
@@ -153,14 +233,8 @@ void ViewerWidget::paintEvent(QPaintEvent* /*event*/) {
     if (img.isNull()) return;
 
     clampTranslate();
-    const QSize ds = currentDrawSize();
-    if (ds.isEmpty()) return;
-
-    const QPoint center(width() / 2, height() / 2);
-    const QPoint topLeft(
-        center.x() - ds.width()  / 2 + _translate.x(),
-        center.y() - ds.height() / 2 + _translate.y());
-    const QRect dst(topLeft, ds);
+    const QRect dst = imageRectOnWidget();
+    if (dst.isEmpty()) return;
 
     // Smooth for downscale (any fit mode + NoFit < 1.0); nearest for
     // upscale in NoFit (>1.0) so pixel art stays crisp when zooming
@@ -169,6 +243,42 @@ void ViewerWidget::paintEvent(QPaintEvent* /*event*/) {
                      || kZoomLevels[_zoomIndex] <= 1.0;
     p.setRenderHint(QPainter::SmoothPixmapTransform, smooth);
     p.drawImage(dst, img);
+
+    if (_cropMode) paintCropOverlay(p, dst);
+}
+
+void ViewerWidget::paintCropOverlay(QPainter& p, const QRect& imageRect) {
+    // The selection is only meaningful where it overlaps the image.
+    const QRect sel = _cropRect.normalized().intersected(imageRect);
+
+    // Dim everything outside the selection (but only over the image — the
+    // dark canvas beyond it needs no scrim). Four rects around `sel`.
+    p.setRenderHint(QPainter::Antialiasing, false);
+    const QColor scrim(0, 0, 0, 130);
+    if (sel.isValid() && sel.width() > 0 && sel.height() > 0) {
+        p.fillRect(QRect(imageRect.left(), imageRect.top(),
+                         imageRect.width(), sel.top() - imageRect.top()), scrim);
+        p.fillRect(QRect(imageRect.left(), sel.bottom() + 1,
+                         imageRect.width(), imageRect.bottom() - sel.bottom()), scrim);
+        p.fillRect(QRect(imageRect.left(), sel.top(),
+                         sel.left() - imageRect.left(), sel.height()), scrim);
+        p.fillRect(QRect(sel.right() + 1, sel.top(),
+                         imageRect.right() - sel.right(), sel.height()), scrim);
+
+        // Selection border + rule-of-thirds guides.
+        p.setPen(QPen(QColor(255, 255, 255, 230), 1));
+        p.drawRect(sel.adjusted(0, 0, -1, -1));
+        p.setPen(QPen(QColor(255, 255, 255, 90), 1));
+        for (int i = 1; i < 3; ++i) {
+            const int x = sel.left() + sel.width()  * i / 3;
+            const int y = sel.top()  + sel.height() * i / 3;
+            p.drawLine(x, sel.top(), x, sel.bottom());
+            p.drawLine(sel.left(), y, sel.right(), y);
+        }
+    } else {
+        // Nothing selected yet — scrim the whole image to signal crop mode.
+        p.fillRect(imageRect, scrim);
+    }
 }
 
 void ViewerWidget::zoomIn() {
@@ -231,11 +341,50 @@ void ViewerWidget::setZoomPercent(int pct) {
 }
 
 void ViewerWidget::keyPressEvent(QKeyEvent* event) {
+    // Crop mode owns the keyboard: Enter applies, Esc cancels, and everything
+    // else is swallowed so navigation / zoom keys don't fire mid-crop.
+    if (_cropMode) {
+        switch (event->key()) {
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+            applyCrop();
+            break;
+        case Qt::Key_Escape:
+            cancelCrop();
+            break;
+        default:
+            break;
+        }
+        event->accept();
+        return;
+    }
+
     switch (event->key()) {
     case Qt::Key_Escape:
     case Qt::Key_Return:
     case Qt::Key_Enter:
         emit dismissed();
+        event->accept();
+        return;
+    case Qt::Key_R:
+        if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) break;
+        if (event->modifiers() & Qt::ShiftModifier) rotateLeft();
+        else                                        rotateRight();
+        event->accept();
+        return;
+    case Qt::Key_H:
+        if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) break;
+        flipHorizontal();
+        event->accept();
+        return;
+    case Qt::Key_V:
+        if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) break;
+        flipVertical();
+        event->accept();
+        return;
+    case Qt::Key_C:
+        if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) break;
+        beginCrop();
         event->accept();
         return;
     case Qt::Key_Left:
@@ -293,6 +442,14 @@ void ViewerWidget::keyReleaseEvent(QKeyEvent* event) {
 }
 
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
+    if (_cropMode && event->button() == Qt::LeftButton) {
+        _cropDragging = true;
+        _cropStart = event->pos();
+        _cropRect = QRect(_cropStart, _cropStart);
+        update();
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::MiddleButton) {
         _midDown = true;
         beginPanIfNeeded(event->pos());
@@ -303,6 +460,14 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
 }
 
 void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
+    if (_cropMode) {
+        if (_cropDragging) {
+            _cropRect = QRect(_cropStart, event->pos());
+            update();
+            event->accept();
+        }
+        return;
+    }
     if (_panning) {
         _translate = event->pos() - _panStart;
         clampTranslate();
@@ -314,6 +479,16 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void ViewerWidget::mouseReleaseEvent(QMouseEvent* event) {
+    if (_cropMode && event->button() == Qt::LeftButton) {
+        _cropDragging = false;
+        // A drag that produced a usable rectangle commits the crop on release;
+        // an accidental click (near-zero rect) just leaves the marquee empty so
+        // the user can drag again. Enter also applies, Esc cancels.
+        _cropRect = QRect(_cropStart, event->pos()).normalized();
+        update();
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::MiddleButton) {
         _midDown = false;
         endPanIfDone();
@@ -337,6 +512,7 @@ void ViewerWidget::focusOutEvent(QFocusEvent* event) {
 }
 
 bool ViewerWidget::wantPan() const {
+    if (_cropMode) return false;   // the mouse is defining the crop marquee
     return (_spaceDown && _fitMode == FitMode::NoFit) || _midDown;
 }
 
@@ -352,6 +528,10 @@ void ViewerWidget::endPanIfDone() {
 }
 
 void ViewerWidget::mouseDoubleClickEvent(QMouseEvent* event) {
+    if (_cropMode) {   // don't dismiss while cropping — a double-click is part of a drag
+        event->accept();
+        return;
+    }
     emit dismissed();
     event->accept();
 }
@@ -374,6 +554,10 @@ void ViewerWidget::wheelEvent(QWheelEvent* event) {
 }
 
 void ViewerWidget::updateCursor() {
+    if (_cropMode) {
+        setCursor(Qt::CrossCursor);
+        return;
+    }
     if (currentImage().isNull() || _fitMode != FitMode::NoFit) {
         unsetCursor();
         return;

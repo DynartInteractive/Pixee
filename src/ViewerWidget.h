@@ -3,6 +3,7 @@
 
 #include <QImage>
 #include <QPoint>
+#include <QRect>
 #include <QWidget>
 
 // Image viewer surface. Phase 3 adds pan + zoom on top of Phase 1's
@@ -50,18 +51,39 @@ public:
     void clear();
     bool hasImage() const { return !_image.isNull(); }
 
-    // Dirty-state plumbing for File → Save. No editing op exists yet, so this
-    // is always false today — the Save action stays greyed. When Crop / Flip /
-    // Rotate land, they call setModified(true) after mutating the image, and
-    // setImage()/clear() reset it to false on image change. modifiedChanged()
-    // lets MainWindow re-evaluate the Save action's enabled state.
+    // Dirty-state plumbing for File → Save. The editing ops (Crop / Flip /
+    // Rotate) call setModified(true) after mutating the in-memory buffer;
+    // setImage()/setPlaceholder()/clear() reset it to false on image change.
+    // modifiedChanged() lets MainWindow re-evaluate the Save action's state.
     bool isModified() const { return _modified; }
     void setModified(bool on);
 
+    // The image the user is currently looking at, including any pending edit.
+    // This is what File → Save / Save As write out. Returns a (cheap, COW)
+    // copy of the edited buffer when an edit is pending, else the loaded image.
+    QImage editedImage() const { return currentImage(); }
+
     void zoomIn();
     void zoomOut();
+
+    // In-viewer editing ops. Each bakes the transform into an in-memory buffer
+    // (_edited) on top of the loaded image and marks the viewer modified. They
+    // no-op while only a thumbnail placeholder is showing (the full-res load
+    // would overwrite the edit) or when there's no image. Rotation re-encodes
+    // pixels — the lossless EXIF-orientation path needs Exiv2 *write*, which
+    // the metadata backend doesn't have yet.
     void rotateLeft();
     void rotateRight();
+    void flipHorizontal();
+    void flipVertical();
+
+    // Crop: beginCrop() enters an interactive mode where a rubber-band drag
+    // defines the crop rectangle; Enter (or a second click-release with a
+    // valid rect) applies it, Esc cancels. Pan/zoom are suppressed while
+    // cropping so the widget↔image mapping stays a simple affine. inCropMode()
+    // reflects the state; cropModeChanged() lets MainWindow show a hint.
+    void beginCrop();
+    bool inCropMode() const { return _cropMode; }
 
     // Zoom-menu API. setZoomPercent flips fit mode to NoFit and snaps to
     // the matching kZoomLevels entry; currentZoomPercent returns 0 when
@@ -79,6 +101,11 @@ signals:
     void nextRequested();
     // Emitted when the dirty flag flips (see isModified()).
     void modifiedChanged(bool modified);
+    // Emitted when crop mode is entered (true) or left (false).
+    void cropModeChanged(bool active);
+    // Emitted after an edit bakes into the buffer, carrying the new pixel size
+    // (rotate/flip/crop can all change dimensions) so the status bar can update.
+    void imageEdited(QSize size);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -94,7 +121,17 @@ protected:
 private:
     QSize currentDrawSize() const;
     const QImage& currentImage() const;
-    void invalidateRotation();
+    // The on-screen rectangle the image currently occupies (top-left + draw
+    // size, honouring pan). Empty when there's no image. Shared by paintEvent
+    // and the crop coordinate mapping so they never disagree.
+    QRect imageRectOnWidget() const;
+    // Map a widget-space rectangle to image pixels, clamped to the image.
+    QRect mapWidgetRectToImage(const QRect& widgetRect) const;
+    // Replace the edited buffer with `img`, mark modified, reset pan, repaint.
+    void commitEdit(const QImage& img);
+    void cancelCrop();
+    void applyCrop();
+    void paintCropOverlay(class QPainter& p, const QRect& imageRect);
     void clampTranslate();
     void updateCursor();
     // Pan starts the moment any pan-trigger becomes active (Space in
@@ -105,10 +142,15 @@ private:
     void beginPanIfNeeded(const QPoint& mousePos);
     void endPanIfDone();
 
-    QImage _image;
-    bool _modified = false;      // unsaved pixel/orientation edit pending (see isModified())
-    QImage _rotatedImage;        // cached _image rotated by _rotation, when != 0
-    int _rotation = 0;           // 0/90/180/270; per-image, resets on setImage
+    QImage _image;               // the loaded image (pristine, as decoded)
+    QImage _edited;              // in-memory edited buffer; null == no edit pending
+    bool _modified = false;      // unsaved pixel edit pending (see isModified())
+    bool _placeholder = false;   // showing a thumbnail placeholder, not full-res
+    // Crop-mode state. _cropRect is in widget coordinates (normalized on use).
+    bool _cropMode = false;
+    bool _cropDragging = false;
+    QPoint _cropStart;
+    QRect _cropRect;
     FitMode _fitMode = FitMode::FitLargeOnly;
     bool _lockZoom = false;      // when true, fit / zoom / pan survive setImage
     int _zoomIndex = 0;          // index into kZoomLevels (used when _fitMode == NoFit)

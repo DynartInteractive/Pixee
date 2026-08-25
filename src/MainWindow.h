@@ -80,6 +80,7 @@ private slots:
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
     void populateViewerZoomMenu(QMenu* zoomMenu);
+    void populateViewerEditMenu(QMenu* editMenu);
     void showFileListContextMenu(const QPoint& pos);
     void copyFileListSelectionToClipboard();
     void copyViewedImageToClipboard();
@@ -124,6 +125,15 @@ private:
     // needs the viewer up and its image marked modified. Called whenever that
     // context can change (viewer show/dismiss, image loaded, list selection).
     void updateSaveActions();
+    // Enqueue a SaveImageTask that overwrites the viewer's original file with
+    // its edited buffer (bypassing the conflict prompt) and clear the dirty
+    // flag. Returns false when there's nothing to save. Does NOT confirm — the
+    // Ctrl+S slot (saveImage) and the unsaved-changes guard confirm first.
+    bool saveEditedOverOriginal();
+    // Unsaved-changes gate for prev/next/dismiss. Returns true when it's safe
+    // to proceed: no viewer edit pending, or the user chose Save (enqueued) or
+    // Discard. Returns false only when the user cancels.
+    bool maybeDiscardEdits();
     void updateStatusBar(FileItem* folder);
     // Shows "Width: w | Height: h" in the status bar while the viewer is
     // active. Pass an invalid QSize() to clear (e.g. while the full-res
