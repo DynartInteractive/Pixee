@@ -11,13 +11,13 @@
 #include "ImageFormats.h"
 
 ScaleImageTask::ScaleImageTask(const QString& sourcePath, const QString& destPath,
-                               int targetLongestEdge, int jpegQuality,
+                               int targetLongestEdge, int quality,
                                TaskGroup* group, QObject* parent)
     : Task(group, parent),
       _src(sourcePath),
       _dst(destPath),
       _longestEdge(targetLongestEdge),
-      _jpegQuality(jpegQuality) {}
+      _quality(quality) {}
 
 QString ScaleImageTask::displayName() const {
     return QObject::tr("Scaling %1").arg(QFileInfo(_src).fileName());
@@ -87,8 +87,8 @@ void ScaleImageTask::run() {
     if (format.isEmpty()) format = suffix.toLatin1();
 
     QImageWriter writer(_dst, format);
-    if (format == "jpg" || format == "jpeg") {
-        writer.setQuality(_jpegQuality);
+    if (ImageFormats::isLossy(QString::fromLatin1(format))) {
+        writer.setQuality(_quality);
     }
     if (!writer.write(img)) {
         setFailed(tr("Cannot write: %1").arg(writer.errorString()));

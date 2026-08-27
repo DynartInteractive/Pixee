@@ -13,7 +13,7 @@ class ConvertFormatTask : public Task
     Q_OBJECT
 public:
     ConvertFormatTask(const QString& sourcePath, const QString& destPath,
-                      const QByteArray& targetFormat, int jpegQuality,
+                      const QByteArray& targetFormat, int quality,
                       TaskGroup* group, QObject* parent = nullptr);
 
     QString displayName() const override;
@@ -27,7 +27,7 @@ private:
     QString _src;
     QString _dst;
     QByteArray _format;
-    int _jpegQuality;
+    int _quality;
 };
 
 #endif // CONVERTFORMATTASK_H

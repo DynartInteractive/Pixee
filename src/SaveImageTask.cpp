@@ -5,6 +5,7 @@
 #include <QImageWriter>
 
 #include "FileOpsHelpers.h"
+#include "ImageFormats.h"
 
 SaveImageTask::SaveImageTask(const QImage& image, const QString& destPath,
                              const QByteArray& format, int quality,
@@ -64,8 +65,7 @@ void SaveImageTask::run() {
     emitProgress(30);
 
     QImageWriter writer(_dst, _format);
-    const QByteArray f = _format.toLower();
-    if (f == "jpg" || f == "jpeg" || f == "webp") {
+    if (ImageFormats::isLossy(QString::fromLatin1(_format))) {
         writer.setQuality(_quality);
     }
     if (!writer.write(_image)) {

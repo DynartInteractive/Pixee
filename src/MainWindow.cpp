@@ -33,6 +33,7 @@
 #include "FileListView.h"
 #include "ConvertFormatTask.h"
 #include "FileOpsMenuBuilder.h"
+#include "ImageFormats.h"
 #include "ImageLoader.h"
 #include "MetadataPanel.h"
 #include "MetadataReader.h"
@@ -870,9 +871,9 @@ void MainWindow::saveImage() {
     if (path.isEmpty()) return;
 
     // Confirm — this replaces the original, and re-encoding a lossy format
-    // (JPEG/WebP) costs a little quality every save.
+    // (JPEG/WebP/…) costs a little quality every save.
     const QString suffix = QFileInfo(path).suffix().toLower();
-    const bool lossy = (suffix == "jpg" || suffix == "jpeg" || suffix == "webp");
+    const bool lossy = ImageFormats::isLossy(suffix);
     QMessageBox box(this);
     box.setIcon(QMessageBox::Question);
     box.setWindowTitle(tr("Save"));

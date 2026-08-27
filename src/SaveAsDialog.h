@@ -45,8 +45,6 @@ private slots:
     void validate();     // enable/disable OK and refresh the target-path label
 
 private:
-    static bool formatIsLossy(const QString& fmt);
-
     QString _sourcePath;
     QString _folder;
 

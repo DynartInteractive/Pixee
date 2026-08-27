@@ -16,6 +16,13 @@ constexpr Alias kAliases[] = {
     { "jfif", "jpeg" },
 };
 
+// Both the extension and the QImageWriter format name for each lossy format,
+// so callers can pass whichever they hold without normalising first. "jxl" is
+// listed ahead of the plugin that decodes it — an entry here costs nothing
+// until a format shows up in supportedImageFormats(), and this way JXL lands
+// with its quality handling already correct (docs/jpeg-xl-support.md).
+constexpr const char* kLossyFormats[] = { "jpg", "jpeg", "jfif", "webp", "jxl" };
+
 }
 
 namespace ImageFormats {
@@ -38,6 +45,14 @@ QStringList aliasExtensionsFor(const QList<QByteArray>& supportedFormats) {
         }
     }
     return result;
+}
+
+bool isLossy(const QString& nameOrExtension) {
+    const QString needle = nameOrExtension.toLower();
+    for (const char* format : kLossyFormats) {
+        if (needle == QLatin1String(format)) return true;
+    }
+    return false;
 }
 
 }

@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QImageReader>
+#include <QImageWriter>
 #include <QSignalSpy>
 #include <QString>
 #include <QUuid>
@@ -17,6 +18,7 @@
 #include <QtTest>
 
 #include "ConvertFormatTask.h"
+#include "ImageFormats.h"
 #include "SaveImageTask.h"
 #include "ScaleImageTask.h"
 #include "Task.h"
@@ -34,6 +36,8 @@ private slots:
     void scale_skip_conflict_leaves_dest_untouched();
     void scale_writes_jfif_destination_as_jpeg();
     void scale_applies_jpeg_quality();
+    void formats_isLossy_covers_every_quality_bearing_format();
+    void convert_applies_webp_quality();
     void convert_png_to_jpg_produces_valid_jpeg();
     void convert_skip_conflict_leaves_dest_untouched();
     void save_writes_in_memory_image_to_disk();
@@ -146,6 +150,51 @@ void TstImageTasks::scale_applies_jpeg_quality() {
     auto* group = new TaskGroup(QStringLiteral("Scale"));
     addScale(group, src, low, /*longest=*/512, /*q=*/10);
     addScale(group, src, high, /*longest=*/512, /*q=*/95);
+
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved(10000));
+
+    QVERIFY(QFile::exists(low));
+    QVERIFY(QFile::exists(high));
+    QVERIFY2(QFileInfo(low).size() < QFileInfo(high).size(),
+             "quality 10 should encode smaller than quality 95");
+}
+
+void TstImageTasks::formats_isLossy_covers_every_quality_bearing_format() {
+    // The single source of truth behind the Save As quality slider, the
+    // setQuality() calls in the three image tasks, and the "re-saving costs
+    // quality" warning on File → Save. It used to be four divergent inline
+    // comparisons; this pins the set so they can't drift apart again.
+    for (const QString& lossy : { QStringLiteral("jpg"), QStringLiteral("jpeg"),
+                                  QStringLiteral("jfif"), QStringLiteral("webp"),
+                                  QStringLiteral("jxl") }) {
+        QVERIFY2(ImageFormats::isLossy(lossy), qPrintable(lossy));
+        QVERIFY2(ImageFormats::isLossy(lossy.toUpper()), qPrintable(lossy));
+    }
+    for (const QString& lossless : { QStringLiteral("png"), QStringLiteral("gif"),
+                                     QStringLiteral("bmp"), QStringLiteral("tiff"),
+                                     QStringLiteral("ico"), QStringLiteral("") }) {
+        QVERIFY2(!ImageFormats::isLossy(lossless), qPrintable(lossless));
+    }
+}
+
+void TstImageTasks::convert_applies_webp_quality() {
+    // Regression: ConvertFormatTask only called setQuality() for jpg/jpeg, so
+    // the quality the user picked in SaveAsDialog — which does show the slider
+    // for WebP — was dropped on the floor for every other lossy format.
+    if (!QImageWriter::supportedImageFormats().contains("webp")) {
+        QSKIP("no WebP writer in this Qt build");
+    }
+
+    TaskTestFixture f;
+    const QString src = f.path("noisy.png");
+    writeNoisyPng(src, 900, 600);
+    const QString low = f.path("low.webp");
+    const QString high = f.path("high.webp");
+
+    auto* group = new TaskGroup(QStringLiteral("Convert"));
+    addConvert(group, src, low, "webp", /*q=*/10);
+    addConvert(group, src, high, "webp", /*q=*/95);
 
     f.mgr.enqueueGroup(group);
     QVERIFY(f.waitForGroupRemoved(10000));

@@ -1,13 +1,15 @@
 # Adding JPEG XL (`.jxl`) support
 
-Status: **planned, not started.** Written up on a machine without vcpkg so the
-plugin half can be done on the machine that has it.
+Status: **Part 2 (the app-side code) is done — only the plugin is left.** Written
+up on a machine without vcpkg so the plugin half can be done on the machine that
+has it.
 
 The short version: **the app code is almost ready.** Everything format-related
 derives from `QImageReader::supportedImageFormats()` at startup, so browsing,
 thumbnailing and viewing `.jxl` costs zero lines of C++ once a decoder plugin
-is installed. The real work is (a) building/bundling that plugin, and (b) a
-small cleanup so the *write* side treats JXL as the lossy format it is.
+is installed. The remaining work is building and bundling that plugin. The
+app-side half — teaching the *write* path that JXL is a lossy format — is
+already done (Part 2).
 
 ---
 
@@ -33,12 +35,15 @@ for suffixes no plugin claims, like `.jfif`).
 
 ---
 
-## Part 2 — The code change: one lossy-format set
+## Part 2 — The code change: one lossy-format set ✅ DONE
 
-JPEG XL is lossy by default. The lossy set is currently **hardcoded in five
-places**, and none of them know about `jxl`:
+**Landed ahead of the plugin — nothing to do here on the vcpkg machine.** Kept
+below as the record of what changed and why.
 
-| Site | Consequence of omitting `jxl` |
+JPEG XL is lossy by default. The lossy set *was* **hardcoded in five places**,
+none of which knew about `jxl`:
+
+| Site (line numbers as of before the change) | Consequence of omitting `jxl` |
 |---|---|
 | `SaveAsDialog::formatIsLossy` (`src/SaveAsDialog.cpp:101`) | quality slider hidden; the dialog's `quality()` is still passed on, so the writer gets an arbitrary value the user never saw |
 | `SaveImageTask::run` (`src/SaveImageTask.cpp:68`) | `writer.setQuality()` skipped — plugin default silently applied |
@@ -51,18 +56,18 @@ data-loss-shaped one. Note the table also records two pre-existing
 inconsistencies: `ConvertFormatTask` and `ScaleImageTask` never set quality for
 WebP even though `SaveAsDialog` offers a slider for it.
 
-### Suggested shape
+### What shipped
 
-Put the predicate next to the other format facts, in `ImageFormats` — it is
-already the "things about formats that Qt won't tell us" home, and
-`ScaleImageTask` includes it:
+The predicate went next to the other format facts, in `ImageFormats` — already
+the "things about formats that Qt won't tell us" home, and `ScaleImageTask`
+included it anyway:
 
 ```cpp
 // ImageFormats.h
-// True when `extension` names a format whose encoder throws away detail, so
-// the caller should offer a quality control and warn before overwriting an
-// original. Case-insensitive; accepts an extension or a format name.
-bool isLossy(const QString& extension);
+// True when `nameOrExtension` denotes a format whose encoder discards detail,
+// so callers should offer a quality control, pass that quality to QImageWriter,
+// and warn before overwriting an original. Case-insensitive.
+bool isLossy(const QString& nameOrExtension);
 ```
 
 ```cpp
@@ -70,14 +75,15 @@ bool isLossy(const QString& extension);
 constexpr const char* kLossyFormats[] = { "jpg", "jpeg", "jfif", "webp", "jxl" };
 ```
 
-Then all five sites become `ImageFormats::isLossy(...)`. Add a case to
-`tests/ImageTasks` (`tst_ImageTasks.cpp`) covering the set — that suite already
-exercises Scale/Convert quality behaviour.
+All five sites now call `ImageFormats::isLossy(...)`, and
+`ConvertFormatTask`/`ScaleImageTask` had their `_jpegQuality` member renamed to
+`_quality` to match what it now means. Two tests in `tests/ImageTasks`:
+`formats_isLossy_covers_every_quality_bearing_format` pins the set, and
+`convert_applies_webp_quality` is the behavioural regression for the WebP gap
+(it fails against the old code, where both quality levels produced identically
+sized files).
 
-Roughly 30 lines plus the test. Worth doing **before** the plugin lands: it
-fixes the WebP quality gaps on its own merits, and makes JXL a genuine drop-in.
-
-### One semantic wrinkle to check
+### Still open: one semantic wrinkle (needs the built plugin)
 
 The KDE JXL plugin appears to map `QImageWriter` quality **100 to
 mathematically lossless** (distance 0), unlike JPEG where 100 is still lossy.

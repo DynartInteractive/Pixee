@@ -8,15 +8,16 @@
 #include <QImageWriter>
 
 #include "FileOpsHelpers.h"
+#include "ImageFormats.h"
 
 ConvertFormatTask::ConvertFormatTask(const QString& sourcePath, const QString& destPath,
-                                     const QByteArray& targetFormat, int jpegQuality,
+                                     const QByteArray& targetFormat, int quality,
                                      TaskGroup* group, QObject* parent)
     : Task(group, parent),
       _src(sourcePath),
       _dst(destPath),
       _format(targetFormat),
-      _jpegQuality(jpegQuality) {}
+      _quality(quality) {}
 
 QString ConvertFormatTask::displayName() const {
     return QObject::tr("Converting %1 → %2")
@@ -65,8 +66,8 @@ void ConvertFormatTask::run() {
     emitProgress(60);
 
     QImageWriter writer(_dst, _format);
-    if (_format.toLower() == "jpg" || _format.toLower() == "jpeg") {
-        writer.setQuality(_jpegQuality);
+    if (ImageFormats::isLossy(QString::fromLatin1(_format))) {
+        writer.setQuality(_quality);
     }
     if (!writer.write(img)) {
         setFailed(tr("Cannot write: %1").arg(writer.errorString()));

@@ -6,6 +6,9 @@
 
 class QString;
 
+// Facts about image formats that Qt won't tell us, in one place.
+//
+// -- Alias extensions ------------------------------------------------------
 // Extensions that name an image format Qt can already decode but which no
 // installed plugin advertises. Qt's jpeg plugin reports only "jpg"/"jpeg",
 // yet a .jfif file is byte-identical to a .jpg — JFIF is the standard
@@ -27,5 +30,18 @@ QByteArray aliasedFormat(const QString& extension);
 // `supportedFormats`, so an alias only surfaces when its decoder is
 // actually installed.
 QStringList aliasExtensionsFor(const QList<QByteArray>& supportedFormats);
+
+// -- Lossy formats ---------------------------------------------------------
+// True when `nameOrExtension` denotes a format whose encoder discards detail,
+// so every re-save costs a little quality. Callers use it to decide whether to
+// offer a quality control, whether to pass that quality to QImageWriter, and
+// whether to warn before overwriting an original. Case-insensitive; accepts
+// either an extension or a QImageWriter format name (they only differ for the
+// aliases above, and both spellings are covered).
+//
+// Qt can't answer this: QImageWriter::supportsOption(Quality) reports whether
+// the plugin *accepts* a quality value, and the PNG handler does — it maps the
+// number onto a zlib compression level, which is lossless.
+bool isLossy(const QString& nameOrExtension);
 
 }

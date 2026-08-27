@@ -14,6 +14,8 @@
 #include <QSlider>
 #include <QVBoxLayout>
 
+#include "ImageFormats.h"
+
 namespace {
 constexpr const char* kLastSaveAsPath = "fileOps/lastSaveAsPath";
 constexpr int kDefaultQuality = 92;
@@ -98,11 +100,6 @@ SaveAsDialog::SaveAsDialog(const QString& sourcePath,
     onFormatChanged();   // set initial quality-row visibility + validate
 }
 
-bool SaveAsDialog::formatIsLossy(const QString& fmt) {
-    const QString f = fmt.toLower();
-    return f == "jpg" || f == "jpeg" || f == "webp";
-}
-
 QByteArray SaveAsDialog::format() const {
     return _formatCombo->currentData().toString().toLatin1();
 }
@@ -129,7 +126,7 @@ void SaveAsDialog::chooseFolder() {
 }
 
 void SaveAsDialog::onFormatChanged() {
-    const bool lossy = formatIsLossy(_formatCombo->currentData().toString());
+    const bool lossy = ImageFormats::isLossy(_formatCombo->currentData().toString());
     _qualityLabel->setVisible(lossy);
     _qualitySlider->setVisible(lossy);
     _qualityValue->setVisible(lossy);

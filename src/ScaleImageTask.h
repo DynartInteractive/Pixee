@@ -13,7 +13,7 @@ class ScaleImageTask : public Task
     Q_OBJECT
 public:
     ScaleImageTask(const QString& sourcePath, const QString& destPath,
-                   int targetLongestEdge, int jpegQuality,
+                   int targetLongestEdge, int quality,
                    TaskGroup* group, QObject* parent = nullptr);
 
     QString displayName() const override;
@@ -27,7 +27,7 @@ private:
     QString _src;
     QString _dst;
     int _longestEdge;
-    int _jpegQuality;
+    int _quality;
 };
 
 #endif // SCALEIMAGETASK_H
