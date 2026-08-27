@@ -7,6 +7,10 @@ Pixee uses Qt's image-plugin system; everything `QImageReader::supportedImageFor
 
 The end state: `kimg_*.dll` plugins land in `<build>/release/imageformats/`; runtime codec DLLs (`avif.dll`, `heif.dll`, …) sit next to `Pixee.exe` in `<build>/release/`; and the startup log's `Supported image formats:` line includes `avif`, `avifs`, `heif`, `heic`, `psd`, `xcf`, etc.
 
+> **Adding JPEG XL?** See [`jpeg-xl-support.md`](jpeg-xl-support.md) — it lists
+> the app-side changes JXL needs on top of this recipe (the write path's lossy
+> handling), and what to verify once the plugin builds.
+
 The recipe below was nailed down in May 2026 against Qt 6.11.1, MSVC 2022 17.8 (toolset 14.38), and the vcpkg ports as of that date. Most of it should age well; the troubleshooting section at the end captures the specific traps we hit.
 
 ## Prerequisites
