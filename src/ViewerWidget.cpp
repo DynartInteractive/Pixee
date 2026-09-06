@@ -1,12 +1,22 @@
 #include "ViewerWidget.h"
 
+#include <QCheckBox>
+#include <QCursor>
+#include <QFontMetrics>
+#include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
+#include <QResizeEvent>
+#include <QSpinBox>
 #include <QStyle>
+#include <QTimer>
 #include <QTransform>
 #include <QWheelEvent>
+
+#include <numeric>
 
 namespace {
 constexpr double kZoomLevels[] = {
@@ -17,6 +27,19 @@ constexpr int kZoomIndex100 = 4;  // index of 1.0 above
 
 int percentForIndex(int i) {
     return int(kZoomLevels[i] * 100.0 + 0.5);
+}
+
+// Crop marquee metrics, in widget pixels.
+constexpr int kHandleSize = 9;    // painted square; odd so it centres on a line
+constexpr int kHandleGrab = 15;   // hit-test square, deliberately larger
+constexpr int kAntsPeriod = 90;   // ms between marching-ants steps
+constexpr int kAntsDash   = 4;    // dash / gap length; the phase wraps at 2x
+constexpr int kMinCropPx  = 4;    // below this a marquee counts as "no crop"
+
+QPoint clampToRect(const QPoint& p, const QRect& r) {
+    if (r.isEmpty()) return p;
+    return QPoint(qBound(r.left(), p.x(), r.right()),
+                  qBound(r.top(),  p.y(), r.bottom()));
 }
 }
 
@@ -128,45 +151,102 @@ void ViewerWidget::beginCrop() {
     if (_placeholder || currentImage().isNull() || _cropMode) return;
     _cropMode = true;
     _cropDragging = false;
+    _cropHandle = CropHandle::None;
     _cropRect = QRect();
     // Pan makes no sense mid-crop; drop any drag state and switch the cursor.
     _spaceDown = _midDown = _panning = false;
+
+    buildCropBar();
+    positionCropBar();
+    _cropBar->show();
+    _cropBar->raise();
+
+    if (!_antsTimer) {
+        _antsTimer = new QTimer(this);
+        _antsTimer->setInterval(kAntsPeriod);
+        connect(_antsTimer, &QTimer::timeout, this, [this] {
+            _antsPhase = (_antsPhase + 1) % (kAntsDash * 2);
+            // Only the marquee border animates, so skip the repaint until
+            // there is one — entering crop mode shouldn't spin the CPU.
+            if (!_cropRect.normalized().isEmpty()) update();
+        });
+    }
+    _antsPhase = 0;
+    _antsTimer->start();
+
     setCursor(Qt::CrossCursor);
     update();
     emit cropModeChanged(true);
 }
 
-void ViewerWidget::cancelCrop() {
-    if (!_cropMode) return;
+void ViewerWidget::endCropMode() {
     _cropMode = false;
     _cropDragging = false;
+    _cropHandle = CropHandle::None;
     _cropRect = QRect();
+    if (_antsTimer) _antsTimer->stop();
+    if (_cropBar) _cropBar->hide();
     updateCursor();
+}
+
+void ViewerWidget::cancelCrop() {
+    if (!_cropMode) return;
+    endCropMode();
     update();
     emit cropModeChanged(false);
 }
 
 void ViewerWidget::applyCrop() {
     if (!_cropMode) return;
-    const QRect sel = _cropRect.normalized().intersected(imageRectOnWidget());
     // Too small a selection is treated as "no crop" — just leave crop mode.
-    if (sel.width() < 4 || sel.height() < 4) {
-        cancelCrop();
-        return;
-    }
-    const QRect imgRect = mapWidgetRectToImage(sel);
+    const QRect imgRect = cropRectInImage();
     if (imgRect.width() < 1 || imgRect.height() < 1) {
         cancelCrop();
         return;
     }
     const QImage cropped = currentImage().copy(imgRect);
     // Leave crop mode first so commitEdit's repaint doesn't draw the overlay.
-    _cropMode = false;
-    _cropDragging = false;
-    _cropRect = QRect();
-    updateCursor();
+    endCropMode();
     commitEdit(cropped);          // bakes the crop, marks modified, repaints
     emit cropModeChanged(false);  // after commit so listeners see the new size
+}
+
+QRect ViewerWidget::cropRectInImage() const {
+    const QRect sel = _cropRect.normalized().intersected(imageRectOnWidget());
+    if (sel.width() < kMinCropPx || sel.height() < kMinCropPx) return QRect();
+    QRect r = mapWidgetRectToImage(sel);
+    if (r.width() < 1 || r.height() < 1) return QRect();
+    if (!ratioLocked()) return r;
+    // The widget-space marquee is only ratio-correct to within a pixel of
+    // rounding, so snap here, in image pixels, where it actually matters.
+    // Reducing to lowest terms first makes the result exact rather than
+    // merely close: k*rw : k*rh is the ratio by construction.
+    const int g = std::gcd(_ratioW->value(), _ratioH->value());
+    const int rw = _ratioW->value() / g;
+    const int rh = _ratioH->value() / g;
+    const int k = qMin(r.width() / rw, r.height() / rh);
+    if (k < 1) return r;
+    r.setWidth(k * rw);
+    r.setHeight(k * rh);
+    return r;
+}
+
+bool ViewerWidget::ratioLocked() const {
+    return _ratioCheck && _ratioCheck->isChecked()
+        && _ratioW && _ratioH && _ratioW->value() > 0 && _ratioH->value() > 0;
+}
+
+double ViewerWidget::lockedRatio() const {
+    if (!ratioLocked()) return 0.0;
+    return double(_ratioW->value()) / double(_ratioH->value());
+}
+
+void ViewerWidget::reapplyRatio() {
+    if (!_cropMode) return;
+    const QRect sel = _cropRect.normalized();
+    // Pin the top-left and re-derive the far corner under the new ratio.
+    if (!sel.isEmpty()) _cropRect = rectFromCorner(sel.topLeft(), sel.bottomRight());
+    update();
 }
 
 QRect ViewerWidget::imageRectOnWidget() const {
@@ -192,6 +272,212 @@ QRect ViewerWidget::mapWidgetRectToImage(const QRect& widgetRect) const {
     const int w = qRound(widgetRect.width()  * sx);
     const int h = qRound(widgetRect.height() * sy);
     return QRect(x, y, w, h).intersected(img.rect());
+}
+
+QRect ViewerWidget::handleRect(CropHandle h, const QRect& sel) const {
+    QPoint c;
+    switch (h) {
+    case CropHandle::TopLeft:     c = sel.topLeft();                          break;
+    case CropHandle::Top:         c = QPoint(sel.center().x(), sel.top());     break;
+    case CropHandle::TopRight:    c = sel.topRight();                         break;
+    case CropHandle::Right:       c = QPoint(sel.right(), sel.center().y());   break;
+    case CropHandle::BottomRight: c = sel.bottomRight();                      break;
+    case CropHandle::Bottom:      c = QPoint(sel.center().x(), sel.bottom());  break;
+    case CropHandle::BottomLeft:  c = sel.bottomLeft();                       break;
+    case CropHandle::Left:        c = QPoint(sel.left(), sel.center().y());    break;
+    case CropHandle::Body:
+    case CropHandle::None:        return QRect();
+    }
+    const int half = kHandleSize / 2;
+    return QRect(c.x() - half, c.y() - half, kHandleSize, kHandleSize);
+}
+
+ViewerWidget::CropHandle ViewerWidget::handleAt(const QPoint& pos) const {
+    const QRect sel = _cropRect.normalized();
+    if (sel.isEmpty()) return CropHandle::None;
+    // Corners are tested first: on a small marquee their grab boxes overlap
+    // the edge handles, and resizing from a corner is the more useful default.
+    static const CropHandle kOrder[] = {
+        CropHandle::TopLeft, CropHandle::TopRight,
+        CropHandle::BottomRight, CropHandle::BottomLeft,
+        CropHandle::Top, CropHandle::Right,
+        CropHandle::Bottom, CropHandle::Left
+    };
+    const int half = kHandleGrab / 2;
+    for (CropHandle h : kOrder) {
+        const QPoint c = handleRect(h, sel).center();
+        if (QRect(c.x() - half, c.y() - half, kHandleGrab, kHandleGrab).contains(pos))
+            return h;
+    }
+    // Not on a handle, but inside the marquee: grabbing here moves it whole.
+    return sel.contains(pos) ? CropHandle::Body : CropHandle::None;
+}
+
+QPoint ViewerWidget::anchorFor(CropHandle h, const QRect& sel) const {
+    switch (h) {
+    case CropHandle::TopLeft:     return sel.bottomRight();
+    case CropHandle::TopRight:    return sel.bottomLeft();
+    case CropHandle::BottomRight: return sel.topLeft();
+    case CropHandle::BottomLeft:  return sel.topRight();
+    default:                      return sel.topLeft();
+    }
+}
+
+QRect ViewerWidget::rectFromCorner(const QPoint& anchor, const QPoint& moving) const {
+    const QRect bounds = imageRectOnWidget();
+    if (bounds.isEmpty()) return QRect();
+    const int sx = (moving.x() < anchor.x()) ? -1 : 1;
+    const int sy = (moving.y() < anchor.y()) ? -1 : 1;
+    int w = qAbs(moving.x() - anchor.x());
+    int h = qAbs(moving.y() - anchor.y());
+    // Room left to grow from the anchor in the direction being dragged.
+    const int availW = qMax(0, (sx > 0) ? bounds.right()  - anchor.x()
+                                        : anchor.x() - bounds.left());
+    const int availH = qMax(0, (sy > 0) ? bounds.bottom() - anchor.y()
+                                        : anchor.y() - bounds.top());
+    w = qMin(w, availW);
+    h = qMin(h, availH);
+    const double r = lockedRatio();
+    if (r > 0.0) {
+        // Grow the short side so the marquee still covers the cursor, then
+        // pull whichever side overflowed back inside the image.
+        if (double(w) > double(h) * r) h = qRound(w / r);
+        else                           w = qRound(h * r);
+        if (w > availW) { w = availW; h = qRound(w / r); }
+        if (h > availH) { h = availH; w = qRound(h * r); }
+    }
+    return QRect(anchor, QPoint(anchor.x() + sx * w, anchor.y() + sy * h)).normalized();
+}
+
+QRect ViewerWidget::rectFromEdge(CropHandle h, const QPoint& moving) const {
+    const QRect bounds = imageRectOnWidget();
+    QRect sel = _cropRect.normalized();
+    if (bounds.isEmpty() || sel.isEmpty()) return sel;
+    switch (h) {
+    case CropHandle::Left:
+        sel.setLeft(qBound(bounds.left(), moving.x(), sel.right() - 1));
+        break;
+    case CropHandle::Right:
+        sel.setRight(qBound(sel.left() + 1, moving.x(), bounds.right()));
+        break;
+    case CropHandle::Top:
+        sel.setTop(qBound(bounds.top(), moving.y(), sel.bottom() - 1));
+        break;
+    case CropHandle::Bottom:
+        sel.setBottom(qBound(sel.top() + 1, moving.y(), bounds.bottom()));
+        break;
+    default:
+        return sel;
+    }
+    const double r = lockedRatio();
+    if (r <= 0.0) return sel;
+    // The perpendicular dimension follows, centred so the marquee grows to
+    // both sides of the edge being dragged. Clipping at the image border can
+    // leave the live rect slightly off-ratio; cropRectInImage() snaps it back
+    // exactly when the crop is actually taken.
+    if (h == CropHandle::Left || h == CropHandle::Right) {
+        const int newH = qMax(1, qRound(sel.width() / r));
+        sel.setTop(sel.center().y() - newH / 2);
+        sel.setHeight(newH);
+    } else {
+        const int newW = qMax(1, qRound(sel.height() * r));
+        sel.setLeft(sel.center().x() - newW / 2);
+        sel.setWidth(newW);
+    }
+    return sel.intersected(bounds);
+}
+
+QRect ViewerWidget::rectMoved(const QPoint& moving) const {
+    const QRect bounds = imageRectOnWidget();
+    QRect sel = _cropRect.normalized();
+    if (bounds.isEmpty() || sel.isEmpty()) return sel;
+    QPoint tl = moving - _cropMoveOffset;
+    // Clamp so the marquee stays wholly on the image. qMax guards the
+    // degenerate case of a marquee wider than the image, where the upper
+    // bound would otherwise fall below the lower one and trip qBound.
+    const int maxX = qMax(bounds.left(), bounds.right()  - sel.width()  + 1);
+    const int maxY = qMax(bounds.top(),  bounds.bottom() - sel.height() + 1);
+    tl.setX(qBound(bounds.left(), tl.x(), maxX));
+    tl.setY(qBound(bounds.top(),  tl.y(), maxY));
+    sel.moveTo(tl);
+    return sel;
+}
+
+void ViewerWidget::setCropCursor(CropHandle h) {
+    switch (h) {
+    case CropHandle::TopLeft:
+    case CropHandle::BottomRight: setCursor(Qt::SizeFDiagCursor); break;
+    case CropHandle::TopRight:
+    case CropHandle::BottomLeft:  setCursor(Qt::SizeBDiagCursor); break;
+    case CropHandle::Left:
+    case CropHandle::Right:       setCursor(Qt::SizeHorCursor);   break;
+    case CropHandle::Top:
+    case CropHandle::Bottom:      setCursor(Qt::SizeVerCursor);   break;
+    case CropHandle::Body:        setCursor(Qt::SizeAllCursor);   break;
+    case CropHandle::None:        setCursor(Qt::CrossCursor);     break;
+    }
+}
+
+void ViewerWidget::buildCropBar() {
+    if (_cropBar) return;
+    _cropBar = new QWidget(this);
+    _cropBar->setObjectName("cropBar");
+    _cropBar->setAutoFillBackground(true);
+    // A palette rather than an inline stylesheet: a widget stylesheet would
+    // outrank the app-level QSS, leaving themes unable to restyle #cropBar.
+    QPalette pal = _cropBar->palette();
+    pal.setColor(QPalette::Window, QColor(32, 32, 32));
+    pal.setColor(QPalette::WindowText, Qt::white);
+    _cropBar->setPalette(pal);
+
+    _ratioCheck = new QCheckBox(tr("Fixed ratio"), _cropBar);
+    _ratioW = new QSpinBox(_cropBar);
+    _ratioH = new QSpinBox(_cropBar);
+    // Set the palette on the label widgets too, not just the bar: once an
+    // app-level stylesheet is installed, QStyleSheetStyle stops propagating a
+    // parent's palette into child text, and the label would fall back to the
+    // default near-black on this dark bar. Themes override via #cropBar QSS.
+    _ratioCheck->setPalette(pal);
+    for (QSpinBox* box : {_ratioW, _ratioH}) {
+        box->setRange(1, 9999);
+        box->setMaximumWidth(64);
+        box->setEnabled(false);          // gated on the check box
+    }
+    _ratioW->setValue(2);
+    _ratioH->setValue(3);
+
+    auto* layout = new QHBoxLayout(_cropBar);
+    layout->setContentsMargins(10, 6, 10, 6);
+    layout->setSpacing(6);
+    layout->addWidget(_ratioCheck);
+    layout->addWidget(_ratioW);
+    auto* colon = new QLabel(QStringLiteral(":"), _cropBar);
+    colon->setPalette(pal);
+    layout->addWidget(colon);
+    layout->addWidget(_ratioH);
+
+    connect(_ratioCheck, &QCheckBox::toggled, this, [this](bool on) {
+        _ratioW->setEnabled(on);
+        _ratioH->setEnabled(on);
+        reapplyRatio();
+    });
+    connect(_ratioW, &QSpinBox::valueChanged, this, [this](int) { reapplyRatio(); });
+    connect(_ratioH, &QSpinBox::valueChanged, this, [this](int) { reapplyRatio(); });
+
+    // Enter / Esc must keep working while the focus sits in the bar. The
+    // filter goes on every descendant because a spin box delivers key events
+    // to its internal QLineEdit, not to itself.
+    _cropBar->installEventFilter(this);
+    for (QObject* child : _cropBar->findChildren<QObject*>())
+        child->installEventFilter(this);
+
+    _cropBar->hide();
+}
+
+void ViewerWidget::positionCropBar() {
+    if (!_cropBar) return;
+    _cropBar->adjustSize();
+    _cropBar->move(qMax(0, (width() - _cropBar->width()) / 2), 12);
 }
 
 QSize ViewerWidget::currentDrawSize() const {
@@ -265,9 +551,7 @@ void ViewerWidget::paintCropOverlay(QPainter& p, const QRect& imageRect) {
         p.fillRect(QRect(sel.right() + 1, sel.top(),
                          imageRect.right() - sel.right(), sel.height()), scrim);
 
-        // Selection border + rule-of-thirds guides.
-        p.setPen(QPen(QColor(255, 255, 255, 230), 1));
-        p.drawRect(sel.adjusted(0, 0, -1, -1));
+        // Rule-of-thirds guides, drawn under the border.
         p.setPen(QPen(QColor(255, 255, 255, 90), 1));
         for (int i = 1; i < 3; ++i) {
             const int x = sel.left() + sel.width()  * i / 3;
@@ -275,10 +559,68 @@ void ViewerWidget::paintCropOverlay(QPainter& p, const QRect& imageRect) {
             p.drawLine(x, sel.top(), x, sel.bottom());
             p.drawLine(sel.left(), y, sel.right(), y);
         }
+
+        // Marching ants: a solid black rectangle with an animated white dashed
+        // one on top. The two-tone border stays legible over both light and
+        // dark pixels, and the moving dashes read as "this is a live
+        // selection" rather than part of the picture.
+        const QRect border = sel.adjusted(0, 0, -1, -1);
+        p.setPen(QPen(Qt::black, 1));
+        p.drawRect(border);
+        QPen ants(Qt::white, 1);
+        ants.setDashPattern({qreal(kAntsDash), qreal(kAntsDash)});
+        ants.setDashOffset(_antsPhase);
+        p.setPen(ants);
+        p.drawRect(border);
+
+        paintCropHandles(p, sel);
+        paintCropReadout(p);
     } else {
         // Nothing selected yet — scrim the whole image to signal crop mode.
         p.fillRect(imageRect, scrim);
     }
+}
+
+void ViewerWidget::paintCropHandles(QPainter& p, const QRect& sel) {
+    // Opaque white square with a 1px black outline, so a handle is visible
+    // whatever it happens to sit on top of.
+    p.setPen(QPen(Qt::black, 1));
+    p.setBrush(Qt::white);
+    static const CropHandle kAll[] = {
+        CropHandle::TopLeft, CropHandle::Top, CropHandle::TopRight,
+        CropHandle::Right, CropHandle::BottomRight, CropHandle::Bottom,
+        CropHandle::BottomLeft, CropHandle::Left
+    };
+    for (CropHandle h : kAll) {
+        const QRect r = handleRect(h, sel);
+        if (!r.isNull()) p.drawRect(r.adjusted(0, 0, -1, -1));
+    }
+    p.setBrush(Qt::NoBrush);
+}
+
+void ViewerWidget::paintCropReadout(QPainter& p) {
+    // The size the crop will actually produce, in image pixels — not the
+    // on-screen marquee, which is whatever the current zoom makes of it.
+    const QRect img = cropRectInImage();
+    if (img.width() < 1 || img.height() < 1) return;
+    QString text = tr("%1 x %2 px").arg(img.width()).arg(img.height());
+    if (ratioLocked()) {
+        text += QStringLiteral("   %1:%2").arg(_ratioW->value()).arg(_ratioH->value());
+    }
+    const QFontMetrics fm(font());
+    const int padX = 10;
+    const int padY = 5;
+    const int w = fm.horizontalAdvance(text) + padX * 2;
+    const int h = fm.height() + padY * 2;
+    const QRect box((width() - w) / 2, height() - h - 14, w, h);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0, 190));
+    p.drawRoundedRect(box, 4, 4);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QColor(240, 240, 240));
+    p.drawText(box, Qt::AlignCenter, text);
+    p.setRenderHint(QPainter::Antialiasing, false);
 }
 
 void ViewerWidget::zoomIn() {
@@ -444,8 +786,17 @@ void ViewerWidget::keyReleaseEvent(QKeyEvent* event) {
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
     if (_cropMode && event->button() == Qt::LeftButton) {
         _cropDragging = true;
-        _cropStart = event->pos();
-        _cropRect = QRect(_cropStart, _cropStart);
+        _cropHandle = handleAt(event->pos());
+        if (_cropHandle == CropHandle::None) {
+            // Fresh marquee. The press is clamped onto the image so starting
+            // the drag out on the surrounding canvas still works.
+            _cropAnchor = clampToRect(event->pos(), imageRectOnWidget());
+            _cropRect = QRect(_cropAnchor, _cropAnchor);
+        } else if (_cropHandle == CropHandle::Body) {
+            _cropMoveOffset = event->pos() - _cropRect.normalized().topLeft();
+        } else {
+            _cropAnchor = anchorFor(_cropHandle, _cropRect.normalized());
+        }
         update();
         event->accept();
         return;
@@ -462,10 +813,27 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
 void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
     if (_cropMode) {
         if (_cropDragging) {
-            _cropRect = QRect(_cropStart, event->pos());
+            switch (_cropHandle) {
+            case CropHandle::None:          // fresh marquee — free corner
+            case CropHandle::TopLeft:
+            case CropHandle::TopRight:
+            case CropHandle::BottomRight:
+            case CropHandle::BottomLeft:
+                _cropRect = rectFromCorner(_cropAnchor, event->pos());
+                break;
+            case CropHandle::Body:
+                _cropRect = rectMoved(event->pos());
+                break;
+            default:
+                _cropRect = rectFromEdge(_cropHandle, event->pos());
+                break;
+            }
             update();
-            event->accept();
+        } else {
+            // Hover feedback: the cursor tells you which way a handle resizes.
+            setCropCursor(handleAt(event->pos()));
         }
+        event->accept();
         return;
     }
     if (_panning) {
@@ -480,11 +848,11 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
 
 void ViewerWidget::mouseReleaseEvent(QMouseEvent* event) {
     if (_cropMode && event->button() == Qt::LeftButton) {
+        // Release only ends the drag — the marquee stays up so its handles can
+        // be nudged. Enter applies, Esc cancels.
         _cropDragging = false;
-        // A drag that produced a usable rectangle commits the crop on release;
-        // an accidental click (near-zero rect) just leaves the marquee empty so
-        // the user can drag again. Enter also applies, Esc cancels.
-        _cropRect = QRect(_cropStart, event->pos()).normalized();
+        _cropHandle = CropHandle::None;
+        setCropCursor(handleAt(event->pos()));
         update();
         event->accept();
         return;
@@ -509,6 +877,33 @@ void ViewerWidget::focusOutEvent(QFocusEvent* event) {
         updateCursor();
     }
     QWidget::focusOutEvent(event);
+}
+
+void ViewerWidget::resizeEvent(QResizeEvent* event) {
+    QWidget::resizeEvent(event);
+    if (_cropMode) positionCropBar();
+}
+
+bool ViewerWidget::eventFilter(QObject* watched, QEvent* event) {
+    // The crop bar's spin boxes swallow Enter and Esc, so intercept them here
+    // and route them to the same handlers the viewer's keyPressEvent uses.
+    if (_cropBar && event->type() == QEvent::KeyPress) {
+        auto* w = qobject_cast<QWidget*>(watched);
+        if (w && (w == _cropBar || _cropBar->isAncestorOf(w))) {
+            switch (static_cast<QKeyEvent*>(event)->key()) {
+            case Qt::Key_Escape:
+                cancelCrop();
+                return true;
+            case Qt::Key_Return:
+            case Qt::Key_Enter:
+                applyCrop();
+                return true;
+            default:
+                break;
+            }
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 bool ViewerWidget::wantPan() const {
@@ -555,7 +950,9 @@ void ViewerWidget::wheelEvent(QWheelEvent* event) {
 
 void ViewerWidget::updateCursor() {
     if (_cropMode) {
-        setCursor(Qt::CrossCursor);
+        // Crop-mode cursor depends on what the pointer is over, not on pan
+        // state, so re-run the same hover test the mouse handler uses.
+        setCropCursor(handleAt(mapFromGlobal(QCursor::pos())));
         return;
     }
     if (currentImage().isNull() || _fitMode != FitMode::NoFit) {

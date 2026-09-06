@@ -145,7 +145,8 @@ void MainWindow::create() {
                      this, [this](bool active) {
                          if (active) {
                              statusBar()->showMessage(
-                                 tr("Crop: drag to select — Enter applies, Esc cancels"));
+                                 tr("Crop: drag to select, drag the handles to adjust — "
+                                   "Enter applies, Esc cancels"));
                          } else {
                              updateViewerStatusBar(_viewerWidget->editedImage().size());
                          }

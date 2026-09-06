@@ -210,3 +210,27 @@ QHeaderView::section {
 	padding: 4px 6px;
 }
 
+/* Crop tool bar — a child overlay floating over the image in the viewer, not
+   part of the window chrome, so it carries its own dark treatment rather than
+   inheriting the panel colours around it. */
+#cropBar {
+	background-color: #2a2a2a;
+	border: 1px solid #444;
+	border-radius: 4px;
+}
+#cropBar QCheckBox,
+#cropBar QLabel {
+	color: #fff;
+	background: transparent;
+}
+#cropBar QSpinBox {
+	color: #fff;
+	background-color: #3a3a3a;
+	border: 1px solid #555;
+	padding: 1px 3px;
+}
+#cropBar QSpinBox:disabled {
+	color: #888;
+	background-color: #2f2f2f;
+	border-color: #444;
+}

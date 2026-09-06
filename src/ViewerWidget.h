@@ -6,6 +6,11 @@
 #include <QRect>
 #include <QWidget>
 
+class QCheckBox;
+class QResizeEvent;
+class QSpinBox;
+class QTimer;
+
 // Image viewer surface. Phase 3 adds pan + zoom on top of Phase 1's
 // fit-to-window paint and Phase 2's prev/next signals.
 //
@@ -117,8 +122,20 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
+    // Watches the crop tool bar so Enter / Esc still apply / cancel while one
+    // of its spin boxes holds the keyboard focus.
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+    // What the pointer is over on the crop marquee: one of the eight drag
+    // handles (clockwise from the top-left), Body for the area inside them
+    // (drag to move the whole selection), or None for anywhere else.
+    enum class CropHandle {
+        None, TopLeft, Top, TopRight, Right, BottomRight, Bottom, BottomLeft,
+        Left, Body
+    };
+
     QSize currentDrawSize() const;
     const QImage& currentImage() const;
     // The on-screen rectangle the image currently occupies (top-left + draw
@@ -131,7 +148,39 @@ private:
     void commitEdit(const QImage& img);
     void cancelCrop();
     void applyCrop();
+    // Tear down crop-mode state (marquee, ants timer, tool bar) without
+    // touching the image. Shared by cancelCrop and applyCrop.
+    void endCropMode();
     void paintCropOverlay(class QPainter& p, const QRect& imageRect);
+    void paintCropHandles(class QPainter& p, const QRect& sel);
+    void paintCropReadout(class QPainter& p);
+    // The image-space rect the current marquee would cut, snapped to the exact
+    // locked ratio. Empty when the marquee is too small to be a crop. Shared by
+    // applyCrop and the readout so the number shown is the number produced.
+    QRect cropRectInImage() const;
+    // Widget-space square of one handle on `sel`.
+    QRect handleRect(CropHandle h, const QRect& sel) const;
+    // Which handle sits under `pos`, using a grab box larger than the painted
+    // square. Corners win over edges where the two overlap on a small marquee.
+    CropHandle handleAt(const QPoint& pos) const;
+    // The corner that stays put while `h` is dragged.
+    QPoint anchorFor(CropHandle h, const QRect& sel) const;
+    // Build a marquee from a fixed `anchor` corner and the dragged `moving`
+    // point, honouring the locked ratio and the image bounds.
+    QRect rectFromCorner(const QPoint& anchor, const QPoint& moving) const;
+    // Move one edge of the marquee. Under a locked ratio the perpendicular
+    // dimension follows, growing symmetrically about the rect's centre.
+    QRect rectFromEdge(CropHandle h, const QPoint& moving) const;
+    // Slide the whole marquee so the grabbed point tracks `moving`, kept
+    // wholly inside the image.
+    QRect rectMoved(const QPoint& moving) const;
+    bool ratioLocked() const;
+    double lockedRatio() const;   // width / height, or 0 when not locked
+    // Re-derive the marquee after the ratio controls changed.
+    void reapplyRatio();
+    void buildCropBar();
+    void positionCropBar();
+    void setCropCursor(CropHandle h);
     void clampTranslate();
     void updateCursor();
     // Pan starts the moment any pan-trigger becomes active (Space in
@@ -149,8 +198,24 @@ private:
     // Crop-mode state. _cropRect is in widget coordinates (normalized on use).
     bool _cropMode = false;
     bool _cropDragging = false;
-    QPoint _cropStart;
     QRect _cropRect;
+    // Which handle the live drag grabbed (None == dragging a fresh marquee),
+    // and the widget-space point that stays fixed while it moves.
+    CropHandle _cropHandle = CropHandle::None;
+    QPoint _cropAnchor;
+    // Grab point relative to the marquee's top-left, for a Body drag.
+    QPoint _cropMoveOffset;
+    // Marching ants: a dash offset stepped by _antsTimer. The timer runs only
+    // while a marquee is up, so an idle viewer repaints nothing.
+    int _antsPhase = 0;
+    QTimer* _antsTimer = nullptr;
+    // Crop tool bar. A child overlay rather than a MainWindow QToolBar so it
+    // travels with the image into F11 fullscreen and costs the browser layout
+    // nothing. Built lazily on first beginCrop(), shown only in crop mode.
+    QWidget* _cropBar = nullptr;
+    QCheckBox* _ratioCheck = nullptr;
+    QSpinBox* _ratioW = nullptr;
+    QSpinBox* _ratioH = nullptr;
     FitMode _fitMode = FitMode::FitLargeOnly;
     bool _lockZoom = false;      // when true, fit / zoom / pan survive setImage
     int _zoomIndex = 0;          // index into kZoomLevels (used when _fitMode == NoFit)
