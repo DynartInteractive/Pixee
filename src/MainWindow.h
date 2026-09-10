@@ -88,6 +88,7 @@ private slots:
     void cutViewedImageToClipboard();
     void pasteIntoCurrentFolder();
     void pasteIntoViewerImageFolder();
+    void pasteIntoSelectedTreeFolder();
     // Show RenameDialog for `path`, validate, drive FileModel::renameItem.
     // Toast on disk failure. Used from the Rename menu action AND the F2
     // shortcuts on the file list / viewer.

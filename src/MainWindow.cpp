@@ -205,6 +205,14 @@ void MainWindow::create() {
     QObject::connect(viewerPasteShortcut, &QShortcut::activated,
                      this, &MainWindow::pasteIntoViewerImageFolder);
 
+    // ...and a third context: the folder tree. Clicking a folder there
+    // moves focus to the tree, so without this Ctrl+V would do nothing
+    // right after the most natural way to pick a paste destination.
+    auto* treePasteShortcut = new QShortcut(QKeySequence::Paste, _folderTreeView);
+    treePasteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(treePasteShortcut, &QShortcut::activated,
+                     this, &MainWindow::pasteIntoSelectedTreeFolder);
+
     // Del / Shift+Del — delete via the same code path as the right-click
     // menu (confirmation dialog, viewer's advance-after-removal). Shift
     // skips the OS trash and hard-deletes (matches Explorer convention).
@@ -1903,6 +1911,22 @@ void MainWindow::pasteIntoCurrentFolder() {
     if (!folder || folder == _fileModel->rootItem()) return;
     FileOpsMenuBuilder::pasteFromClipboardToFolder(
         folder->fileInfo().filePath(), _pixee->taskManager(), this);
+}
+
+void MainWindow::pasteIntoSelectedTreeFolder() {
+    // The tree's selected folder is normally the one the central list is
+    // showing (selecting in the tree navigates), but the tree is the more
+    // direct answer to "paste where I just clicked" — and it still holds a
+    // folder in the cases where the list root doesn't (drive list).
+    const QString dest = _folderTreeView->selectedFolderPath();
+    if (!dest.isEmpty()) {
+        FileOpsMenuBuilder::pasteFromClipboardToFolder(
+            dest, _pixee->taskManager(), this);
+        return;
+    }
+    // Nothing selected in the tree (fresh start, or the selection was
+    // cleared) — fall back to the folder the list is showing.
+    pasteIntoCurrentFolder();
 }
 
 void MainWindow::pasteIntoViewerImageFolder() {

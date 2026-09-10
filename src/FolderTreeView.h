@@ -22,6 +22,11 @@ public:
     // and toasts to. Call once after construction.
     void setDropContext(TaskManager* taskManager, QWidget* dialogParent);
 
+    // Absolute path of the folder the tree currently has selected, or an
+    // empty string when nothing usable is selected. Used by the tree's
+    // Ctrl+V handler so a paste lands on the folder the user last clicked.
+    QString selectedFolderPath() const;
+
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;

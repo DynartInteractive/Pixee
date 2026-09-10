@@ -7,6 +7,7 @@
 #include <QDropEvent>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QItemSelectionModel>
 #include <QMimeData>
 #include <QPainter>
 #include <QPaintEvent>
@@ -124,6 +125,22 @@ void FolderTreeView::dragMoveEvent(QDragMoveEvent* event) {
     }
     event->setDropAction(pickDropAction(event));
     event->accept();
+}
+
+QString FolderTreeView::selectedFolderPath() const {
+    if (!selectionModel()) return QString();
+    // Prefer the selection; fall back to the current index so a row
+    // reached with the arrow keys (current, but not selected) still
+    // answers. Single-selection tree, so first() is the only row.
+    const QModelIndexList sel = selectionModel()->selectedRows();
+    const QModelIndex proxyIdx =
+        sel.isEmpty() ? selectionModel()->currentIndex() : sel.first();
+    if (!proxyIdx.isValid()) return QString();
+    const QModelIndex srcIdx = _folderFilterModel->mapToSource(proxyIdx);
+    if (!srcIdx.isValid()) return QString();
+    FileItem* item = static_cast<FileItem*>(srcIdx.internalPointer());
+    if (!item || item->fileType() != FileType::Folder) return QString();
+    return item->fileInfo().filePath();
 }
 
 void FolderTreeView::startDrag(Qt::DropActions supportedActions) {

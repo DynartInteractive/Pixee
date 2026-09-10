@@ -135,7 +135,7 @@ To regenerate the prebuilt kimageformats plugins from source (e.g. after upgradi
 | `Enter` / Double-click | Open folder or image |
 | `Ctrl + C` | Copy selection to the clipboard |
 | `Ctrl + X` | Cut selection to the clipboard (next paste moves) |
-| `Ctrl + V` | Paste into the current folder |
+| `Ctrl + V` | Paste into the current folder (or, with the folder tree focused, into the folder selected there) |
 | `Ctrl + Shift + S` | Save As… (export the selected image) |
 | `Ctrl + Q` | Quit |
 
