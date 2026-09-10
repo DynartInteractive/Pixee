@@ -104,6 +104,8 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
 }
 
 void FileListView::setRootIndex(const QModelIndex& index) {
+    const bool folderChanged = (index != rootIndex());
+
     // Wipe the previous folder's pipeline in one shot — clears the generator's
     // priority queue immediately, instead of leaving hundreds of cancelled
     // entries to be popped-and-skipped one by one. The in-flight decode (if
@@ -118,6 +120,22 @@ void FileListView::setRootIndex(const QModelIndex& index) {
     _windowCoversFolder = false;
 
     QListView::setRootIndex(index);
+
+    // Qt carries the scroll offset across a root change. Neither
+    // QListView::setRootIndex nor the updateGeometries that follows it
+    // touches the scrollbar *value* — updateVerticalScrollBar only calls
+    // setRange — and in IconMode that value is a raw pixel offset into the
+    // grid (range = contentsHeight - viewportHeight, not a row number
+    // despite ScrollPerItem; see the wheelEvent gotcha). So entering a
+    // folder inherited the previous folder's pixel offset: mid-folder when
+    // the new folder is at least as tall, pinned to the *bottom* when it's
+    // shorter and setRange clamps. Where that offset lands also shifts with
+    // the window width, since the grid re-flows. Start every folder at the
+    // top instead.
+    if (folderChanged) {
+        verticalScrollBar()->setValue(0);
+        horizontalScrollBar()->setValue(0);
+    }
 
     // Skip the debounce on folder change so the new folder's items reach the
     // generator without waiting 50 ms.
