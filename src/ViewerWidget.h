@@ -6,6 +6,8 @@
 #include <QRect>
 #include <QWidget>
 
+#include "ImageAdjust.h"
+
 class QCheckBox;
 class QResizeEvent;
 class QSpinBox;
@@ -60,13 +62,41 @@ public:
     // Rotate) call setModified(true) after mutating the in-memory buffer;
     // setImage()/setPlaceholder()/clear() reset it to false on image change.
     // modifiedChanged() lets MainWindow re-evaluate the Save action's state.
-    bool isModified() const { return _modified; }
+    // True when anything is unsaved: a baked geometry edit, a pending colour
+    // adjustment, or both.
+    bool isModified() const;
     void setModified(bool on);
 
-    // The image the user is currently looking at, including any pending edit.
-    // This is what File → Save / Save As write out. Returns a (cheap, COW)
-    // copy of the edited buffer when an edit is pending, else the loaded image.
-    QImage editedImage() const { return currentImage(); }
+    // The image the user is currently looking at, including every pending
+    // edit. This is what File → Save / Save As write out. Baked edits are
+    // already in the buffer; the colour adjustment is applied here, at full
+    // resolution, which is the one deliberately synchronous cost in the
+    // pipeline - it happens once, when the user asks to save.
+    QImage editedImage() const;
+
+    // Pixel size of the image as the user currently sees it. Deliberately
+    // separate from editedImage(): a colour adjustment never changes the size,
+    // so callers that only want dimensions must not pay for the full-resolution
+    // adjustment pass.
+    QSize currentSize() const { return currentImage().size(); }
+
+    // -- Live colour adjustment ---------------------------------------------
+    // Unlike rotate / flip / crop these are *parameters*, not pixels: they are
+    // re-applied to the pristine source every time they change, so dragging a
+    // slider never compounds and returning it to zero restores the original
+    // exactly. See the note at the top of ImageAdjust.h.
+    const ImageAdjust::Adjustments& adjustments() const { return _adjust; }
+    void setAdjustments(const ImageAdjust::Adjustments& adjustments);
+    void resetAdjustments();
+    bool hasAdjustments() const { return !_adjust.isIdentity(); }
+
+    // Keep a preview-resolution copy of the displayed pixels available (and
+    // previewUpdated flowing) even when no adjustment is pending. Off by
+    // default so plain browsing pays nothing; the histogram dock turns it on
+    // while it is visible.
+    void setPreviewEnabled(bool on);
+    bool previewEnabled() const { return _previewEnabled; }
+    const QImage& previewImage() const { return _preview; }
 
     void zoomIn();
     void zoomOut();
@@ -111,6 +141,12 @@ signals:
     // Emitted after an edit bakes into the buffer, carrying the new pixel size
     // (rotate/flip/crop can all change dimensions) so the status bar can update.
     void imageEdited(QSize size);
+    // Emitted whenever the adjustment parameters change (including a reset).
+    void adjustmentsChanged(ImageAdjust::Adjustments adjustments);
+    // The displayed pixels, at preview resolution, after every change that
+    // alters them. This is the seam the histogram panel hangs off: one
+    // producer, so the graph can never disagree with the image above it.
+    void previewUpdated(QImage preview);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -137,7 +173,29 @@ private:
     };
 
     QSize currentDrawSize() const;
+    // The logical image: the source with any baked geometry edit applied, but
+    // *not* the colour adjustment. Everything that measures or transforms the
+    // image works from this - adjustments are per-pixel, so they neither
+    // change its size nor need re-doing when it is rotated or cropped.
     const QImage& currentImage() const;
+    // The pixels to actually paint: the adjusted preview when one is live,
+    // otherwise the logical image itself.
+    const QImage& displayImage() const;
+    // Rebuild the proxy and its adjusted result, then emit previewUpdated.
+    // Drop the parameters on an image change and tell subscribers, so the
+    // Adjust panel's sliders follow the viewer instead of showing the previous
+    // image's settings over the new one.
+    void clearAdjustments();
+    void refreshPreview();
+    // Drop the cached proxy (the logical pixels changed under it) and rebuild.
+    void invalidatePreview();
+    // Top up the proxy when the view grew since it was built. Called from
+    // paintEvent, so deliberately silent - a resolution bump is not a change
+    // of content, and emitting a signal mid-paint invites re-entrancy.
+    void ensurePreviewResolution();
+    // Width the proxy needs, quantised so a resize drag does not rescale the
+    // source on every pixel of movement.
+    int previewTargetWidth() const;
     // The on-screen rectangle the image currently occupies (top-left + draw
     // size, honouring pan). Empty when there's no image. Shared by paintEvent
     // and the crop coordinate mapping so they never disagree.
@@ -192,9 +250,20 @@ private:
     void endPanIfDone();
 
     QImage _image;               // the loaded image (pristine, as decoded)
-    QImage _edited;              // in-memory edited buffer; null == no edit pending
-    bool _modified = false;      // unsaved pixel edit pending (see isModified())
+    QImage _baked;               // geometry edits baked in; null == none pending
+    bool _modified = false;      // unsaved *baked* edit pending (see isModified())
     bool _placeholder = false;   // showing a thumbnail placeholder, not full-res
+
+    // Colour-adjustment layer, sitting on top of _baked. _previewSource is the
+    // logical image downscaled to roughly what the screen shows, so a slider
+    // drag re-adjusts ~1-2 MP instead of the full 24+; _preview is that proxy
+    // with _adjust applied, and is what paintEvent draws. Both are dropped
+    // whenever the logical pixels change.
+    ImageAdjust::Adjustments _adjust;
+    QImage _previewSource;
+    QImage _preview;
+    bool _previewEnabled = false;  // keep a preview alive even with no adjustment
+    bool _bypassAdjust = false;    // B held: show the unadjusted image
     // Crop-mode state. _cropRect is in widget coordinates (normalized on use).
     bool _cropMode = false;
     bool _cropDragging = false;

@@ -25,8 +25,11 @@ class FileItem;
 class FileListView;
 class FolderTreeView;
 class ImageLoader;
+class AdjustPanel;
+class HistogramPanel;
 class MetadataPanel;
 class MetadataReader;
+class PreviewReader;
 class QAction;
 class QMenu;
 class SettingsDialog;
@@ -77,6 +80,9 @@ private slots:
     // MetadataReader results for the info panel (queued from its thread).
     void onMetadataReady(QString path, ImageMetadata metadata);
     void onMetadataReadFailed(QString path);
+    // Scaled-image result for the histogram while browsing (queued from its
+    // thread). Ignored when the viewer is up - it feeds the panel directly.
+    void onPreviewReady(QString path, QImage preview);
     void toggleFullscreen();
     void showViewerContextMenu(const QPoint& pos);
     void populateViewerZoomMenu(QMenu* zoomMenu);
@@ -89,6 +95,15 @@ private slots:
     void pasteIntoCurrentFolder();
     void pasteIntoViewerImageFolder();
     void pasteIntoSelectedTreeFolder();
+    // Del / Shift+Del with the folder tree focused — deletes the folder
+    // selected there (same confirmation + task path as the file list) and
+    // arms the fall-back-to-parent selection below.
+    void deleteSelectedTreeFolder(bool toTrash);
+    // Post-delete follow-up for deleteSelectedTreeFolder: once the task has
+    // touched the parent directory, drop the selection off the now-gone
+    // folder and navigate to its parent. No-op when the user has already
+    // moved on somewhere else.
+    void selectParentAfterFolderDelete();
     // Show RenameDialog for `path`, validate, drive FileModel::renameItem.
     // Toast on disk failure. Used from the Rename menu action AND the F2
     // shortcuts on the file list / viewer.
@@ -106,6 +121,7 @@ private slots:
 signals:
     void requestImageLoad(QString path, int taskVersion);
     void requestMetadataRead(QString path, int taskVersion);
+    void requestPreviewRead(QString path, int taskVersion);
 
 private:
     void navigateTo(FileItem* item);
@@ -174,6 +190,12 @@ private:
     void requestMetadataFor(const QString& path);
     QString currentContextImagePath() const;
     void scheduleMetadataForSelection();
+    // Point the histogram at the file list's selection. Exactly one image
+    // shows that image; anything else (nothing, several, a folder) empties the
+    // graph rather than leaving the last one on screen. No-op while the viewer
+    // is up or the dock is hidden.
+    void scheduleHistogramForSelection();
+    void requestHistogramFor(const QString& path);
     QString displayPath(const QString& storedPath) const;
     FileItem* currentFolder() const;
 
@@ -231,6 +253,25 @@ private:
     // Metadata info panel (right dock) + its off-thread reader. Same
     // supersede-on-navigate pattern as the image loader: _metadataAbortVersion
     // is bumped per request so a slow read of a superseded file self-aborts.
+    // Live colour-adjustment dock (right side, tabbed with Metadata). The
+    // panel is a view over the viewer's Adjustments value - it holds no pixels.
+    QDockWidget* _adjustDock = nullptr;
+    AdjustPanel* _adjustPanel = nullptr;
+    QAction* _adjustToggleAction = nullptr;
+
+    // Live tone distribution for the viewer's image, fed from the same
+    // previewUpdated signal that paints it.
+    QDockWidget* _histogramDock = nullptr;
+    HistogramPanel* _histogramPanel = nullptr;
+    QAction* _histogramToggleAction = nullptr;
+    // Off-thread scaled decode feeding the histogram while browsing, with the
+    // same abort-version supersede as the metadata reader.
+    QThread _previewThread;
+    PreviewReader* _previewReader = nullptr;
+    QAtomicInt _previewAbortVersion;
+    QTimer _histogramDebounce;
+    QString _pendingHistogramPath;
+
     QDockWidget* _metadataDock = nullptr;
     MetadataPanel* _metadataPanel = nullptr;
     QAction* _metadataToggleAction = nullptr;
@@ -256,6 +297,12 @@ private:
     // when applied or when the user navigates elsewhere.
     QStringList _pendingSelectPaths;
     QString _pendingSelectFolder;
+    // Folder deleted from the folder tree, waiting for its task to finish so
+    // the selection can fall back to the parent. _pendingDeletedParent is the
+    // parent's model path (FileItem::filePath keying, so itemForPath resolves
+    // it) captured before the delete, since the child's row is about to go.
+    QString _pendingDeletedFolder;
+    QString _pendingDeletedParent;
     // The modeless, stays-on-top settings window. QPointer so it auto-nulls
     // when the window closes (it's WA_DeleteOnClose).
     QPointer<SettingsDialog> _settingsDialog;

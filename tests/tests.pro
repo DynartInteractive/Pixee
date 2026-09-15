@@ -10,6 +10,8 @@ SUBDIRS = \
     FolderCleanupTask \
     TaskGroup \
     ImageTasks \
+    ImageAdjust \
+    Histogram \
     FolderExpand \
     Metadata \
     BatchRename

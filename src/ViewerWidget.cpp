@@ -55,17 +55,30 @@ ViewerWidget::ViewerWidget(QWidget* parent)
     _zoomIndex = kZoomIndex100;
 }
 
+bool ViewerWidget::isModified() const {
+    // A pending adjustment counts as unsaved just as much as a baked edit.
+    return _modified || !_adjust.isIdentity();
+}
+
 void ViewerWidget::setModified(bool on) {
     if (_modified == on) return;
+    // _modified is only half the story, so report the change in the *effective*
+    // state: clearing the baked flag while an adjustment is still pending must
+    // not tell MainWindow the viewer went clean.
+    const bool was = isModified();
     _modified = on;
-    emit modifiedChanged(_modified);
+    if (isModified() != was) emit modifiedChanged(isModified());
 }
 
 void ViewerWidget::setImage(const QImage& image) {
     _image = image;
     _placeholder = false;
     // A new image starts clean; any pending edit belonged to the old one.
-    _edited = QImage();
+    // The adjustment has to go first: setModified() reports the effective
+    // dirty state, which is still true while parameters are set.
+    _baked = QImage();
+    clearAdjustments();
+    invalidatePreview();
     setModified(false);
     cancelCrop();
     if (!_lockZoom) {
@@ -83,7 +96,9 @@ void ViewerWidget::setImage(const QImage& image) {
 void ViewerWidget::setPlaceholder(const QImage& image) {
     _image = image;
     _placeholder = true;
-    _edited = QImage();
+    _baked = QImage();
+    clearAdjustments();
+    invalidatePreview();
     setModified(false);
     cancelCrop();
     if (!_lockZoom) {
@@ -97,13 +112,19 @@ void ViewerWidget::setPlaceholder(const QImage& image) {
 void ViewerWidget::updateImage(const QImage& image) {
     _image = image;
     _placeholder = false;
+    // Same image, better pixels - so the adjustment is deliberately kept. It
+    // is a parameter, not a baked result, which is exactly what lets a slider
+    // moved over the thumbnail placeholder carry onto the full-res decode.
+    invalidatePreview();
     update();
 }
 
 void ViewerWidget::clear() {
     _image = QImage();
-    _edited = QImage();
+    _baked = QImage();
     _placeholder = false;
+    clearAdjustments();
+    invalidatePreview();
     setModified(false);
     cancelCrop();
     _translate = QPoint();
@@ -111,14 +132,115 @@ void ViewerWidget::clear() {
 }
 
 const QImage& ViewerWidget::currentImage() const {
-    return _edited.isNull() ? _image : _edited;
+    return _baked.isNull() ? _image : _baked;
+}
+
+const QImage& ViewerWidget::displayImage() const {
+    if (_bypassAdjust || _adjust.isIdentity() || _preview.isNull()) {
+        return currentImage();
+    }
+    return _preview;
+}
+
+QImage ViewerWidget::editedImage() const {
+    return ImageAdjust::applyTo(currentImage(), _adjust);
+}
+
+void ViewerWidget::setAdjustments(const ImageAdjust::Adjustments& adjustments) {
+    const ImageAdjust::Adjustments next = ImageAdjust::clamped(adjustments);
+    if (next == _adjust) return;
+    const bool wasModified = isModified();
+    _adjust = next;
+    refreshPreview();
+    emit adjustmentsChanged(_adjust);
+    if (isModified() != wasModified) emit modifiedChanged(isModified());
+}
+
+void ViewerWidget::clearAdjustments() {
+    if (_adjust.isIdentity()) return;
+    _adjust = ImageAdjust::Adjustments();
+    emit adjustmentsChanged(_adjust);
+}
+
+void ViewerWidget::resetAdjustments() {
+    setAdjustments(ImageAdjust::Adjustments());
+}
+
+void ViewerWidget::setPreviewEnabled(bool on) {
+    if (_previewEnabled == on) return;
+    _previewEnabled = on;
+    refreshPreview();
+}
+
+int ViewerWidget::previewTargetWidth() const {
+    const QImage& img = currentImage();
+    if (img.isNull()) return 0;
+    const QSize ds = currentDrawSize();
+    // Never build more pixels than the screen shows, and never more than the
+    // image has: zoomed past 1:1 that means the full-resolution image, so
+    // inspecting detail mid-adjustment is sharp rather than soft. (The cost of
+    // that case is the visible-crop proxy, deliberately left for later.)
+    const int needed = ds.isEmpty() ? img.width()
+                                    : qMin(img.width(), qMax(1, ds.width()));
+    constexpr int kStep = 256;
+    const int quantised = ((needed + kStep - 1) / kStep) * kStep;
+    return qMin(img.width(), quantised);
+}
+
+void ViewerWidget::invalidatePreview() {
+    _previewSource = QImage();
+    _preview = QImage();
+    refreshPreview();
+}
+
+void ViewerWidget::refreshPreview() {
+    const QImage& img = currentImage();
+    const bool wanted = _previewEnabled || !_adjust.isIdentity();
+    if (!wanted || img.isNull()) {
+        const bool had = !_preview.isNull() || !_previewSource.isNull();
+        _previewSource = QImage();
+        _preview = QImage();
+        if (had) {
+            update();
+            // Tell subscribers the preview is gone rather than leaving them
+            // rendering the last image's pixels - clear() lands here.
+            emit previewUpdated(QImage());
+        }
+        return;
+    }
+
+    const int target = previewTargetWidth();
+    if (_previewSource.isNull() || _previewSource.width() < target) {
+        _previewSource = target >= img.width()
+            ? img
+            : img.scaledToWidth(target, Qt::SmoothTransformation);
+    }
+    // applyTo returns the source untouched for identity parameters, so with
+    // only previewEnabled set this is just the proxy - which is what the
+    // histogram wants.
+    _preview = ImageAdjust::applyTo(_previewSource, _adjust);
+    update();
+    emit previewUpdated(_preview);
+}
+
+void ViewerWidget::ensurePreviewResolution() {
+    if (_preview.isNull()) return;
+    const QImage& img = currentImage();
+    if (img.isNull()) return;
+    const int target = previewTargetWidth();
+    if (!_previewSource.isNull() && _previewSource.width() >= target) return;
+    _previewSource = target >= img.width()
+        ? img
+        : img.scaledToWidth(target, Qt::SmoothTransformation);
+    _preview = ImageAdjust::applyTo(_previewSource, _adjust);
 }
 
 void ViewerWidget::commitEdit(const QImage& img) {
     if (img.isNull()) return;
-    _edited = img;
+    _baked = img;
     setModified(true);
     _translate = QPoint();   // aspect / bounds changed; recenter
+    invalidatePreview();     // the logical pixels moved under the proxy
     update();
     emit imageEdited(img.size());
 }
@@ -518,6 +640,11 @@ void ViewerWidget::paintEvent(QPaintEvent* /*event*/) {
     const QImage& img = currentImage();
     if (img.isNull()) return;
 
+    // Top up the proxy if the view has grown since it was built. Geometry
+    // below still comes from the logical image - a colour adjustment never
+    // changes the image's size, so only the pixels being drawn differ.
+    ensurePreviewResolution();
+
     clampTranslate();
     const QRect dst = imageRectOnWidget();
     if (dst.isEmpty()) return;
@@ -528,7 +655,7 @@ void ViewerWidget::paintEvent(QPaintEvent* /*event*/) {
     const bool smooth = (_fitMode != FitMode::NoFit)
                      || kZoomLevels[_zoomIndex] <= 1.0;
     p.setRenderHint(QPainter::SmoothPixmapTransform, smooth);
-    p.drawImage(dst, img);
+    p.drawImage(dst, displayImage());
 
     if (_cropMode) paintCropOverlay(p, dst);
 }
@@ -729,6 +856,16 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
         beginCrop();
         event->accept();
         return;
+    case Qt::Key_B:
+        // Held, not toggled: the comparison is only useful while you can see
+        // both, and a hold can never be left switched on by accident.
+        if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) break;
+        if (!_bypassAdjust && hasAdjustments()) {
+            _bypassAdjust = true;
+            update();
+        }
+        event->accept();
+        return;
     case Qt::Key_Left:
         emit prevRequested();
         event->accept();
@@ -773,6 +910,14 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
 }
 
 void ViewerWidget::keyReleaseEvent(QKeyEvent* event) {
+    if (event->key() == Qt::Key_B && !event->isAutoRepeat()) {
+        if (_bypassAdjust) {
+            _bypassAdjust = false;
+            update();
+        }
+        event->accept();
+        return;
+    }
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
         _spaceDown = false;
         endPanIfDone();
@@ -875,6 +1020,12 @@ void ViewerWidget::focusOutEvent(QFocusEvent* event) {
         _midDown = false;
         _panning = false;
         updateCursor();
+    }
+    // Same reasoning for the before/after peek: no release is coming, so it
+    // would otherwise stay stuck showing the unadjusted image.
+    if (_bypassAdjust) {
+        _bypassAdjust = false;
+        update();
     }
     QWidget::focusOutEvent(event);
 }

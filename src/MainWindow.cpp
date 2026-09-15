@@ -35,8 +35,11 @@
 #include "FileOpsMenuBuilder.h"
 #include "ImageFormats.h"
 #include "ImageLoader.h"
+#include "AdjustPanel.h"
+#include "HistogramPanel.h"
 #include "MetadataPanel.h"
 #include "MetadataReader.h"
+#include "PreviewReader.h"
 #include "MoveFileTask.h"
 #include "NewFolderDialog.h"
 #include "RenameDialog.h"
@@ -148,7 +151,7 @@ void MainWindow::create() {
                                  tr("Crop: drag to select, drag the handles to adjust — "
                                    "Enter applies, Esc cancels"));
                          } else {
-                             updateViewerStatusBar(_viewerWidget->editedImage().size());
+                             updateViewerStatusBar(_viewerWidget->currentSize());
                          }
                      });
     QObject::connect(_viewerWidget, &QWidget::customContextMenuRequested,
@@ -252,6 +255,21 @@ void MainWindow::create() {
     QObject::connect(viewerHardDeleteShortcut, &QShortcut::activated, this,
                      [deleteFromViewer]() { deleteFromViewer(/*toTrash=*/false); });
 
+    // ...and the folder tree, which deletes the folder selected there. Same
+    // third-context reasoning as Ctrl+V above: clicking a folder in the tree
+    // moves focus to it, so without this Del does nothing right after the
+    // most natural way to pick a folder.
+    auto* treeDeleteShortcut = new QShortcut(QKeySequence::Delete, _folderTreeView);
+    treeDeleteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(treeDeleteShortcut, &QShortcut::activated, this,
+                     [this]() { deleteSelectedTreeFolder(/*toTrash=*/true); });
+
+    auto* treeHardDeleteShortcut = new QShortcut(
+        QKeySequence(Qt::SHIFT | Qt::Key_Delete), _folderTreeView);
+    treeHardDeleteShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(treeHardDeleteShortcut, &QShortcut::activated, this,
+                     [this]() { deleteSelectedTreeFolder(/*toTrash=*/false); });
+
     // F2 — rename. Single-selection only on the file list; the viewer
     // always operates on the current image. Both shortcuts are
     // WidgetShortcut so the path-edit (which has no rename concept) and
@@ -325,6 +343,33 @@ void MainWindow::create() {
     connect(&_metadataDebounce, &QTimer::timeout, this,
             [this] { requestMetadataFor(_pendingMetadataPath); });
 
+    // Scaled-image reader for the histogram while browsing. Same shape as the
+    // metadata reader above, including the abort counter.
+    _previewAbortVersion.storeRelease(0);
+    _previewReader = new PreviewReader(&_previewAbortVersion);
+    _previewReader->moveToThread(&_previewThread);
+    QObject::connect(&_previewThread, &QThread::finished,
+                     _previewReader, &QObject::deleteLater);
+    QObject::connect(this, &MainWindow::requestPreviewRead,
+                     _previewReader, &PreviewReader::read);
+    QObject::connect(_previewReader, &PreviewReader::ready,
+                     this, &MainWindow::onPreviewReady);
+    // A file Qt cannot decode must empty the graph, not leave the previously
+    // selected image's distribution sitting there looking like this one's.
+    // (`aborted` needs no handler - it only ever means a newer read is coming.)
+    QObject::connect(_previewReader, &PreviewReader::failed, this,
+                     [this](QString path) {
+                         if (path == _pendingHistogramPath) {
+                             onPreviewReady(path, QImage());
+                         }
+                     });
+    _previewThread.start();
+
+    _histogramDebounce.setSingleShot(true);
+    _histogramDebounce.setInterval(120);
+    connect(&_histogramDebounce, &QTimer::timeout, this,
+            [this] { requestHistogramFor(_pendingHistogramPath); });
+
     // Browser "page" — path edit + file grid in a vertical layout. This is
     // the entire chrome that's visible in normal browsing. The viewer is a
     // sibling page in the same stack, so swapping pages naturally hides the
@@ -366,6 +411,62 @@ void MainWindow::create() {
     connect(_metadataDock, &QDockWidget::visibilityChanged, this,
             [this](bool visible) {
                 if (visible) requestMetadataFor(currentContextImagePath());
+            });
+
+    _adjustPanel = new AdjustPanel();
+    _adjustDock = new QDockWidget(tr("Adjust"));
+    _adjustDock->setObjectName("adjustDockWidget");
+    _adjustDock->setWidget(_adjustPanel);
+    _adjustDock->setFeatures(QDockWidget::DockWidgetClosable
+                             | QDockWidget::DockWidgetFloatable
+                             | QDockWidget::DockWidgetMovable);
+    addDockWidget(Qt::RightDockWidgetArea, _adjustDock);
+    _adjustDock->setVisible(QSettings().value("adjustDockEnabled", false).toBool());
+
+    // Panel -> viewer, and back again. The viewer clamps and de-duplicates, and
+    // its own setAdjustments does not echo a value the panel already holds, so
+    // this pair cannot loop.
+    connect(_adjustPanel, &AdjustPanel::adjustmentsChanged, this,
+            [this](ImageAdjust::Adjustments a) {
+                if (_viewerWidget) _viewerWidget->setAdjustments(a);
+            });
+    connect(_viewerWidget, &ViewerWidget::adjustmentsChanged, this,
+            [this](ImageAdjust::Adjustments a) {
+                if (_adjustPanel) _adjustPanel->setAdjustments(a);
+            });
+
+    _histogramPanel = new HistogramPanel();
+    _histogramDock = new QDockWidget(tr("Histogram"));
+    _histogramDock->setObjectName("histogramDockWidget");
+    _histogramDock->setWidget(_histogramPanel);
+    _histogramDock->setFeatures(QDockWidget::DockWidgetClosable
+                                | QDockWidget::DockWidgetFloatable
+                                | QDockWidget::DockWidgetMovable);
+    addDockWidget(Qt::RightDockWidgetArea, _histogramDock);
+    _histogramDock->setVisible(
+        QSettings().value("histogramDockEnabled", false).toBool());
+
+    // The viewer only keeps a preview-resolution copy of its pixels around
+    // when something wants one. An adjustment in progress is one reason; this
+    // dock being open is the other, so the graph still tracks the image when
+    // every slider is at zero.
+    connect(_histogramDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) {
+                if (_viewerWidget) _viewerWidget->setPreviewEnabled(visible);
+                if (visible && _histogramPanel && _viewerWidget) {
+                    _histogramPanel->setPreviewImage(_viewerWidget->previewImage());
+                }
+                // Browsing, not viewing: there is no viewer preview to show,
+                // so read the selected file instead.
+                if (visible) scheduleHistogramForSelection();
+            });
+    // Counting is wasted work while the dock is hidden, and previews still flow
+    // whenever an adjustment is pending.
+    connect(_viewerWidget, &ViewerWidget::previewUpdated, this,
+            [this](QImage preview) {
+                if (_histogramPanel && _histogramDock && _histogramDock->isVisible()) {
+                    _histogramPanel->setPreviewImage(preview);
+                }
             });
 
     _taskDockWidget = new TaskDockWidget(_pixee->taskManager());
@@ -480,6 +581,42 @@ void MainWindow::create() {
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
     restoreState(settings.value("mainWindowState").toByteArray());
 
+    // restoreState rebuilds the whole dock layout from saved data, so a dock
+    // added since that data was written is unknown to it and gets dropped out
+    // of any grouping set up at construction - the Adjust dock lands beside
+    // Metadata instead of tabbed with it, and once saveState() records that it
+    // stays wrong forever. So the default placement has to be re-asserted, but
+    // exactly once: doing it on every launch would stomp the user's own
+    // arrangement.
+    //
+    // Note what this deliberately does NOT use. QMainWindow::restoreDockWidget()
+    // looks like the answer (it reports whether the restored state knew about a
+    // dock) but it is specified for docks created *after* restoreState(), and
+    // these are created before it because createMenus() needs them. Calling it
+    // on a dock that is already placed and tabified corrupts QMainWindowLayout:
+    // the first launch looks fine and the *next* one dies with an access
+    // violation inside Qt6Widgets while restoring. A plain one-shot flag of our
+    // own stays inside Qt's contract and is easier to reason about.
+    // Stacked vertically, not tabbed: Histogram and Adjust are used together
+    // (you watch the clipping readout while dragging a slider), and tabs make
+    // that impossible. Metadata stays on top as the anchor, so the two editing
+    // panels end up adjacent at the bottom.
+    //
+    // The version number is what makes this re-runnable: bump it when the
+    // default arrangement changes and an existing install adopts the new one
+    // exactly once, instead of being stuck with whatever the first release
+    // happened to save.
+    constexpr int kRightDockLayout = 2;   // 1 = tabbed, 2 = stacked
+    if (settings.value("rightDockLayout", 0).toInt() < kRightDockLayout) {
+        settings.setValue("rightDockLayout", kRightDockLayout);
+        splitDockWidget(_metadataDock, _adjustDock, Qt::Vertical);
+        splitDockWidget(_adjustDock, _histogramDock, Qt::Vertical);
+        _adjustDock->setVisible(
+            settings.value("adjustDockEnabled", false).toBool());
+        _histogramDock->setVisible(
+            settings.value("histogramDockEnabled", false).toBool());
+    }
+
     // If a previous session's saved state left the folders dock detached
     // from any dock area (and not floating either), Qt won't know how to
     // show it again. Re-anchor it to the left so the menu toggle works.
@@ -572,6 +709,7 @@ void MainWindow::create() {
             if (_centerStack->currentWidget() == _viewerWidget) return;
             updateSaveActions();   // list selection drives Save As enablement
             scheduleMetadataForSelection();
+            scheduleHistogramForSelection();
         });
     // Multi-select changes (rubber-band / Ctrl-click) may not move the current
     // index, but they change the selection size that Save As gates on.
@@ -580,6 +718,9 @@ void MainWindow::create() {
         this, [this](const QItemSelection&, const QItemSelection&) {
             if (_centerStack->currentWidget() == _viewerWidget) return;
             updateSaveActions();
+            // Selecting a second file has to empty the graph, so this runs on
+            // selection size changes too, not just on the current index moving.
+            scheduleHistogramForSelection();
         });
 
     // Pick up an image path from the command line (e.g. "Pixee photo.jpg"
@@ -760,6 +901,11 @@ void MainWindow::onTouchedDirsRefreshDue() {
         }
     }
     _touchedDirs.clear();
+
+    // A folder deleted from the tree leaves the selection (and possibly the
+    // list root) pointing at something that no longer exists — step up to
+    // the parent now that the task has landed.
+    selectParentAfterFolderDelete();
 }
 
 void MainWindow::onGroupFinished(QStringList producedPaths) {
@@ -1002,8 +1148,14 @@ void MainWindow::updateSaveActions() {
     _saveAsAction->setEnabled(canSaveAs);
 
     // Save overwrites the original, which only makes sense for an edited viewer
-    // image. isModified() is always false until the editing ops land.
+    // image.
     _saveAction->setEnabled(viewerUp && _viewerWidget->isModified());
+
+    // Colour adjustment needs the full-resolution pixels, so it is viewer-only
+    // - unlike the metadata panel, which also follows the file list.
+    if (_adjustPanel) {
+        _adjustPanel->setEnabled(viewerUp && _viewerWidget->hasImage());
+    }
 }
 
 void MainWindow::updateViewerStatusBar(const QSize& size) {
@@ -1156,6 +1308,38 @@ void MainWindow::createMenus() {
                 _metadataToggleAction->setChecked(visible);
             });
     viewMenu->addAction(_metadataToggleAction);
+
+    // Adjust dock toggle - same two-way binding and stickiness as Metadata.
+    _adjustToggleAction = new QAction(tr("&Adjust"), this);
+    _adjustToggleAction->setCheckable(true);
+    _adjustToggleAction->setChecked(_adjustDock->isVisible());
+    connect(_adjustToggleAction, &QAction::toggled, this, [this](bool on) {
+        QSettings().setValue("adjustDockEnabled", on);
+        _adjustDock->setVisible(on);
+        if (on) _adjustDock->raise();
+    });
+    connect(_adjustDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) {
+                const QSignalBlocker block(_adjustToggleAction);
+                _adjustToggleAction->setChecked(visible);
+            });
+    viewMenu->addAction(_adjustToggleAction);
+
+    // Histogram dock toggle - same two-way binding and stickiness again.
+    _histogramToggleAction = new QAction(tr("&Histogram"), this);
+    _histogramToggleAction->setCheckable(true);
+    _histogramToggleAction->setChecked(_histogramDock->isVisible());
+    connect(_histogramToggleAction, &QAction::toggled, this, [this](bool on) {
+        QSettings().setValue("histogramDockEnabled", on);
+        _histogramDock->setVisible(on);
+        if (on) _histogramDock->raise();
+    });
+    connect(_histogramDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) {
+                const QSignalBlocker block(_histogramToggleAction);
+                _histogramToggleAction->setChecked(visible);
+            });
+    viewMenu->addAction(_histogramToggleAction);
 
     _tasksToggleAction = new QAction(tr("&Tasks"), this);
     _tasksToggleAction->setCheckable(true);
@@ -1554,6 +1738,55 @@ void MainWindow::scheduleMetadataForSelection() {
     _metadataDebounce.start();  // coalesces rapid selection changes
 }
 
+void MainWindow::scheduleHistogramForSelection() {
+    if (!_histogramPanel || !_histogramDock || !_histogramDock->isVisible()) return;
+    // The viewer owns the panel while it is up: it publishes the pixels it is
+    // actually painting, adjustments included, which a re-read of the file on
+    // disk would contradict.
+    if (_centerStack && _centerStack->currentWidget() == _viewerWidget) return;
+
+    QString path;
+    if (_fileListView) {
+        const FileListView::Selection sel = _fileListView->selectionPaths();
+        // Same idiom Save As gates on: imageOpsAllowed rules out folders and
+        // non-image files, so this is "exactly one image".
+        if (sel.imageOpsAllowed && sel.paths.size() == 1) path = sel.paths.first();
+    }
+    _pendingHistogramPath = path;
+
+    if (path.isEmpty()) {
+        // Nothing, several, or a folder. Clear immediately rather than after
+        // the debounce - leaving the previous image's graph up while the user
+        // rubber-bands a selection reads as the histogram being wrong.
+        _previewAbortVersion.fetchAndAddRelease(1);   // drop any in-flight read
+        _histogramDebounce.stop();
+        _histogramPanel->setPreviewImage(QImage());
+        return;
+    }
+    _histogramDebounce.start();   // coalesces arrow-key runs down a folder
+}
+
+void MainWindow::requestHistogramFor(const QString& path) {
+    if (!_histogramPanel || !_histogramDock || !_histogramDock->isVisible()) return;
+    const int taskVersion = _previewAbortVersion.fetchAndAddRelease(1) + 1;
+    if (path.isEmpty()) {
+        _histogramPanel->setPreviewImage(QImage());
+        return;
+    }
+    // Full size on purpose - Histogram::compute does the sampling, and it does
+    // it without the clipping bias a scaled decode introduces (see the note at
+    // the top of PreviewReader.h).
+    emit requestPreviewRead(path, taskVersion);
+}
+
+void MainWindow::onPreviewReady(QString path, QImage preview) {
+    if (!_histogramPanel || !_histogramDock || !_histogramDock->isVisible()) return;
+    // A read that finished after the user moved on, or after the viewer opened.
+    if (path != _pendingHistogramPath) return;
+    if (_centerStack && _centerStack->currentWidget() == _viewerWidget) return;
+    _histogramPanel->setPreviewImage(preview);
+}
+
 void MainWindow::requestMetadataFor(const QString& path) {
     // Skip the disk read entirely when nobody's looking at the panel.
     if (!_metadataDock || !_metadataDock->isVisible()) return;
@@ -1650,6 +1883,14 @@ void MainWindow::populateViewerEditMenu(QMenu* editMenu) {
     addEdit(tr("Flip vertical"),   QStringLiteral("V"),       &ViewerWidget::flipVertical);
     editMenu->addSeparator();
     addEdit(tr("Crop..."),         QStringLiteral("C"),       &ViewerWidget::beginCrop);
+    editMenu->addSeparator();
+    // One row, not five: the controls themselves live in the dock (see the
+    // menu-density note in CLAUDE.md).
+    QAction* adjust = editMenu->addAction(tr("Adjust colours..."));
+    adjust->setEnabled(enabled);
+    QObject::connect(adjust, &QAction::triggered, this, [this] {
+        if (_adjustToggleAction) _adjustToggleAction->setChecked(true);
+    });
 }
 
 void MainWindow::populateViewerZoomMenu(QMenu* zoomMenu) {
@@ -1772,6 +2013,9 @@ void MainWindow::dismissViewer() {
     _viewerImageCache.clear();
     _viewerCacheOrder.clear();
     if (_dockWasVisible) _dockWidget->show();
+    // clear() above emitted a null preview, which blanked the histogram; hand
+    // it back to whatever the file list has selected.
+    scheduleHistogramForSelection();
     setWindowTitle("Pixee");
     // Restore the folder counts now that we're back in browse mode.
     updateStatusBar(currentFolder());
@@ -1855,6 +2099,8 @@ void MainWindow::exit() {
     _metadataAbortVersion.fetchAndAddRelease(1);
     _metadataThread.quit();
     _metadataThread.wait();
+    _previewThread.quit();
+    _previewThread.wait();
 }
 
 MainWindow::~MainWindow() {}
@@ -1927,6 +2173,61 @@ void MainWindow::pasteIntoSelectedTreeFolder() {
     // Nothing selected in the tree (fresh start, or the selection was
     // cleared) — fall back to the folder the list is showing.
     pasteIntoCurrentFolder();
+}
+
+void MainWindow::deleteSelectedTreeFolder(bool toTrash) {
+    const QString path = _folderTreeView->selectedFolderPath();
+    if (path.isEmpty()) return;
+
+    // Capture the parent *now*: once the folder is gone the refresh drops
+    // its row, and with it the only handle we'd have on where to land.
+    // Stored as the model's own path spelling so itemForPath resolves it.
+    QString parentPath;
+    if (FileItem* item = _fileModel->itemForPath(path)) {
+        FileItem* parent = item->parent();
+        if (parent && parent != _fileModel->rootItem()) {
+            parentPath = parent->fileInfo().filePath();
+        }
+    }
+
+    FileOpsMenuBuilder builder({path}, _pixee->taskManager(), this);
+    // The advance callback fires only once the confirmation is through and
+    // the task is about to be enqueued, so a cancelled dialog (or a refused
+    // drive root) leaves nothing pending.
+    builder.setAdvanceCallback([this, path, parentPath]() {
+        _pendingDeletedFolder = path;
+        _pendingDeletedParent = parentPath;
+    });
+    builder.runDelete(toTrash);
+}
+
+void MainWindow::selectParentAfterFolderDelete() {
+    if (_pendingDeletedFolder.isEmpty()) return;
+    const QString gone = _pendingDeletedFolder;
+    const QString parentPath = _pendingDeletedParent;
+    // One shot: this runs off the post-task refresh tick, so whatever the
+    // outcome was, it's decided by now. A folder still on disk means the
+    // delete failed or was skipped — leave the selection alone.
+    _pendingDeletedFolder.clear();
+    _pendingDeletedParent.clear();
+    if (parentPath.isEmpty() || QFileInfo::exists(gone)) return;
+
+    // Only step up if the user is still standing on the folder that just
+    // went away — either in the tree (what they deleted from) or in the
+    // central list, which would otherwise be rooted at a dead folder.
+    const QString goneNorm = QDir::cleanPath(gone);
+    const QString treeSel = QDir::cleanPath(_folderTreeView->selectedFolderPath());
+    FileItem* cur = currentFolder();
+    const QString listCur = (cur && cur != _fileModel->rootItem())
+            ? QDir::cleanPath(cur->fileInfo().filePath())
+            : QString();
+    if (treeSel != goneNorm && listCur != goneNorm) return;
+
+    FileItem* parent = _fileModel->itemForPath(parentPath);
+    if (!parent) return;
+    // navigateTo both selects the parent in the tree and diff-refreshes it,
+    // which is what finally removes the deleted folder's row.
+    navigateTo(parent);
 }
 
 void MainWindow::pasteIntoViewerImageFolder() {

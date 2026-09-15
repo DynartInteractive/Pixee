@@ -234,3 +234,72 @@ QHeaderView::section {
 	background-color: #2f2f2f;
 	border-color: #444;
 }
+
+/* Adjust + Histogram docks. Every label needs a rule that matches it: the
+   dark background comes from QMainWindow and propagates, but text colour does
+   not — with an app stylesheet installed, a QLabel with no rule of its own
+   falls back to the near-black default and disappears into the panel. Same
+   reason #cropBar above spells its labels out. */
+#adjustPanel QLabel,
+#adjustPanel QCheckBox,
+#histogramPanel QLabel,
+#histogramPanel QCheckBox {
+	color: #fff;
+	background: transparent;
+}
+/* The before/after hint is secondary, so it sits back a little. The selector
+   is deliberately more specific than the rule above — in Qt stylesheets it is
+   specificity, not source order, that decides, and a bare #adjustHint would
+   lose to "#adjustPanel QLabel". */
+#adjustPanel QLabel#adjustHint {
+	color: #999;
+}
+
+/* Input widgets in the two panels. Without these they fall back to the native
+   light styling — readable, but a white box sitting in a dark column. Same
+   treatment #cropBar gives its spin boxes. */
+#adjustPanel QSpinBox,
+#adjustPanel QDoubleSpinBox,
+#histogramPanel QComboBox {
+	color: #fff;
+	background-color: #3a3a3a;
+	border: 1px solid #555;
+	padding: 1px 3px;
+}
+/* Sub-controls are NOT inherited from the QComboBox rule above — styling the
+   combo hands its whole rendering to QStyleSheetStyle, which then draws no
+   arrow unless one is named. branch-open.png is the theme's existing
+   downward chevron, already used by the folder tree. */
+#histogramPanel QComboBox::drop-down {
+	border: none;
+	width: 18px;
+}
+#histogramPanel QComboBox::down-arrow {
+	image: url(":/images/branch-open.png");
+	width: 9px;
+	height: 9px;
+}
+/* The popup is a separate top-level view and inherits none of the above. */
+#histogramPanel QComboBox QAbstractItemView {
+	color: #fff;
+	background-color: #3a3a3a;
+	border: 1px solid #555;
+	selection-background-color: #2b4580;
+	selection-color: #fff;
+}
+/* Disabled state. The Adjust panel is switched off whenever the viewer is not
+   up, and the white-label rule above applies regardless of enabled state — so
+   without these it would stay bright and look live while doing nothing. */
+#adjustPanel QLabel:disabled,
+#adjustPanel QCheckBox:disabled,
+#adjustPanel QSpinBox:disabled,
+#adjustPanel QDoubleSpinBox:disabled,
+#histogramPanel QComboBox:disabled {
+	color: #777;
+	background-color: #2f2f2f;
+	border-color: #444;
+}
+#adjustPanel QLabel:disabled,
+#adjustPanel QCheckBox:disabled {
+	background: transparent;
+}

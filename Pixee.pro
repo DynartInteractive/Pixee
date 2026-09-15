@@ -51,6 +51,10 @@ SOURCES += \
     src/FolderRefresher.cpp \
     src/FolderTreeView.cpp \
     src/IcoUtils.cpp \
+    src/HistogramPanel.cpp \
+    src/AdjustPanel.cpp \
+    src/Histogram.cpp \
+    src/ImageAdjust.cpp \
     src/ImageFormats.cpp \
     src/ImageLoader.cpp \
     src/MainWindow.cpp \
@@ -59,6 +63,7 @@ SOURCES += \
     src/SaveAsDialog.cpp \
     src/SaveImageTask.cpp \
     src/MetadataPanel.cpp \
+    src/PreviewReader.cpp \
     src/MetadataReader.cpp \
     src/MoveFileTask.cpp \
     src/RenameTask.cpp \
@@ -110,11 +115,16 @@ HEADERS += \
     src/BatchRenamePlan.h \
     src/SaveAsDialog.h \
     src/SaveImageTask.h \
+    src/HistogramPanel.h \
+    src/AdjustPanel.h \
+    src/Histogram.h \
+    src/ImageAdjust.h \
     src/ImageFormats.h \
     src/ImageLoader.h \
     src/ImageMetadata.h \
     src/MainWindow.h \
     src/MetadataPanel.h \
+    src/PreviewReader.h \
     src/MetadataReader.h \
     src/MoveFileTask.h \
     src/RenameTask.h \

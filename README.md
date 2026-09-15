@@ -29,6 +29,8 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Sorting** — `View → Sort by` orders the file list by name, creation date, or modification date, ascending or descending (two independent, sticky choices). Folders stay grouped ahead of files, always sorted alphabetically A→Z (only the files follow the chosen key/direction), and `..` stays first regardless. The folder tree and the folder index overlay are always name-sorted.
 - **Image viewer** integrated into the main window: async chunked loading with a cached-thumbnail placeholder, fit / 1:1 / discrete zoom (`0.1×` – `8×`), pan with `Space + LMB` or `Middle-drag`, `F11` fullscreen, plus a 5-image preload cache for instant prev/next.
 - **In-viewer editing** — rotate (`R` / `Shift + R`), flip horizontal / vertical (`H` / `V`), and **crop** (`C`) from the viewer's `Edit ▸` menu or the keys. The crop marquee has a marching-ants border, eight drag handles (corners and edge midpoints), a draggable interior that slides the whole selection, a live pixel-size readout, and an optional **fixed aspect ratio** — tick *Fixed ratio* in the crop bar and set the two numbers, e.g. `2 : 3`. `Enter` applies, `Esc` cancels. Edits are applied in memory; `File → Save` (`Ctrl + S`) writes them back over the original after a confirm, and `File → Save As…` exports the edited image to a new file. Navigating away with an unsaved edit prompts to Save, Discard, or Cancel. (Rotate re-encodes the pixels for now — lossless orientation-only rotation comes with metadata write support.)
+- **Colour adjustment** (`View → Adjust`, or `Edit ▸ Adjust colours…` in the viewer) — a dock of live sliders for **brightness, contrast, saturation, hue and gamma**, applied to the viewer's image as you drag. Unlike rotate / flip / crop these are stored as *parameters*, not baked pixels, so a slider never compounds on its own last value, dragging back to zero restores the original exactly, and the settings survive a rotation. The preview runs on a screen-resolution proxy of the image, which keeps a drag responsive on a 24 MP file; the full-resolution pass happens once, when you save. Double-click any slider's label to reset just that one, or **Reset all** for the lot, and hold `B` to compare against the original. The panel is viewer-only — it greys out while you are browsing, since adjusting needs the full-resolution image. Adjustments count as an unsaved edit, so `File → Save` / `Save As…` and the navigate-away prompt all cover them.
+- **Histogram** (`View → Histogram`) — a live tone distribution, stacked in the right-hand column with Metadata and Adjust. In the viewer it reads the *same* pixels being painted, so it follows every adjustment as you drag a slider rather than lagging a step behind, and it always covers the whole image — panning and zooming never reshape it. While browsing it follows the file list instead: select one image and it reads that file (off-thread, so a slow share never stalls the list); select several, or none, and it empties rather than leaving the last one on screen. RGB (additively blended, so overlaps read as the colour they actually make) or luminance, an optional **log scale** for when one flat expanse of sky would otherwise squash everything else onto the axis, and a **clipping readout** showing what percentage of the image has been pushed off each end.
 - **Metadata panel** (`View → Metadata`) — a read-only info dock for the focused image, updating both as you select thumbnails and as you navigate the viewer. Reads off-thread so it never stalls browsing on a network share. Shows dimensions / format / size and any **embedded PNG text** — including AI-tool generation data (ComfyUI `prompt`/`workflow`, Automatic1111 `parameters`) — out of the box; with the optional [Exiv2](https://exiv2.org/) backend it adds full **EXIF / IPTC / XMP** — camera, exposure, date taken, GPS, and a complete tag dump. Right-click or `Ctrl + C` copies a value (handy for lifting a long prompt). See [`docs/metadata.md`](docs/metadata.md) to enable Exiv2.
 - **Format support** for everything Qt's image plugins can decode — JPEG, PNG, WebP, GIF, BMP, ICO, plus whatever extra plugins (HEIC, AVIF, PSD via [`kimageformats`](https://invent.kde.org/frameworks/kimageformats), …) are installed against your Qt build. ICO files pick the highest-area, highest-bit-depth sub-image. See [`docs/windows-extra-image-formats.md`](docs/windows-extra-image-formats.md) for the Windows MSVC setup recipe.
 - **Pixel-art aware** — nearest-neighbor upscaling for source images smaller than the cell, smooth scaling for downscaling. Transparent images render over a configurable checker pattern.
@@ -136,6 +138,7 @@ To regenerate the prebuilt kimageformats plugins from source (e.g. after upgradi
 | `Ctrl + C` | Copy selection to the clipboard |
 | `Ctrl + X` | Cut selection to the clipboard (next paste moves) |
 | `Ctrl + V` | Paste into the current folder (or, with the folder tree focused, into the folder selected there) |
+| `Del` / `Shift + Del` | Delete the selection to the recycle bin / permanently (with the folder tree focused, deletes the folder selected there and steps up to its parent) |
 | `Ctrl + Shift + S` | Save As… (export the selected image) |
 | `Ctrl + Q` | Quit |
 
@@ -154,12 +157,13 @@ To regenerate the prebuilt kimageformats plugins from source (e.g. after upgradi
 | `R` / `Shift + R` | Rotate right / left |
 | `H` / `V` | Flip horizontal / vertical |
 | `C` | Crop — drag a rectangle, drag the handles to resize or the inside to move it, then `Enter` to apply / `Esc` to cancel |
+| `B` (hold) | Compare with the original — temporarily hides any pending colour adjustment |
 | `F11` | Toggle fullscreen |
 | `Esc` / `Enter` / Double-click | Return to the file list (prompts if there's an unsaved edit) |
 | `Ctrl + C` / `Ctrl + X` / `Ctrl + V` | Copy / Cut / Paste the current image |
 | `Ctrl + S` | Save (overwrite the original with the edited image) |
 | `Ctrl + Shift + S` | Save As… (export the current image) |
-| Right-click | Context menu — `Edit ▸` (rotate / flip / crop), `Zoom ▸`, **Copy to…** |
+| Right-click | Context menu — `Edit ▸` (rotate / flip / crop / adjust colours), `Zoom ▸`, **Copy to…** |
 
 ## 🎨 Theming
 

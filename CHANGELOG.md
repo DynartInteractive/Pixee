@@ -5,6 +5,62 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
+## [0.3.0] — 2026-09-15
+
+### Colour adjustment
+
+- **Adjust dock** (`View → Adjust`, or `Edit ▸ Adjust colours…` in the viewer) —
+  live sliders for **brightness, contrast, saturation, hue and gamma**, applied
+  to the viewer's image as you drag. Unlike rotate / flip / crop these are kept
+  as *parameters* rather than baked pixels, so a slider never compounds on its
+  own last value, dragging back to zero restores the original exactly, and the
+  settings survive a rotation. Double-click a slider's label to reset just that
+  one, **Reset all** for the lot, and hold **`B`** to compare against the
+  original.
+- The preview runs on a screen-resolution proxy, which is what keeps a drag
+  responsive: a full 24 MP pass measures 174 ms, the proxy 15 ms. Zooming past
+  1:1 falls back to full resolution rather than going soft, and the
+  full-resolution pass happens once — when you save.
+- Adjustments count as an unsaved edit, so `File → Save`, `Save As…` and the
+  navigate-away prompt all cover them. The panel is viewer-only and greys out
+  while browsing, since adjusting needs the full-resolution image.
+
+### Histogram
+
+- **Histogram dock** (`View → Histogram`) — RGB (additively blended, so overlaps
+  read as the colour they actually make) or luminance, an optional **log scale**
+  for when one flat expanse of sky would otherwise squash everything onto the
+  axis, and a **clipping readout** showing how much of the image has been pushed
+  off each end.
+- In the viewer it reads the *same* pixels being painted, so it follows every
+  adjustment as you drag rather than lagging a step behind, and it always covers
+  the whole image — panning and zooming never reshape it. While browsing it
+  follows the file list instead: one image selected reads that file off-thread;
+  several, or none, empties the graph rather than leaving the last one up.
+
+### File operations
+
+- **`Del` / `Shift + Del` with the folder tree focused** now deletes the folder
+  selected there — to the recycle bin or permanently — with the same
+  confirmation and task pipeline as the file list, then steps the selection up
+  to the parent.
+- **`Ctrl + V` with the folder tree focused** pastes into the folder selected
+  there rather than the folder being browsed.
+
+### Interface
+
+- The Metadata, Adjust and Histogram docks share the right-hand column,
+  **stacked vertically** so an open histogram and metadata panel are visible at
+  the same time. All three fit alongside the image at 1280×720.
+- Dark theme: the new panels' labels, spin boxes and drop-downs are themed
+  rather than falling back to near-black text on a dark ground.
+
+### Fixed
+
+- Folders now open scrolled to the top. `QListView::setRootIndex` re-roots
+  without resetting the scroll offset, so a folder could open part-way down —
+  or pinned to its bottom when it was shorter than the previous one.
+
 ## [0.2.0] — 2026-08-25
 
 ### Metadata
