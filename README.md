@@ -21,7 +21,7 @@
 
 ## ⬇️ Download
 
-**Windows** — [**Installer** (`Pixee-0.1.0-setup.exe`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.1.0/Pixee-0.1.0-setup.exe) · [**Portable** (`Pixee-0.1.0-portable.zip`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.1.0/Pixee-0.1.0-portable.zip)
+**Windows** — [**Installer** (`Pixee-0.3.0-setup.exe`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.3.0/Pixee-0.3.0-setup.exe) · [**Portable** (`Pixee-0.3.0-portable.zip`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.3.0/Pixee-0.3.0-portable.zip)
 
 The installer registers Pixee in Explorer's **Open with…**; the portable is a self-contained folder — unzip and run `Pixee.exe`. Both are **unsigned** for now, so SmartScreen warns on first run (*More info → Run anyway*).
 
