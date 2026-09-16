@@ -9,7 +9,15 @@
   <img src="https://img.shields.io/badge/License-MIT-blue" alt="License">
 </p>
 
-![Pixee screenshot](docs/screenshot-v1.jpg)
+<p align="center">
+  <img src="docs/screenshot-list-v1.jpg" alt="Pixee browsing a folder of images as a thumbnail grid"><br>
+  <em>List view</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot-view-v1.jpg" alt="Pixee showing a single image in the viewer"><br>
+  <em>Image view</em>
+</p>
 
 ## ⬇️ Download
 
