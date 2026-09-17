@@ -190,6 +190,33 @@ export(copy_themes.commands)
 QMAKE_EXTRA_TARGETS += first copy_themes
 
 # Default rules for deployment.
-qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
-!isEmpty(target.path): INSTALLS += target
+qnx {
+    target.path = /tmp/$${TARGET}/bin
+    !isEmpty(target.path): INSTALLS += target
+}
+
+# Freedesktop install layout (Linux packaging, incl. the Flatpak build, which
+# runs `make install INSTALL_ROOT=` with PREFIX=/app). Pass PREFIX to override:
+#     qmake PREFIX=/app Pixee.pro
+# Config::themeSearchPaths() knows about <prefix>/share/pixee/themes, which is
+# why the themes tree can live there rather than beside the binary.
+unix:!android:!qnx:!macx {
+    isEmpty(PREFIX): PREFIX = /usr/local
+    APP_ID = net.dynart.Pixee
+
+    target.path = $$PREFIX/bin
+
+    themes_install.path = $$PREFIX/share/pixee/themes
+    themes_install.files = $$PWD/themes/*
+
+    desktop_install.path = $$PREFIX/share/applications
+    desktop_install.files = $$PWD/packaging/$${APP_ID}.desktop
+
+    metainfo_install.path = $$PREFIX/share/metainfo
+    metainfo_install.files = $$PWD/packaging/$${APP_ID}.metainfo.xml
+
+    icon_install.path = $$PREFIX/share/icons/hicolor/scalable/apps
+    icon_install.files = $$PWD/resources/icons/$${APP_ID}.svg
+
+    INSTALLS += target themes_install desktop_install metainfo_install icon_install
+}

@@ -1,5 +1,7 @@
 #include "Pixee.h"
 #include <QCoreApplication>
+#include <QGuiApplication>
+#include <QIcon>
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QSettings>
@@ -22,8 +24,24 @@ Pixee::Pixee(int argc, char** argv) : _argc(argc) {
     QCoreApplication::setApplicationName("Pixee");
     QCoreApplication::setApplicationVersion(QStringLiteral(APP_VERSION));
 
+    // Ties the running window to its .desktop file. Without it Qt reports a
+    // WM_CLASS of "Pixee", which does not match the desktop entry's id, so
+    // Wayland compositors (and GNOME's dash) show the window under a generic
+    // icon instead of ours — the icon lives in the desktop entry, not in the
+    // window, on that platform. Harmless everywhere else.
+    QGuiApplication::setDesktopFileName(QStringLiteral("net.dynart.Pixee"));
+
     // _argc, not the by-value parameter — see the comment in Pixee.h.
     _app = new QApplication(_argc, argv);
+
+    // X11 and Windows read the icon off the window, so set it there too.
+    // fromTheme picks up the installed hicolor icon; the qrc copy covers the
+    // portable build, which installs nothing. Both are SVG, so this needs
+    // Qt's svg image plugin — without it the icon is simply absent, the same
+    // as the settings dialog's SVG icons.
+    QIcon icon = QIcon::fromTheme(QStringLiteral("net.dynart.Pixee"));
+    if (icon.isNull()) icon = QIcon(QStringLiteral(":/icons/app.svg"));
+    if (!icon.isNull()) QApplication::setWindowIcon(icon);
 
     // Must precede any widget construction (below) so tr() picks up the
     // chosen language while the UI is built.

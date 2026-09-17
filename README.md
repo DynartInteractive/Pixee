@@ -85,7 +85,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
   </p>
 
 - **Languages** — English plus Hungarian / German / French / Spanish scaffolding; pick one in Settings (restart to apply) or follow the OS locale. Untranslated strings fall back to English.
-- **Themable** — Qt stylesheet (`style.qss`) plus an INI for non-CSS values (`style.ini`). User overrides drop in at `~/.pixee/themes/<name>/`. Dark theme included.
+- **Themable** — Qt stylesheet (`style.qss`) plus an INI for non-CSS values (`style.ini`). User overrides drop in at `<data dir>/themes/<name>/` (see [Theming](#-theming)). Dark theme included.
 
 ## 🛠️ Building
 
@@ -171,6 +171,16 @@ Two independent plugin sets, both **MSVC-only** — the kit must be `msvc2022_64
 
 To regenerate the prebuilt kimageformats plugins from source (e.g. after upgrading Qt), see [`docs/windows-extra-image-formats.md`](docs/windows-extra-image-formats.md).
 
+### Linux: Flatpak
+
+```sh
+flatpak install flathub org.kde.Platform//6.11 org.kde.Sdk//6.11 org.flatpak.Builder
+flatpak run org.flatpak.Builder --user --install --force-clean build packaging/net.dynart.Pixee.yml
+flatpak run net.dynart.Pixee
+```
+
+The manifest builds from the working tree, so no tag or commit is needed to try it. Packaging files live in [`packaging/`](packaging/); [`docs/flatpak.md`](docs/flatpak.md) covers what the sandbox changes about the app and the permissions it needs, and [`docs/flathub-requirements.md`](docs/flathub-requirements.md) is the submission checklist. Pixee is **not on Flathub yet**.
+
 ## ⌨️ Keyboard
 
 ### File browser
@@ -222,12 +232,12 @@ themes/dark/
 └── style.ini      # extra colours / sizes (checker pattern, index-thumbnail margin, ...)
 ```
 
-Drop a folder at `~/.pixee/themes/<name>/` to override the bundled assets without rebuilding. Anything missing from the user theme falls through to the embedded defaults.
+Drop a folder at `<data dir>/themes/<name>/` to override the bundled assets without rebuilding, where `<data dir>` is `~/.local/share/Dynart/Pixee` on Linux and `~/.pixee` on Windows. (Pixee also still reads `~/.pixee/themes/` on Linux, so a theme from an older version keeps working.) Anything missing from the user theme falls through to the embedded defaults.
 
 ## 🏗️ Architecture
 
 - **Threads** — GUI for view & model; dedicated workers for the SQLite thumbnail cache, four parallel thumbnail decoders, directory enumeration, and full-res viewer loads. Cross-thread communication is exclusively via Qt signals/slots with queued connections.
-- **Cache** — `~/.pixee/thumbnails.s3db` (SQLite, WAL). Path-keyed; `mtime + size` validate freshness; PNG storage when the source has an alpha channel, JPEG otherwise; format auto-detected on read.
+- **Cache** — `thumbnails.s3db` in the data dir above (SQLite, WAL). Path-keyed; `mtime + size` validate freshness; PNG storage when the source has an alpha channel, JPEG otherwise; format auto-detected on read.
 - **Models** — hand-rolled `QAbstractItemModel` + two `QSortFilterProxyModel` instances drive a `QTreeView` (folder dock) and a `QListView` (icon grid). No `QFileSystemModel`, no `QFileDialog` for the central browser — both behave poorly on Windows network shares.
 
 ## 📄 License

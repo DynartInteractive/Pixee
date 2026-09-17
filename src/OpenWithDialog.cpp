@@ -1,5 +1,6 @@
 #include "OpenWithDialog.h"
 
+#include <QDesktopServices>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -11,8 +12,10 @@
 #include <QProcess>
 #include <QPushButton>
 #include <QSettings>
+#include <QUrl>
 #include <QVBoxLayout>
 
+#include "Config.h"
 #include "Toast.h"
 
 namespace {
@@ -32,6 +35,18 @@ QString defaultProgramsFolder() {
     return QStringLiteral("/usr/bin");
 #endif
 }
+}
+
+void OpenWithDialog::openWithDesktop(const QStringList& filePaths,
+                                     QWidget* errorParent) {
+    for (const QString& path : filePaths) {
+        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path))) {
+            Toast::show(errorParent,
+                tr("Couldn't open \"%1\"").arg(QFileInfo(path).fileName()),
+                Toast::Error);
+            return;   // one failure means the whole route is unavailable
+        }
+    }
 }
 
 QList<OpenWithProgram> OpenWithDialog::loadPrograms() {
@@ -66,7 +81,14 @@ void OpenWithDialog::savePrograms(const QList<OpenWithProgram>& programs) {
 void OpenWithDialog::launch(const OpenWithProgram& program,
                             const QStringList& filePaths,
                             QWidget* errorParent) {
-    if (program.path.isEmpty() || filePaths.isEmpty()) return;
+    if (filePaths.isEmpty()) return;
+    // In a sandbox the stored path points at a host binary that isn't here;
+    // the desktop's own chooser is the only route that works.
+    if (Config::isSandboxed()) {
+        openWithDesktop(filePaths, errorParent);
+        return;
+    }
+    if (program.path.isEmpty()) return;
     if (!QProcess::startDetached(program.path, filePaths)) {
         Toast::show(errorParent,
             tr("Failed to launch \"%1\"").arg(program.label),

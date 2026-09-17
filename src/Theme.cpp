@@ -19,14 +19,19 @@ void Theme::apply(QWidget* widget) {
 }
 
 QString Theme::_basePath() {
-    QString postfix = "/themes/" + _config->theme() + "/";
-    QString themePath = _config->userFolder() + postfix;
-    QFileInfo info(themePath);
-    if (info.exists(themePath)) {
-        return themePath;
+    const QString postfix = "/themes/" + _config->theme() + "/";
+    const QStringList roots = _config->themeSearchPaths();
+    for (const QString& root : roots) {
+        const QString themePath = root + postfix;
+        if (QFileInfo::exists(themePath)) {
+            return themePath;
+        }
     }
-    themePath = _config->appFolder() + postfix;
-    return themePath;
+    // Nothing found: hand back the binary-adjacent path anyway. realPath()
+    // falls back to the ":/" resource for every asset that doesn't exist
+    // there, so a missing theme degrades to the built-in look rather than
+    // failing.
+    return _config->appFolder() + postfix;
 }
 
 QString Theme::realPath(QString path) {

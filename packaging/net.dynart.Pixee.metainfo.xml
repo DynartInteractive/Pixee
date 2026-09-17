@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Dynart Interactive -->
+<component type="desktop-application">
+  <id>net.dynart.Pixee</id>
+
+  <name>Pixee</name>
+  <summary>Browse and view your image files</summary>
+  <summary xml:lang="hu">Képfájlok böngészése és megtekintése</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="net.dynart">
+    <name>Dynart Interactive</name>
+  </developer>
+
+  <launchable type="desktop-id">net.dynart.Pixee.desktop</launchable>
+
+  <description>
+    <p>
+      Pixee is a fast, minimalist image manager. It browses folders as a
+      thumbnail grid, opens images in a built-in viewer, and handles the
+      everyday file work — copy, move, rename, delete — without leaving the
+      window.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Thumbnail grid backed by a local cache, filled in the background so browsing stays responsive</li>
+      <li>Viewer with fit / 1:1 / stepped zoom, panning, fullscreen and instant previous / next</li>
+      <li>In-viewer editing: rotate, flip and crop with a fixed-ratio marquee</li>
+      <li>Live colour adjustment — brightness, contrast, saturation, hue and gamma</li>
+      <li>Metadata panel, including the embedded text chunks that AI image tools write</li>
+      <li>Live histogram while browsing and while viewing</li>
+      <li>Background file operations with progress, conflict prompts and batch rename</li>
+    </ul>
+    <p>
+      Pixee reads and writes ordinary folders, so it fits alongside whatever
+      else you already use — it keeps no library and imports nothing.
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/DynartInteractive/Pixee</url>
+  <url type="bugtracker">https://github.com/DynartInteractive/Pixee/issues</url>
+  <url type="vcs-browser">https://github.com/DynartInteractive/Pixee</url>
+
+  <!-- Screenshots are fetched at build time and mirrored by Flathub. Repoint
+       these at the release tag when cutting a release if you want them frozen
+       to that version's UI. -->
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-list-v1.jpg</image>
+      <caption>Browsing a folder as a thumbnail grid</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-view-v1.jpg</image>
+      <caption>The viewer, with the metadata, adjust and histogram panels</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-crop-v2.jpg</image>
+      <caption>Cropping an image to a fixed aspect ratio</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-batch-rename-dialog-v1.jpg</image>
+      <caption>Renaming a selection of files in one step</caption>
+    </screenshot>
+  </screenshots>
+
+  <categories>
+    <category>Graphics</category>
+    <category>Photography</category>
+    <category>Viewer</category>
+  </categories>
+
+  <keywords>
+    <keyword>image</keyword>
+    <keyword>photo</keyword>
+    <keyword>picture</keyword>
+    <keyword>browser</keyword>
+    <keyword>viewer</keyword>
+    <keyword>thumbnail</keyword>
+    <keyword>gallery</keyword>
+  </keywords>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#8ea4f5</color>
+    <color type="primary" scheme_preference="dark">#2b3a8f</color>
+  </branding>
+
+  <content_rating type="oars-1.1"/>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <recommends>
+    <!-- The UI is designed against a 1280x720 baseline. -->
+    <display_length compare="ge">1024</display_length>
+  </recommends>
+
+  <releases>
+    <release version="0.3.0" date="2026-09-15">
+      <description>
+        <p>Colour adjustment, a live histogram, batch rename and Save / Save As.</p>
+      </description>
+      <url type="details">https://github.com/DynartInteractive/Pixee/releases/tag/v0.3.0</url>
+    </release>
+    <release version="0.2.0" date="2026-09-06">
+      <description>
+        <p>Image viewer with in-viewer editing, metadata panel and the task system.</p>
+      </description>
+      <url type="details">https://github.com/DynartInteractive/Pixee/releases/tag/v0.2.0</url>
+    </release>
+  </releases>
+</component>

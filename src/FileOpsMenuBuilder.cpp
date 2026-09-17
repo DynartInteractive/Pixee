@@ -14,6 +14,7 @@
 #include <QString>
 #include <QUrl>
 
+#include "Config.h"
 #include "CopyFileTask.h"
 #include "DeleteFileTask.h"
 #include "FileOpsHelpers.h"
@@ -103,24 +104,37 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     // shell via double-click instead. Always shows at least a 'Configure...'
     // entry so the user can discover the dialog before adding any programs.
     if (_imageOpsEnabled) {
-        QMenu* openMenu = menu->addMenu(tr("Open with"));
-        const QList<OpenWithProgram> programs = OpenWithDialog::loadPrograms();
         const QStringList paths = _paths;
         QWidget* dialogParent = _dialogParent;
-        for (const OpenWithProgram& p : programs) {
-            QAction* a = openMenu->addAction(p.label);
-            const OpenWithProgram pCopy = p;
-            connect(a, &QAction::triggered, this, [pCopy, paths, dialogParent]() {
-                OpenWithDialog::launch(pCopy, paths, dialogParent);
+
+        // Sandboxed: one entry that hands the file to the desktop's chooser.
+        // The configurable list can't work there — the paths it stores are
+        // host binaries, absent from the sandbox — and a submenu holding a
+        // single item would only cost a row in a menu with a 720px budget.
+        if (Config::isSandboxed()) {
+            QAction* openAct = menu->addAction(tr("Open with..."));
+            connect(openAct, &QAction::triggered, this, [paths, dialogParent]() {
+                OpenWithDialog::openWithDesktop(paths, dialogParent);
             });
+            menu->addSeparator();
+        } else {
+            QMenu* openMenu = menu->addMenu(tr("Open with"));
+            const QList<OpenWithProgram> programs = OpenWithDialog::loadPrograms();
+            for (const OpenWithProgram& p : programs) {
+                QAction* a = openMenu->addAction(p.label);
+                const OpenWithProgram pCopy = p;
+                connect(a, &QAction::triggered, this, [pCopy, paths, dialogParent]() {
+                    OpenWithDialog::launch(pCopy, paths, dialogParent);
+                });
+            }
+            if (!programs.isEmpty()) openMenu->addSeparator();
+            QAction* configAct = openMenu->addAction(tr("Configure..."));
+            connect(configAct, &QAction::triggered, this, [dialogParent]() {
+                OpenWithDialog dlg(dialogParent);
+                dlg.exec();
+            });
+            menu->addSeparator();
         }
-        if (!programs.isEmpty()) openMenu->addSeparator();
-        QAction* configAct = openMenu->addAction(tr("Configure..."));
-        connect(configAct, &QAction::triggered, this, [dialogParent]() {
-            OpenWithDialog dlg(dialogParent);
-            dlg.exec();
-        });
-        menu->addSeparator();
     }
 
     // ---- Refresh thumbnail ----

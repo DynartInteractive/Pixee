@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/icons">
+        <file alias="app.svg">resources/icons/net.dynart.Pixee.svg</file>
         <file alias="hard-drive.png">resources/icons/hard-drive.png</file>
         <file alias="folder.png">resources/icons/folder.png</file>
         <file alias="folder-big.png">resources/icons/folder-big.png</file>

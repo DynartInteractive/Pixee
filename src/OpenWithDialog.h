@@ -33,6 +33,14 @@ public:
                        const QStringList& filePaths,
                        QWidget* errorParent);
 
+    // Hand the files to the desktop's own application chooser. Inside a
+    // sandbox this goes through the xdg-desktop-portal OpenURI call, which is
+    // how a confined app is meant to open a file in another application —
+    // the portal runs it outside the sandbox on the user's behalf, with no
+    // need for the app to hold host-spawn permission.
+    static void openWithDesktop(const QStringList& filePaths,
+                                QWidget* errorParent);
+
 private slots:
     void onAdd();
     void onRemove();

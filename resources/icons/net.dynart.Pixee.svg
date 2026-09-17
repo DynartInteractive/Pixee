@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pixee application icon. Installed as the freedesktop hicolor scalable
+     icon (net.dynart.Pixee.svg) and used for the window icon via the qrc. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4F6BED"/>
+      <stop offset="1" stop-color="#2B3A8F"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EAF0FF"/>
+      <stop offset="1" stop-color="#FFFFFF"/>
+    </linearGradient>
+    <clipPath id="frame">
+      <rect x="48" y="78" width="160" height="120" rx="14"/>
+    </clipPath>
+  </defs>
+
+  <!-- app tile -->
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#tile)"/>
+
+  <!-- the photo behind, hinting at a stack -->
+  <rect x="64" y="50" width="128" height="100" rx="12" fill="#FFFFFF" opacity="0.32"/>
+
+  <!-- the photo in front -->
+  <rect x="48" y="78" width="160" height="120" rx="14" fill="url(#sky)"/>
+  <circle cx="168" cy="112" r="15" fill="#FFB020"/>
+  <g clip-path="url(#frame)">
+    <path d="M48 176 L96 122 L142 176 Z" fill="#3E8E6A"/>
+    <path d="M118 176 L160 134 L208 176 Z" fill="#2F6F53"/>
+    <rect x="48" y="172" width="160" height="26" fill="#27573F"/>
+  </g>
+</svg>

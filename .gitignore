@@ -62,3 +62,11 @@ dist/
 # Exiv2 metadata backend (optional, GPLv2+): binaries stay local, not in the
 # repo — drop them here per docs/metadata.md to build with PIXEE_HAVE_EXIV2=1.
 thirdparty/exiv2/
+
+# qmake generates one of these per test binary on Linux.
+target_wrapper.sh
+
+# Flatpak local builds (flatpak-builder writes these into the repo root)
+/build/
+/.flatpak-builder/
+/repo/

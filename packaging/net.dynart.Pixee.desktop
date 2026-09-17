@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Pixee
+GenericName=Image Manager
+GenericName[hu]=Képkezelő
+Comment=Browse, view and organise your images
+Comment[hu]=Képek böngészése, megtekintése és rendezése
+Exec=Pixee %f
+Icon=net.dynart.Pixee
+Terminal=false
+Categories=Graphics;Photography;Viewer;Qt;
+Keywords=image;photo;picture;browser;viewer;thumbnail;gallery;
+Keywords[hu]=kép;fotó;fénykép;böngésző;néző;bélyegkép;galéria;
+MimeType=image/jpeg;image/png;image/gif;image/bmp;image/tiff;image/webp;image/avif;image/heif;image/jxl;image/svg+xml;image/x-icon;image/vnd.microsoft.icon;image/x-portable-pixmap;image/x-portable-bitmap;image/x-portable-graymap;image/x-xbitmap;image/x-xpixmap;image/x-tga;
+StartupNotify=true
+# Matches the WM_CLASS Qt reports; QGuiApplication::setDesktopFileName in
+# Pixee.cpp covers Wayland, this covers X11 window managers that use WM_CLASS.
+StartupWMClass=Pixee

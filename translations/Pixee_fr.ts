@@ -309,132 +309,137 @@ Prefix/suffix by typing around {name}, e.g. IMG_{name}.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="106"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="114"/>
+        <source>Open with...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="120"/>
         <source>Open with</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="118"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="130"/>
         <source>Configure...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="132"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="145"/>
         <source>Refresh thumbnail</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="143"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="156"/>
         <source>Copy</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="152"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="165"/>
         <source>Cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="163"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="176"/>
         <source>Copy to &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="166"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="168"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="179"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="181"/>
         <source>Copy to...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="175"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="188"/>
         <source>Move to &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="178"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="180"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="191"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="193"/>
         <source>Move to...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="200"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="213"/>
         <source>Rename...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="213"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="512"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="513"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="226"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="525"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="526"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="420"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="433"/>
         <source>Refusing to copy a drive root: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="425"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="438"/>
         <source>Cannot copy %1 into itself or a subfolder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="432"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="445"/>
         <source>Copy %1 to &quot;%2&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="433"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="446"/>
         <source>Copy %1 file(s) to &quot;%2&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="465"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="478"/>
         <source>Refusing to move a drive root: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="470"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="483"/>
         <source>Cannot move %1 into itself or a subfolder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="478"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="491"/>
         <source>Move %1 to &quot;%2&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="479"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="492"/>
         <source>Move %1 file(s) to &quot;%2&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="507"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="520"/>
         <source>Refusing to delete a drive root: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="512"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="513"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="525"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="526"/>
         <source>Permanently delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="515"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="528"/>
         <source>%1 &quot;%2&quot;?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="516"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="529"/>
         <source>%1 %2 selected items?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="523"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="536"/>
         <source>%1 &quot;%2&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="524"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="537"/>
         <source>%1 %2 item(s)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1005,62 +1010,67 @@ Reading metadata…</source>
 <context>
     <name>OpenWithDialog</name>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="72"/>
+        <location filename="../src/OpenWithDialog.cpp" line="50"/>
+        <source>Couldn&apos;t open &quot;%1&quot;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithDialog.cpp" line="97"/>
         <source>Failed to launch &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="78"/>
+        <location filename="../src/OpenWithDialog.cpp" line="103"/>
         <source>Configure programs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="84"/>
+        <location filename="../src/OpenWithDialog.cpp" line="109"/>
         <source>Add...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="85"/>
+        <location filename="../src/OpenWithDialog.cpp" line="110"/>
         <source>Remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="86"/>
+        <location filename="../src/OpenWithDialog.cpp" line="111"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="122"/>
+        <location filename="../src/OpenWithDialog.cpp" line="147"/>
         <source>Programs (*.exe);;All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="124"/>
+        <location filename="../src/OpenWithDialog.cpp" line="149"/>
         <source>All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="127"/>
+        <location filename="../src/OpenWithDialog.cpp" line="152"/>
         <source>Pick a program</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="133"/>
+        <location filename="../src/OpenWithDialog.cpp" line="158"/>
         <source>Program label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="133"/>
+        <location filename="../src/OpenWithDialog.cpp" line="158"/>
         <source>Display name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="149"/>
+        <location filename="../src/OpenWithDialog.cpp" line="174"/>
         <source>Remove program</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="150"/>
+        <location filename="../src/OpenWithDialog.cpp" line="175"/>
         <source>Remove &quot;%1&quot; from the list?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1083,32 +1093,32 @@ Reading metadata…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="304"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="317"/>
         <source>Refusing to paste a drive root: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="309"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="322"/>
         <source>Cannot paste %1 into itself or a subfolder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="324"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="337"/>
         <source>Move %1 file(s) to &quot;%2&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="326"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="339"/>
         <source>Paste %1 file(s) to &quot;%2&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="355"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="368"/>
         <source>Move out: delete &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="356"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="369"/>
         <source>Move out: delete %1 item(s)</source>
         <translation type="unfinished"></translation>
     </message>
