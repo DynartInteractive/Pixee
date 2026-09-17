@@ -31,26 +31,40 @@ account that submitted. Whichever account you use becomes the maintainer of
 `flathub/net.dynart.Pixee`. Using your normal account is fine — just be aware
 this is the one that gets the review notifications and the update PRs forever.
 
-## 3. Cut a release
+## 3. Cut a release — **done: v0.4.0**
 
-Flathub builds from an immutable tarball, and none of the packaging files exist
-at `v0.3.0` — so you need a new tag after this work is committed.
+Flathub builds from an immutable tarball, and none of the packaging files existed
+at `v0.3.0`, so this needed a new tag. `v0.4.0` is tagged and pushed, which is
+all the manifest needs: GitHub generates the source tarball for any tag
+automatically, with no Release object required.
 
-1. Decide the number. These changes are features plus a behaviour change, so
-   pre-1.0 that's a **minor bump: 0.4.0**. Edit `VERSION.txt` — it's the single
-   source, everything else reads it.
+Two things about v0.4.0 are worth knowing before you submit:
+
+- **There are no Windows binaries for it.** Building those needs your Windows
+  machine, and 0.4.0 changes nothing there beyond the window icon, so the
+  README's download links still point at the 0.3.0 assets. If you'd rather the
+  release page not look half-finished, build and attach the 0.4.0 installer and
+  portable before announcing it — Flathub neither needs nor looks at them.
+- **Creating the GitHub Release object is optional** for Flathub, but it's what
+  makes the `<url type="details">` link in the metainfo resolve, and it's where
+  release notes live for humans. `docs/release-0.4.0.md` is written and ready to
+  paste in.
+
+For future releases the procedure is:
+
+1. Decide the number — pre-1.0, features bump the minor, fixes the patch. Edit
+   `VERSION.txt`; it's the single source, everything else reads it.
 2. Add a `<release>` entry at the top of
    `packaging/net.dynart.Pixee.metainfo.xml` with that version and the date.
    This text becomes the "What's new" in software centres, so a sentence or two,
    written for users rather than for a changelog.
 3. Validate it: `appstreamcli validate packaging/net.dynart.Pixee.metainfo.xml`
-4. Update `CHANGELOG.md` and `README.md` as usual.
-5. Commit, then `git tag v0.4.0 && git push --tags`.
-6. Create the GitHub release so the tarball URL exists.
+4. Update `CHANGELOG.md`, `README.md` and add a `docs/release-<version>.md`.
+5. Commit, then `git tag v<version> && git push --tags`.
 
 ## 4. Pin the manifest to that tarball
 
-Take the sha256:
+**This is the next thing to do.** Take the sha256:
 
 ```sh
 curl -sL https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.4.0.tar.gz \

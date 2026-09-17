@@ -5,6 +5,49 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
+## [0.4.0] — 2026-09-17
+
+Linux packaging. Pixee can now be built and installed as a Flatpak, which also
+gives it the desktop integration it never had on Linux: an app icon, a launcher
+entry and app-store metadata. Nothing about the Windows build changes except
+that the window finally carries an icon.
+
+### Linux packaging
+
+- **Flatpak** — `packaging/net.dynart.Pixee.yml` builds against the KDE 6.11
+  runtime. `flatpak run org.flatpak.Builder --user --install --force-clean build
+  packaging/net.dynart.Pixee.yml` and you have it; the manifest builds from the
+  working tree, so no tag or commit is needed to try one.
+- **More image formats, for free** — the KDE runtime bundles kimageformats, so
+  the Flatpak reads HEIC/HEIF, AVIF, JPEG XL, PSD/PSB, XCF, KRA, ORA, DDS, QOI
+  and SVG without the plugin juggling the Windows build needs.
+- **Desktop integration** — a desktop entry with MIME associations (Pixee shows
+  up in your file manager's *Open with*), AppStream metadata for software
+  centres, and an app icon. The window is tied to its desktop entry via
+  `setDesktopFileName`, which is what Wayland reads the icon from.
+- **`make install`** — `Pixee.pro` now installs under `$$PREFIX` (default
+  `/usr/local`) following the freedesktop layout, replacing the old
+  `/opt/Pixee/bin` default.
+- **Not on Flathub yet** — see [`docs/flathub-requirements.md`](docs/flathub-requirements.md)
+  for what's left.
+
+### Changed
+
+- **The Linux data folder moved to the XDG location** —
+  `~/.local/share/Dynart/Pixee` instead of `~/.pixee`. Your thumbnail cache is
+  carried across automatically on first run, and a user theme in the old
+  location keeps working. Windows is unchanged. This exists so the Flatpak,
+  which is granted the host filesystem, keeps its state to itself instead of
+  writing a dot-folder into your real home.
+- **"Open with" inside a Flatpak** goes through the desktop's own application
+  chooser rather than the configurable program list — in a sandbox those stored
+  paths point at host binaries that aren't reachable. Unchanged everywhere else.
+
+### Added
+
+- **App icon** — used for the launcher, the software-centre listing, and the
+  window itself on Windows and X11.
+
 ## [0.3.0] — 2026-09-15
 
 ### Colour adjustment

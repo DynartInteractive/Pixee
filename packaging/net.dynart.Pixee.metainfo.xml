@@ -98,6 +98,16 @@
   </recommends>
 
   <releases>
+    <release version="0.4.0" date="2026-09-17">
+      <description>
+        <p>
+          Pixee is now available as a Flatpak, with a proper launcher entry and
+          app icon. The Flatpak reads more image formats than before, including
+          HEIC, AVIF, JPEG XL, PSD and XCF.
+        </p>
+      </description>
+      <url type="details">https://github.com/DynartInteractive/Pixee/releases/tag/v0.4.0</url>
+    </release>
     <release version="0.3.0" date="2026-09-15">
       <description>
         <p>Colour adjustment, a live histogram, batch rename and Save / Save As.</p>
