@@ -62,27 +62,30 @@ For future releases the procedure is:
 4. Update `CHANGELOG.md`, `README.md` and add a `docs/release-<version>.md`.
 5. Commit, then `git tag v<version> && git push --tags`.
 
-## 4. Pin the manifest to that tarball
+## 4. Pin the manifest to that tarball — **done and verified**
 
-**This is the next thing to do.** Take the sha256:
-
-```sh
-curl -sL https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.4.0.tar.gz \
-    | sha256sum
-```
-
-In the copy you submit (**not** the one in this repo — that one stays a `dir`
-source so local builds stay easy), replace the `sources:` block with:
+The submission manifest is `packaging/net.dynart.Pixee.yml` with its `sources:`
+block replaced by the pinned release tarball. Keep the repo copy as a `dir`
+source — that's what makes local builds convenient — and change it only in the
+copy you put in the Flathub PR:
 
 ```yaml
     sources:
       - type: archive
         url: https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.4.0.tar.gz
-        sha256: <the hash>
+        sha256: 393907fbb8545e20f1562b107ac23e37cbb6a0ad77c91e5a21ff34f916099ae3
 ```
 
-Then build *that* version once locally and run it, so you know the tarball builds
-as cleanly as the working tree did.
+That exact manifest has been built and run: it produces a working Pixee 0.4.0,
+and both linters return only the expected errors (see below). So the buildbot
+should have nothing to say that a reviewer doesn't.
+
+For a future release, regenerate the hash with:
+
+```sh
+curl -sL https://github.com/DynartInteractive/Pixee/archive/refs/tags/v<version>.tar.gz \
+    | sha256sum
+```
 
 ## 5. Open the submission PR
 
