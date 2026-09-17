@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="docs/screenshot-view-v1.jpg" alt="Pixee showing a single image in the viewer"><br>
-  <em>Image view</em>
+  <em>Image view with Metadata, Adjust and Histogram docks</em>
 </p>
 
 ## ⬇️ Download
