@@ -39,13 +39,31 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **In-viewer editing** — rotate (`R` / `Shift + R`), flip horizontal / vertical (`H` / `V`), and **crop** (`C`) from the viewer's `Edit ▸` menu or the keys. The crop marquee has a marching-ants border, eight drag handles (corners and edge midpoints), a draggable interior that slides the whole selection, a live pixel-size readout, and an optional **fixed aspect ratio** — tick *Fixed ratio* in the crop bar and set the two numbers, e.g. `2 : 3`. `Enter` applies, `Esc` cancels. Edits are applied in memory; `File → Save` (`Ctrl + S`) writes them back over the original after a confirm, and `File → Save As…` exports the edited image to a new file. Navigating away with an unsaved edit prompts to Save, Discard, or Cancel. (Rotate re-encodes the pixels for now — lossless orientation-only rotation comes with metadata write support.)
 
   <p align="center">
-    <img src="docs/screenshot-crop-v1.jpg" alt="Pixee's crop marquee over a photo, with the fixed-ratio bar set to 2 : 3 and a 452 x 678 px readout"><br>
-    <em>Cropping at a fixed 2 : 3 ratio</em>
+    <img src="docs/screenshot-crop-v2.jpg" alt="Pixee's crop marquee over a photo, with the fixed-ratio bar set to 2 : 3, a 452 x 678 px readout, and the viewer context menu open on the Edit submenu"><br>
+    <em>Cropping at a fixed 2 : 3 ratio, with the viewer's <code>Edit ▸</code> menu open</em>
   </p>
 
 - **Colour adjustment** (`View → Adjust`, or `Edit ▸ Adjust colours…` in the viewer) — a dock of live sliders for **brightness, contrast, saturation, hue and gamma**, applied to the viewer's image as you drag. Unlike rotate / flip / crop these are stored as *parameters*, not baked pixels, so a slider never compounds on its own last value, dragging back to zero restores the original exactly, and the settings survive a rotation. The preview runs on a screen-resolution proxy of the image, which keeps a drag responsive on a 24 MP file; the full-resolution pass happens once, when you save. Double-click any slider's label to reset just that one, or **Reset all** for the lot, and hold `B` to compare against the original. The panel is viewer-only — it greys out while you are browsing, since adjusting needs the full-resolution image. Adjustments count as an unsaved edit, so `File → Save` / `Save As…` and the navigate-away prompt all cover them.
+
+  <p align="center">
+    <img src="docs/screenshot-adjust-dock-v1.jpg" alt="The Adjust dock: brightness, contrast, saturation, hue and gamma sliders, each with a spin box, and a Reset all button"><br>
+    <em>The Adjust dock</em>
+  </p>
+
 - **Histogram** (`View → Histogram`) — a live tone distribution, stacked in the right-hand column with Metadata and Adjust. In the viewer it reads the *same* pixels being painted, so it follows every adjustment as you drag a slider rather than lagging a step behind, and it always covers the whole image — panning and zooming never reshape it. While browsing it follows the file list instead: select one image and it reads that file (off-thread, so a slow share never stalls the list); select several, or none, and it empties rather than leaving the last one on screen. RGB (additively blended, so overlaps read as the colour they actually make) or luminance, an optional **log scale** for when one flat expanse of sky would otherwise squash everything else onto the axis, and a **clipping readout** showing what percentage of the image has been pushed off each end.
+
+  <p align="center">
+    <img src="docs/screenshot-histogram-dock-v1.jpg" alt="The Histogram dock showing an additively blended RGB plot, a channel selector, a Log checkbox and a shadow/highlight clipping readout"><br>
+    <em>The Histogram dock</em>
+  </p>
+
 - **Metadata panel** (`View → Metadata`) — a read-only info dock for the focused image, updating both as you select thumbnails and as you navigate the viewer. Reads off-thread so it never stalls browsing on a network share. Shows dimensions / format / size and any **embedded PNG text** — including AI-tool generation data (ComfyUI `prompt`/`workflow`, Automatic1111 `parameters`) — out of the box; with the optional [Exiv2](https://exiv2.org/) backend it adds full **EXIF / IPTC / XMP** — camera, exposure, date taken, GPS, and a complete tag dump. Right-click or `Ctrl + C` copies a value (handy for lifting a long prompt). See [`docs/metadata.md`](docs/metadata.md) to enable Exiv2.
+
+  <p align="center">
+    <img src="docs/screenshot-metadata-dock-v1.jpg" alt="The Metadata dock listing dimensions, megapixels, format, file size and modified date, plus an Embedded text group holding a ComfyUI prompt"><br>
+    <em>The Metadata dock, showing a PNG’s embedded ComfyUI prompt</em>
+  </p>
+
 - **Format support** for everything Qt's image plugins can decode — JPEG, PNG, WebP, GIF, BMP, ICO, plus whatever extra plugins (HEIC, AVIF, PSD via [`kimageformats`](https://invent.kde.org/frameworks/kimageformats), …) are installed against your Qt build. ICO files pick the highest-area, highest-bit-depth sub-image. See [`docs/windows-extra-image-formats.md`](docs/windows-extra-image-formats.md) for the Windows MSVC setup recipe.
 - **Pixel-art aware** — nearest-neighbor upscaling for source images smaller than the cell, smooth scaling for downscaling. Transparent images render over a configurable checker pattern.
 - **SMB-friendly** — chunked file reads with cooperative abort, off-GUI directory enumeration, no `QFileSystemModel` / `QFileDialog` for browsing. Designed for image folders sitting on a network share.
