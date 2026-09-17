@@ -61,8 +61,8 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Metadata panel** (`View → Metadata`) — a read-only info dock for the focused image, whether that's the viewer's or a selected thumbnail. Reads off-thread, so it never stalls browsing on a network share. Shows dimensions / format / size plus any **embedded PNG text** — including AI-tool generation data (ComfyUI `prompt`/`workflow`, Automatic1111 `parameters`) — out of the box; the optional [Exiv2](https://exiv2.org/) backend adds full **EXIF / IPTC / XMP**: camera, exposure, date taken, GPS and a complete tag dump. Right-click or `Ctrl + C` copies a value. See [`docs/metadata.md`](docs/metadata.md) to enable Exiv2.
 
   <p align="center">
-    <img src="docs/screenshot-metadata-dock-v1.jpg" alt="The Metadata dock listing dimensions, megapixels, format, file size and modified date, plus an Embedded text group holding a ComfyUI prompt"><br>
-    <em>The Metadata dock, showing a PNG’s embedded ComfyUI prompt</em>
+    <img src="docs/screenshot-metadata-dock-v2.jpg" alt="The Metadata dock listing dimensions, megapixels, format, file size and modified date, with an Embedded text group holding a ComfyUI prompt and its right-click menu open on Copy value"><br>
+    <em>The Metadata dock — right-click a row to copy the full value</em>
   </p>
 
 - **Format support** for everything Qt's image plugins can decode — JPEG, PNG, WebP, GIF, BMP, ICO, plus whatever extra plugins (HEIC, AVIF, PSD via [`kimageformats`](https://invent.kde.org/frameworks/kimageformats), …) are installed against your Qt build. ICO files pick the highest-area, highest-bit-depth sub-image. Windows MSVC recipe: [`docs/windows-extra-image-formats.md`](docs/windows-extra-image-formats.md).
