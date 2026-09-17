@@ -69,9 +69,21 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Pixel-art aware** — nearest-neighbor upscaling for images smaller than the cell, smooth scaling down. Transparent images render over a configurable checker pattern.
 - **SMB-friendly** — chunked reads with cooperative abort, off-GUI enumeration, no `QFileSystemModel` / `QFileDialog`. Built for image folders sitting on a network share.
 - **File operations** — Copy / Cut / Paste / Move / Rename / Delete / New folder through a task pipeline. The conflict prompt shows the two clashing files **side by side** — Existing vs Incoming, each with a thumbnail and dimensions / size / date — so you pick Skip / Rename / Overwrite by eye rather than by path. Moves and renames **keep the cached thumbnail** (the row is repointed, not regenerated), and a finished batch selects the files it added and scrolls them into view (toggle in Settings).
-- **Batch rename** (`Tools → Batch rename…`) — renames the whole selection at once: find & replace, a `{name}` / `{n}` pattern (prefix, suffix and zero-padded numbering with a configurable Start / Step), and keep-extension. A live before→after table previews every name and flags clashes — two files heading for the same name is blocked, a name that already exists on disk prompts per file. Same task pipeline, so the same progress dock and conflict handling.
+- **Batch rename** (`Tools → Batch rename…`) — renames the whole selection at once: find & replace (optionally case-sensitive), a `{name}` / `{n}` pattern with a configurable Start / Step (`{n:3}` zero-pads to three digits; prefix and suffix fall out of typing around `{name}`), and keep-extension. A live before→after table previews every name and flags clashes — two files heading for the same name is blocked, a name that already exists on disk prompts per file. Same task pipeline, so the same progress dock and conflict handling.
+
+  <p align="center">
+    <img src="docs/screenshot-batch-rename-dialog-v1.jpg" alt="The Batch rename dialog: find and replace fields, a {name}-{n:3} pattern with its token tooltip open, Start and Step spin boxes, and a before-and-after table of three files"><br>
+    <em>Batch rename, with the pattern tooltip listing the tokens</em>
+  </p>
+
 - **Save / Save As** (`File → Save`, `Ctrl + S` / `File → Save As…`, `Ctrl + Shift + S`) — write the focused image (the viewer's, or a single selected thumbnail) to any folder, name and format. The format list offers only what your Qt build can actually **write**, with a quality slider for the lossy ones (JPEG / WebP). With an unsaved edit, Save overwrites the original after a confirm and Save As exports the edited pixels; with no edit, Save As converts straight from the file on disk. Both run through the task pipeline, so the side-by-side conflict prompt covers them.
 - **Settings window** (`Edit → Settings…`) — a non-modal, always-on-top panel: type to filter any label, groups in an icon sidebar, Save / Cancel. Currently *Select added files* and *Language*.
+
+  <p align="center">
+    <img src="docs/screenshot-settings-dialog-v1.jpg" alt="The Settings window: a search box, a File operations / General icon sidebar, and the General page with the Language dropdown open"><br>
+    <em>Settings, with the language list open</em>
+  </p>
+
 - **Languages** — English plus Hungarian / German / French / Spanish scaffolding; pick one in Settings (restart to apply) or follow the OS locale. Untranslated strings fall back to English.
 - **Themable** — Qt stylesheet (`style.qss`) plus an INI for non-CSS values (`style.ini`). User overrides drop in at `~/.pixee/themes/<name>/`. Dark theme included.
 
