@@ -187,12 +187,20 @@ void MainWindow::create() {
     // Ctrl+X — cut paths to the clipboard (same payload as Ctrl+C, tagged
     // Move so the next paste relocates the source). Mirrors the two-context
     // Ctrl+C wiring above.
-    auto* listCutShortcut = new QShortcut(QKeySequence::Cut, _fileListView);
+    //
+    // Bound explicitly rather than with QKeySequence::Cut: on Windows that
+    // standard key expands to Ctrl+X *and Shift+Del*, which collides with the
+    // Shift+Del hard-delete below. Two shortcuts matching one sequence on the
+    // same widget are ambiguous, so Qt fires activatedAmbiguously() on both
+    // and activated() on neither — Shift+Del silently did nothing. Explorer
+    // treats Shift+Del as permanent delete too, so this is also the right
+    // precedence. (Qt::CTRL is Cmd on macOS, so it stays cross-platform.)
+    auto* listCutShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_X), _fileListView);
     listCutShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(listCutShortcut, &QShortcut::activated,
                      this, &MainWindow::cutFileListSelectionToClipboard);
 
-    auto* viewerCutShortcut = new QShortcut(QKeySequence::Cut, _viewerWidget);
+    auto* viewerCutShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_X), _viewerWidget);
     viewerCutShortcut->setContext(Qt::WidgetShortcut);
     QObject::connect(viewerCutShortcut, &QShortcut::activated,
                      this, &MainWindow::cutViewedImageToClipboard);
