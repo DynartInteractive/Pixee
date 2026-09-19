@@ -291,152 +291,152 @@ Előtag/utótag: {name} köré gépelve, pl. IMG_{name}.</translation>
 <context>
     <name>FileOpsMenuBuilder</name>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="76"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="77"/>
         <source>Paste (Move)</source>
         <translation>Beillesztés (áthelyezés)</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="76"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="77"/>
         <source>Paste</source>
         <translation>Beillesztés</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="83"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="84"/>
         <source>New folder...</source>
         <translation>Új mappa…</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="114"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="115"/>
         <source>Open with...</source>
         <translation>Megnyitás ezzel…</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="120"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="121"/>
         <source>Open with</source>
         <translation>Megnyitás ezzel</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="130"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="131"/>
         <source>Configure...</source>
         <translation>Beállítás…</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="145"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="146"/>
         <source>Refresh thumbnail</source>
         <translation>Bélyegkép frissítése</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="156"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="157"/>
         <source>Copy</source>
         <translation>Másolás</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="165"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="166"/>
         <source>Cut</source>
         <translation>Kivágás</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="176"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="177"/>
         <source>Copy to &quot;%1&quot;</source>
         <translation>Másolás ide: „%1”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="179"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="181"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="180"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="182"/>
         <source>Copy to...</source>
         <translation>Másolás ide…</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="188"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="189"/>
         <source>Move to &quot;%1&quot;</source>
         <translation>Áthelyezés ide: „%1”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="191"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="193"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="192"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="194"/>
         <source>Move to...</source>
         <translation>Áthelyezés ide…</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="213"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="214"/>
         <source>Rename...</source>
         <translation>Átnevezés…</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="226"/>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="525"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="227"/>
         <location filename="../src/FileOpsMenuBuilder.cpp" line="526"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="527"/>
         <source>Delete</source>
         <translation>Törlés</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="433"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="434"/>
         <source>Refusing to copy a drive root: %1</source>
         <translation>Meghajtó gyökere nem másolható: %1</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="438"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="439"/>
         <source>Cannot copy %1 into itself or a subfolder</source>
         <translation>%1 nem másolható önmagába vagy az almappájába</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="445"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="446"/>
         <source>Copy %1 to &quot;%2&quot;</source>
         <translation>%1 másolása ide: „%2”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="446"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="447"/>
         <source>Copy %1 file(s) to &quot;%2&quot;</source>
         <translation>%1 fájl másolása ide: „%2”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="478"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="479"/>
         <source>Refusing to move a drive root: %1</source>
         <translation>Meghajtó gyökere nem helyezhető át: %1</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="483"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="484"/>
         <source>Cannot move %1 into itself or a subfolder</source>
         <translation>%1 nem helyezhető át önmagába vagy az almappájába</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="491"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="492"/>
         <source>Move %1 to &quot;%2&quot;</source>
         <translation>%1 áthelyezése ide: „%2”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="492"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="493"/>
         <source>Move %1 file(s) to &quot;%2&quot;</source>
         <translation>%1 fájl áthelyezése ide: „%2”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="520"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="521"/>
         <source>Refusing to delete a drive root: %1</source>
         <translation>Meghajtó gyökere nem törölhető: %1</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="525"/>
         <location filename="../src/FileOpsMenuBuilder.cpp" line="526"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="527"/>
         <source>Permanently delete</source>
         <translation>Végleges törlés</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="528"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="529"/>
         <source>%1 &quot;%2&quot;?</source>
         <translation>%1: „%2”?</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="529"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="530"/>
         <source>%1 %2 selected items?</source>
         <translation>%1: %2 kijelölt elem?</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="536"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="537"/>
         <source>%1 &quot;%2&quot;</source>
         <translation>%1: „%2”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="537"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="538"/>
         <source>%1 %2 item(s)</source>
         <translation>%1: %2 elem</translation>
     </message>
@@ -488,308 +488,312 @@ Előtag/utótag: {name} köré gépelve, pl. IMG_{name}.</translation>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/MainWindow.cpp" line="151"/>
+        <location filename="../src/MainWindow.cpp" line="157"/>
         <source>Crop: drag to select, drag the handles to adjust — Enter applies, Esc cancels</source>
         <translation>Vágás: húzással jelölhető ki, a fogantyúkkal módosítható — Enter alkalmaz, Esc kilép</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="400"/>
+        <location filename="../src/MainWindow.cpp" line="414"/>
         <source>Metadata</source>
         <translation>Metaadatok</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="417"/>
+        <location filename="../src/MainWindow.cpp" line="431"/>
         <source>Adjust</source>
         <translation>Színkorrekció</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="439"/>
+        <location filename="../src/MainWindow.cpp" line="453"/>
         <source>Histogram</source>
         <translation>Hisztogram</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="990"/>
+        <location filename="../src/MainWindow.cpp" line="1004"/>
         <source>Select one or more files to rename first.</source>
         <translation>Előbb ki kell jelölni az átnevezendő fájlokat.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1007"/>
+        <location filename="../src/MainWindow.cpp" line="1021"/>
         <source>These names swap around in a cycle — rename in two passes, or use an intermediate name.</source>
         <translation>Ezek a nevek körbe cserélődnek — két menetben kell átnevezni, vagy átmeneti nevet használni.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1013"/>
+        <location filename="../src/MainWindow.cpp" line="1027"/>
         <source>Rename %1 file(s)</source>
         <translation>%1 fájl átnevezése</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1034"/>
+        <location filename="../src/MainWindow.cpp" line="1048"/>
         <source>Save</source>
         <translation>Mentés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1035"/>
+        <location filename="../src/MainWindow.cpp" line="1049"/>
         <source>Overwrite the original file?</source>
         <translation>Felülírja az eredeti fájlt?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1036"/>
+        <location filename="../src/MainWindow.cpp" line="1050"/>
         <source>%1 will be replaced with your edited version.</source>
         <translation>A(z) %1 helyére a szerkesztett változat kerül.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1040"/>
+        <location filename="../src/MainWindow.cpp" line="1054"/>
         <source>This is a lossy format, so re-saving may slightly reduce image quality. Use Save As to keep the original.</source>
         <translation>Ez veszteséges formátum, az újramentés kissé ronthatja a képminőséget. Az eredeti megtartásához használja a Mentés másként funkciót.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1066"/>
-        <location filename="../src/MainWindow.cpp" line="1115"/>
+        <location filename="../src/MainWindow.cpp" line="1080"/>
+        <location filename="../src/MainWindow.cpp" line="1129"/>
         <source>Save %1</source>
         <translation>%1 mentése</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1083"/>
+        <location filename="../src/MainWindow.cpp" line="1097"/>
         <source>Unsaved changes</source>
         <translation>Mentetlen változtatások</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1084"/>
+        <location filename="../src/MainWindow.cpp" line="1098"/>
         <source>This image has unsaved edits.</source>
         <translation>A képen mentetlen szerkesztések vannak.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1085"/>
+        <location filename="../src/MainWindow.cpp" line="1099"/>
         <source>Save your changes, or discard them?</source>
         <translation>Menti a változtatásokat, vagy elveti őket?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1166"/>
+        <location filename="../src/MainWindow.cpp" line="1180"/>
         <source>Width: %1 | Height: %2</source>
         <translation>Szélesség: %1 | Magasság: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1187"/>
+        <location filename="../src/MainWindow.cpp" line="1201"/>
         <source>Images: %1  |  Folders: %2</source>
         <translation>Képek: %1  |  Mappák: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1193"/>
+        <location filename="../src/MainWindow.cpp" line="1207"/>
         <source>&amp;File</source>
         <translation>&amp;Fájl</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1198"/>
+        <location filename="../src/MainWindow.cpp" line="1212"/>
         <source>&amp;Save</source>
         <translation>&amp;Mentés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1202"/>
+        <location filename="../src/MainWindow.cpp" line="1216"/>
         <source>Save &amp;As...</source>
         <translation>Mentés más&amp;ként…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1208"/>
+        <location filename="../src/MainWindow.cpp" line="1222"/>
         <source>&amp;Quit</source>
         <translation>Ki&amp;lépés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1216"/>
+        <location filename="../src/MainWindow.cpp" line="1230"/>
         <source>&amp;Edit</source>
         <translation>S&amp;zerkesztés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1217"/>
+        <location filename="../src/MainWindow.cpp" line="1231"/>
         <source>&amp;Settings...</source>
         <translation>&amp;Beállítások…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1222"/>
+        <location filename="../src/MainWindow.cpp" line="1236"/>
         <source>&amp;View</source>
         <translation>&amp;Nézet</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1223"/>
+        <location filename="../src/MainWindow.cpp" line="1237"/>
         <source>&amp;Refresh</source>
         <translation>&amp;Frissítés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1232"/>
+        <location filename="../src/MainWindow.cpp" line="1246"/>
         <source>&amp;Sort by</source>
         <translation>&amp;Rendezés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1247"/>
+        <location filename="../src/MainWindow.cpp" line="1261"/>
         <source>&amp;Alphabetical</source>
         <translation>&amp;Ábécé szerint</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1248"/>
+        <location filename="../src/MainWindow.cpp" line="1262"/>
         <source>&amp;Created date</source>
         <translation>&amp;Létrehozás dátuma</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1249"/>
+        <location filename="../src/MainWindow.cpp" line="1263"/>
         <source>&amp;Modified date</source>
         <translation>&amp;Módosítás dátuma</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1266"/>
+        <location filename="../src/MainWindow.cpp" line="1280"/>
         <source>As&amp;cending</source>
         <translation>Nö&amp;vekvő</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1267"/>
+        <location filename="../src/MainWindow.cpp" line="1281"/>
         <source>&amp;Descending</source>
         <translation>&amp;Csökkenő</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1275"/>
+        <location filename="../src/MainWindow.cpp" line="1289"/>
         <source>&amp;Folders</source>
         <translation>&amp;Mappák</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1297"/>
+        <location filename="../src/MainWindow.cpp" line="1311"/>
         <source>&amp;Metadata</source>
         <translation>Meta&amp;adatok</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1313"/>
+        <location filename="../src/MainWindow.cpp" line="1327"/>
         <source>&amp;Adjust</source>
         <translation>&amp;Színkorrekció</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1329"/>
+        <location filename="../src/MainWindow.cpp" line="1343"/>
         <source>&amp;Histogram</source>
         <translation>&amp;Hisztogram</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1344"/>
+        <location filename="../src/MainWindow.cpp" line="1358"/>
         <source>&amp;Tasks</source>
         <translation>Fela&amp;datok</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1370"/>
+        <location filename="../src/MainWindow.cpp" line="1384"/>
         <source>&amp;Tools</source>
         <translation>&amp;Eszközök</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1371"/>
+        <location filename="../src/MainWindow.cpp" line="1385"/>
         <source>&amp;Batch rename...</source>
         <translation>&amp;Kötegelt átnevezés…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1374"/>
+        <location filename="../src/MainWindow.cpp" line="1388"/>
         <source>&amp;Help</source>
         <translation>Sú&amp;gó</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1375"/>
+        <location filename="../src/MainWindow.cpp" line="1389"/>
         <source>&amp;About</source>
         <translation>&amp;Névjegy</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1381"/>
-        <source>&lt;b&gt;Pixee&lt;/b&gt; %1&lt;br&gt;&lt;br&gt;An image manager built on Qt 6.&lt;br&gt;&lt;a href=&quot;https://github.com/DynartInteractive/Pixee&quot;&gt;Pixee on GitHub&lt;/a&gt;</source>
-        <translation>&lt;b&gt;Pixee&lt;/b&gt; %1&lt;br&gt;&lt;br&gt;Qt 6 alapú képkezelő.&lt;br&gt;&lt;a href=&quot;https://github.com/DynartInteractive/Pixee&quot;&gt;A Pixee a GitHubon&lt;/a&gt;</translation>
+        <location filename="../src/MainWindow.cpp" line="1395"/>
+        <source>&lt;b&gt;Pixee&lt;/b&gt; %1&lt;br&gt;&lt;small&gt;Built %2&lt;/small&gt;&lt;br&gt;&lt;br&gt;An image manager built on Qt 6.&lt;br&gt;&lt;a href=&quot;https://github.com/DynartInteractive/Pixee&quot;&gt;Pixee on GitHub&lt;/a&gt;</source>
+        <translation>&lt;b&gt;Pixee&lt;/b&gt; %1&lt;br&gt;&lt;small&gt;Készült: %2&lt;/small&gt;&lt;br&gt;&lt;br&gt;Qt 6 alapú képkezelő.&lt;br&gt;&lt;a href=&quot;https://github.com/DynartInteractive/Pixee&quot;&gt;A Pixee a GitHubon&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1386"/>
+        <source>&lt;b&gt;Pixee&lt;/b&gt; %1&lt;br&gt;&lt;br&gt;An image manager built on Qt 6.&lt;br&gt;&lt;a href=&quot;https://github.com/DynartInteractive/Pixee&quot;&gt;Pixee on GitHub&lt;/a&gt;</source>
+        <translation type="vanished">&lt;b&gt;Pixee&lt;/b&gt; %1&lt;br&gt;&lt;br&gt;Qt 6 alapú képkezelő.&lt;br&gt;&lt;a href=&quot;https://github.com/DynartInteractive/Pixee&quot;&gt;A Pixee a GitHubon&lt;/a&gt;</translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1401"/>
         <source>&lt;br&gt;&lt;br&gt;Metadata by &lt;a href=&quot;https://exiv2.org/&quot;&gt;Exiv2&lt;/a&gt; (GPLv2+).</source>
         <translation>&lt;br&gt;&lt;br&gt;Metaadatok: &lt;a href=&quot;https://exiv2.org/&quot;&gt;Exiv2&lt;/a&gt; (GPLv2+).</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1389"/>
+        <location filename="../src/MainWindow.cpp" line="1404"/>
         <source>About Pixee</source>
         <translation>A Pixee névjegye</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1859"/>
+        <location filename="../src/MainWindow.cpp" line="1874"/>
         <source>Zoom</source>
         <translation>Nagyítás</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1861"/>
+        <location filename="../src/MainWindow.cpp" line="1876"/>
         <source>Edit</source>
         <translation>Szerkesztés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1879"/>
+        <location filename="../src/MainWindow.cpp" line="1894"/>
         <source>Rotate right</source>
         <translation>Forgatás jobbra</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1880"/>
+        <location filename="../src/MainWindow.cpp" line="1895"/>
         <source>Rotate left</source>
         <translation>Forgatás balra</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1882"/>
+        <location filename="../src/MainWindow.cpp" line="1897"/>
         <source>Flip horizontal</source>
         <translation>Tükrözés vízszintesen</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1883"/>
+        <location filename="../src/MainWindow.cpp" line="1898"/>
         <source>Flip vertical</source>
         <translation>Tükrözés függőlegesen</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1885"/>
+        <location filename="../src/MainWindow.cpp" line="1900"/>
         <source>Crop...</source>
         <translation>Vágás…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1889"/>
+        <location filename="../src/MainWindow.cpp" line="1904"/>
         <source>Adjust colours...</source>
         <translation>Színek módosítása…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1904"/>
+        <location filename="../src/MainWindow.cpp" line="1919"/>
         <source>Zoom in</source>
         <translation>Nagyítás</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1905"/>
+        <location filename="../src/MainWindow.cpp" line="1920"/>
         <source>Zoom out</source>
         <translation>Kicsinyítés</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1923"/>
+        <location filename="../src/MainWindow.cpp" line="1938"/>
         <source>No fit</source>
         <translation>Nincs igazítás</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1924"/>
+        <location filename="../src/MainWindow.cpp" line="1939"/>
         <source>Fit image to window</source>
         <translation>Kép igazítása az ablakhoz</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1925"/>
+        <location filename="../src/MainWindow.cpp" line="1940"/>
         <source>Fit image to window, large only</source>
         <translation>Igazítás az ablakhoz, csak nagy képnél</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1943"/>
+        <location filename="../src/MainWindow.cpp" line="1958"/>
         <source>Lock zoom</source>
         <translation>Nagyítás rögzítése</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2247"/>
+        <location filename="../src/MainWindow.cpp" line="2262"/>
         <source>Cannot rename — item not found in model</source>
         <translation>Nem nevezhető át — az elem nincs a modellben</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2263"/>
+        <location filename="../src/MainWindow.cpp" line="2278"/>
         <source>Could not rename &quot;%1&quot; — file may be in use or read-only</source>
         <translation>„%1” átnevezése sikertelen — a fájl használatban lehet, vagy írásvédett</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2273"/>
+        <location filename="../src/MainWindow.cpp" line="2288"/>
         <source>Cannot create folder — parent not in model</source>
         <translation>A mappa nem hozható létre — a szülő nincs a modellben</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2286"/>
+        <location filename="../src/MainWindow.cpp" line="2301"/>
         <source>Could not create folder &quot;%1&quot; — check permissions</source>
         <translation>A(z) „%1” mappa létrehozása sikertelen — ellenőrizze a jogosultságokat</translation>
     </message>
@@ -1008,67 +1012,67 @@ Metaadatok olvasása…</translation>
 <context>
     <name>OpenWithDialog</name>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="50"/>
+        <location filename="../src/OpenWithDialog.cpp" line="45"/>
         <source>Couldn&apos;t open &quot;%1&quot;</source>
         <translation>Nem sikerült megnyitni: „%1”</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="97"/>
+        <location filename="../src/OpenWithDialog.cpp" line="94"/>
         <source>Failed to launch &quot;%1&quot;</source>
         <translation>„%1” indítása sikertelen</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="103"/>
+        <location filename="../src/OpenWithDialog.cpp" line="100"/>
         <source>Configure programs</source>
         <translation>Programok beállítása</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="109"/>
+        <location filename="../src/OpenWithDialog.cpp" line="106"/>
         <source>Add...</source>
         <translation>Hozzáadás…</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="110"/>
+        <location filename="../src/OpenWithDialog.cpp" line="107"/>
         <source>Remove</source>
         <translation>Eltávolítás</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="111"/>
+        <location filename="../src/OpenWithDialog.cpp" line="108"/>
         <source>Close</source>
         <translation>Bezárás</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="147"/>
+        <location filename="../src/OpenWithDialog.cpp" line="144"/>
         <source>Programs (*.exe);;All files (*)</source>
         <translation>Programok (*.exe);;Minden fájl (*)</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="149"/>
+        <location filename="../src/OpenWithDialog.cpp" line="146"/>
         <source>All files (*)</source>
         <translation>Minden fájl (*)</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="152"/>
+        <location filename="../src/OpenWithDialog.cpp" line="149"/>
         <source>Pick a program</source>
         <translation>Válasszon programot</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="158"/>
+        <location filename="../src/OpenWithDialog.cpp" line="155"/>
         <source>Program label</source>
         <translation>Program neve</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="158"/>
+        <location filename="../src/OpenWithDialog.cpp" line="155"/>
         <source>Display name:</source>
         <translation>Megjelenő név:</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="174"/>
+        <location filename="../src/OpenWithDialog.cpp" line="171"/>
         <source>Remove program</source>
         <translation>Program eltávolítása</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="175"/>
+        <location filename="../src/OpenWithDialog.cpp" line="172"/>
         <source>Remove &quot;%1&quot; from the list?</source>
         <translation>Eltávolítja a listából: „%1”?</translation>
     </message>
@@ -1091,32 +1095,32 @@ Metaadatok olvasása…</translation>
         <translation>Törlés: %1</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="317"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="318"/>
         <source>Refusing to paste a drive root: %1</source>
         <translation>Meghajtó gyökere nem illeszthető be: %1</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="322"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="323"/>
         <source>Cannot paste %1 into itself or a subfolder</source>
         <translation>%1 nem illeszthető be önmagába vagy az almappájába</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="337"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="338"/>
         <source>Move %1 file(s) to &quot;%2&quot;</source>
         <translation>%1 fájl áthelyezése ide: „%2”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="339"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="340"/>
         <source>Paste %1 file(s) to &quot;%2&quot;</source>
         <translation>%1 fájl beillesztése ide: „%2”</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="368"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="369"/>
         <source>Move out: delete &quot;%1&quot;</source>
         <translation>Áthelyezés: „%1” törlése</translation>
     </message>
     <message>
-        <location filename="../src/FileOpsMenuBuilder.cpp" line="369"/>
+        <location filename="../src/FileOpsMenuBuilder.cpp" line="370"/>
         <source>Move out: delete %1 item(s)</source>
         <translation>Áthelyezés: %1 elem törlése</translation>
     </message>

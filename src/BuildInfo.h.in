@@ -1,0 +1,10 @@
+// Generated from src/BuildInfo.h.in by qmake (QMAKE_SUBSTITUTES) — do not edit
+// the generated copy. BUILD_DATE is the time qmake last ran, which for any
+// clean build (make-portable.bat and build-installer.bat both re-run qmake) is
+// the build time. An incremental `make` without re-running qmake keeps the
+// previous stamp, so trust it on release artefacts, not on dev rebuilds.
+#pragma once
+
+// The quotes are backslash-escaped because QMAKE_SUBSTITUTES evaluates each
+// line as a qmake value and strips bare quotation marks.
+#define BUILD_DATE \"$$BUILD_DATE\"

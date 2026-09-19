@@ -14,6 +14,16 @@ CONFIG += c++17
 VERSION = $$cat($$PWD/VERSION.txt)
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
+# Build timestamp, surfaced in Help -> About and `--version` so a given binary
+# can be identified at a glance. $$_DATE_ is the moment qmake ran; it is passed
+# through a generated header rather than a -D define because the string has
+# spaces in it, which do not survive the compiler command line intact.
+BUILD_DATE = $$_DATE_
+buildinfo.input  = $$PWD/src/BuildInfo.h.in
+buildinfo.output = $$OUT_PWD/BuildInfo.h
+QMAKE_SUBSTITUTES += buildinfo
+INCLUDEPATH       += $$OUT_PWD
+
 # Optional Exiv2 metadata backend for the Info panel. OFF by default: the app
 # builds and shows Qt-only basics (dimensions/format/size) without it. To turn
 # it on, drop the prebuilt Exiv2 MSVC binaries into thirdparty/exiv2/ (see
