@@ -7,6 +7,7 @@
 #include <QStringList>
 
 class QListWidget;
+class QPushButton;
 
 struct OpenWithProgram {
     QString label;
@@ -43,12 +44,19 @@ public:
 
 private slots:
     void onAdd();
+    void onEdit();
     void onRemove();
 
 private:
     void refreshList();
+    // Edit and Remove act on the current row, so they stay disabled until
+    // there is one. QListWidget is single-selection, so a current row is
+    // exactly the "one program selected" case.
+    void updateButtons();
 
     QListWidget* _list;
+    QPushButton* _editBtn;
+    QPushButton* _removeBtn;
     QList<OpenWithProgram> _programs;
 };
 

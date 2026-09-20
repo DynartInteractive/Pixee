@@ -85,6 +85,7 @@ SOURCES += \
     src/RenameTask.cpp \
     src/NewFolderDialog.cpp \
     src/OpenWithDialog.cpp \
+    src/OpenWithProgramDialog.cpp \
     src/Pixee.cpp \
     src/RenameDialog.cpp \
     src/ScaleImageTask.cpp \
@@ -146,6 +147,7 @@ HEADERS += \
     src/RenameTask.h \
     src/NewFolderDialog.h \
     src/OpenWithDialog.h \
+    src/OpenWithProgramDialog.h \
     src/Pixee.h \
     src/RenameDialog.h \
     src/ScaleImageTask.h \

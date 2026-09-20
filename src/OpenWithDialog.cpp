@@ -1,12 +1,9 @@
 #include "OpenWithDialog.h"
 
 #include <QDesktopServices>
-#include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QInputDialog>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QProcess>
@@ -16,25 +13,13 @@
 #include <QVBoxLayout>
 
 #include "Config.h"
+#include "OpenWithProgramDialog.h"
 #include "Toast.h"
 
 namespace {
 constexpr const char* kArrayKey = "openWithPrograms";
 constexpr const char* kLabelKey = "label";
 constexpr const char* kPathKey  = "path";
-
-// Sensible starting point for the Add file picker. Windows registers the
-// canonical path through the ProgramFiles env var (handles localised
-// 'Program Files (x86)' / non-C: installs); fall back to the conventional
-// path if the env var is empty (some stripped sandboxes).
-QString defaultProgramsFolder() {
-#ifdef Q_OS_WIN
-    const QString pf = qEnvironmentVariable("ProgramFiles");
-    return pf.isEmpty() ? QStringLiteral("C:/Program Files") : pf;
-#else
-    return QStringLiteral("/usr/bin");
-#endif
-}
 }
 
 void OpenWithDialog::openWithDesktop(const QStringList& filePaths,
@@ -104,7 +89,8 @@ OpenWithDialog::OpenWithDialog(QWidget* parent) : QDialog(parent) {
     _list->setMinimumWidth(280);
 
     auto* addBtn = new QPushButton(tr("Add..."), this);
-    auto* removeBtn = new QPushButton(tr("Remove"), this);
+    _editBtn = new QPushButton(tr("Edit..."), this);
+    _removeBtn = new QPushButton(tr("Remove"), this);
     auto* closeBtn = new QPushButton(tr("Close"), this);
 
     auto* sep = new QFrame(this);
@@ -113,7 +99,8 @@ OpenWithDialog::OpenWithDialog(QWidget* parent) : QDialog(parent) {
 
     auto* buttons = new QVBoxLayout;
     buttons->addWidget(addBtn);
-    buttons->addWidget(removeBtn);
+    buttons->addWidget(_editBtn);
+    buttons->addWidget(_removeBtn);
     buttons->addWidget(sep);
     buttons->addWidget(closeBtn);
     buttons->addStretch(1);
@@ -122,12 +109,21 @@ OpenWithDialog::OpenWithDialog(QWidget* parent) : QDialog(parent) {
     layout->addWidget(_list, 1);
     layout->addLayout(buttons);
 
-    connect(addBtn,    &QPushButton::clicked, this, &OpenWithDialog::onAdd);
-    connect(removeBtn, &QPushButton::clicked, this, &OpenWithDialog::onRemove);
-    connect(closeBtn,  &QPushButton::clicked, this, &OpenWithDialog::accept);
+    connect(addBtn,     &QPushButton::clicked, this, &OpenWithDialog::onAdd);
+    connect(_editBtn,   &QPushButton::clicked, this, &OpenWithDialog::onEdit);
+    connect(_removeBtn, &QPushButton::clicked, this, &OpenWithDialog::onRemove);
+    connect(closeBtn,   &QPushButton::clicked, this, &OpenWithDialog::accept);
+
+    // Double-click is the habitual way into an editor, so wire it to the
+    // same slot rather than leaving it dead.
+    connect(_list, &QListWidget::itemDoubleClicked,
+            this, &OpenWithDialog::onEdit);
+    connect(_list, &QListWidget::currentRowChanged,
+            this, &OpenWithDialog::updateButtons);
 
     _programs = loadPrograms();
     refreshList();
+    updateButtons();
 }
 
 void OpenWithDialog::refreshList() {
@@ -139,29 +135,35 @@ void OpenWithDialog::refreshList() {
     }
 }
 
+void OpenWithDialog::updateButtons() {
+    const int row = _list->currentRow();
+    const bool one = row >= 0 && row < _programs.size();
+    _editBtn->setEnabled(one);
+    _removeBtn->setEnabled(one);
+}
+
 void OpenWithDialog::onAdd() {
-#ifdef Q_OS_WIN
-    const QString filter = tr("Programs (*.exe);;All files (*)");
-#else
-    const QString filter = tr("All files (*)");
-#endif
-    const QString path = QFileDialog::getOpenFileName(
-        this, tr("Pick a program"), defaultProgramsFolder(), filter);
-    if (path.isEmpty()) return;
+    OpenWithProgramDialog dlg(QString(), QString(), this);
+    if (dlg.exec() != QDialog::Accepted) return;
 
-    bool ok = false;
-    const QString defaultLabel = QFileInfo(path).completeBaseName();
-    const QString label = QInputDialog::getText(
-        this, tr("Program label"), tr("Display name:"),
-        QLineEdit::Normal, defaultLabel, &ok);
-    if (!ok) return;
-    const QString trimmed = label.trimmed();
-    if (trimmed.isEmpty()) return;
-
-    _programs.append({trimmed, path});
+    _programs.append({dlg.label(), dlg.path()});
     savePrograms(_programs);
     refreshList();
     _list->setCurrentRow(_programs.size() - 1);
+}
+
+void OpenWithDialog::onEdit() {
+    const int row = _list->currentRow();
+    if (row < 0 || row >= _programs.size()) return;
+
+    OpenWithProgramDialog dlg(_programs.at(row).label,
+                              _programs.at(row).path, this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    _programs[row] = {dlg.label(), dlg.path()};
+    savePrograms(_programs);
+    refreshList();
+    _list->setCurrentRow(row);   // refreshList() cleared the selection
 }
 
 void OpenWithDialog::onRemove() {
@@ -175,4 +177,10 @@ void OpenWithDialog::onRemove() {
     _programs.removeAt(row);
     savePrograms(_programs);
     refreshList();
+    // Keep a row selected (the next one down, or the new last) so Edit and
+    // Remove stay reachable for a run of deletions. refreshList()'s clear()
+    // already dropped the selection to -1 and disabled them.
+    if (!_programs.isEmpty()) {
+        _list->setCurrentRow(qMin(row, _programs.size() - 1));
+    }
 }

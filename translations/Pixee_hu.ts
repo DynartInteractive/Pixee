@@ -1012,69 +1012,117 @@ Metaadatok olvasása…</translation>
 <context>
     <name>OpenWithDialog</name>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="45"/>
+        <location filename="../src/OpenWithDialog.cpp" line="30"/>
         <source>Couldn&apos;t open &quot;%1&quot;</source>
         <translation>Nem sikerült megnyitni: „%1”</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="94"/>
+        <location filename="../src/OpenWithDialog.cpp" line="79"/>
         <source>Failed to launch &quot;%1&quot;</source>
         <translation>„%1” indítása sikertelen</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="100"/>
+        <location filename="../src/OpenWithDialog.cpp" line="85"/>
         <source>Configure programs</source>
         <translation>Programok beállítása</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="106"/>
+        <location filename="../src/OpenWithDialog.cpp" line="91"/>
         <source>Add...</source>
         <translation>Hozzáadás…</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="107"/>
+        <location filename="../src/OpenWithDialog.cpp" line="92"/>
+        <source>Edit...</source>
+        <translation>Szerkesztés…</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithDialog.cpp" line="93"/>
         <source>Remove</source>
         <translation>Eltávolítás</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="108"/>
+        <location filename="../src/OpenWithDialog.cpp" line="94"/>
         <source>Close</source>
         <translation>Bezárás</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="144"/>
         <source>Programs (*.exe);;All files (*)</source>
-        <translation>Programok (*.exe);;Minden fájl (*)</translation>
+        <translation type="vanished">Programok (*.exe);;Minden fájl (*)</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="146"/>
         <source>All files (*)</source>
-        <translation>Minden fájl (*)</translation>
+        <translation type="vanished">Minden fájl (*)</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="149"/>
         <source>Pick a program</source>
-        <translation>Válasszon programot</translation>
+        <translation type="vanished">Válasszon programot</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="155"/>
         <source>Program label</source>
-        <translation>Program neve</translation>
+        <translation type="vanished">Program neve</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="155"/>
         <source>Display name:</source>
-        <translation>Megjelenő név:</translation>
+        <translation type="vanished">Megjelenő név:</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="171"/>
+        <location filename="../src/OpenWithDialog.cpp" line="173"/>
         <source>Remove program</source>
         <translation>Program eltávolítása</translation>
     </message>
     <message>
-        <location filename="../src/OpenWithDialog.cpp" line="172"/>
+        <location filename="../src/OpenWithDialog.cpp" line="174"/>
         <source>Remove &quot;%1&quot; from the list?</source>
         <translation>Eltávolítja a listából: „%1”?</translation>
+    </message>
+</context>
+<context>
+    <name>OpenWithProgramDialog</name>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="58"/>
+        <source>Edit program</source>
+        <translation>Program szerkesztése</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="58"/>
+        <source>Add program</source>
+        <translation>Program hozzáadása</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="62"/>
+        <source>Name shown in the Open with menu</source>
+        <translation>A „Megnyitás ezzel” menüben megjelenő név</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="67"/>
+        <source>Browse...</source>
+        <translation>Tallózás…</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="75"/>
+        <source>Label:</source>
+        <translation>Név:</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="76"/>
+        <source>Program:</source>
+        <translation>Program:</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="118"/>
+        <source>Programs (*.exe);;All files (*)</source>
+        <translation>Programok (*.exe);;Minden fájl (*)</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="120"/>
+        <source>All files (*)</source>
+        <translation>Minden fájl (*)</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="136"/>
+        <source>Pick a program</source>
+        <translation>Válasszon programot</translation>
     </message>
 </context>
 <context>
@@ -1254,6 +1302,26 @@ Metaadatok olvasása…</translation>
         <location filename="../src/SettingsDialog.cpp" line="61"/>
         <source>System default</source>
         <translation>Rendszer szerinti</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="31"/>
+        <source>Enter a name to show in the menu.</source>
+        <translation>Adjon meg egy menüben megjelenő nevet.</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="35"/>
+        <source>Enter or browse for the program&apos;s executable.</source>
+        <translation>Adja meg vagy tallózza ki a program futtatható fájlját.</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="43"/>
+        <source>No such file: %1</source>
+        <translation>Nincs ilyen fájl: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/OpenWithProgramDialog.cpp" line="46"/>
+        <source>That&apos;s a folder, not a program.</source>
+        <translation>Ez egy mappa, nem program.</translation>
     </message>
 </context>
 <context>
