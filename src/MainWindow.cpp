@@ -18,6 +18,8 @@
 #include <QSortFilterProxyModel>
 #include <QStatusBar>
 #include <QStorageInfo>
+#include <QStyle>
+#include <QSysInfo>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -64,6 +66,7 @@
 #include "TaskGroup.h"
 #include "TaskManager.h"
 #include "TaskStatusWidget.h"
+#include "Theme.h"   // showAbout() reads the link colour off it
 #include "ViewerWidget.h"
 
 #include<QDebug>
@@ -1402,16 +1405,42 @@ void MainWindow::createMenus() {
 }
 
 void MainWindow::showAbout() {
+    // Anchors are drawn in the palette's link colour, which is a dark blue the
+    // dark theme's dialogs cannot carry — legible on the default light theme,
+    // near-invisible on #333. The stylesheet can't reach it (there is no
+    // link-colour property) and this box is a static QMessageBox with no
+    // palette of ours, so the colour goes inline. Themes can override it;
+    // the default is the accent the stylesheet already uses for focus rings.
+    const QString link = _pixee->theme()->color("about.link-color",
+                                                QColor(0x5a, 0x8d, 0xee)).name();
     QString body =
         tr("<b>Pixee</b> %1<br><small>Built %2</small><br><br>An image manager built on Qt 6."
-           "<br><a href=\"https://github.com/DynartInteractive/Pixee\">Pixee on GitHub</a>")
+           "<br><a href=\"https://github.com/DynartInteractive/Pixee\" style=\"color:%3\">"
+           "Pixee on GitHub</a>")
             .arg(QApplication::applicationVersion(),
-                 QString::fromLatin1(BUILD_DATE));
+                 QString::fromLatin1(BUILD_DATE),
+                 link);
 #ifdef PIXEE_HAVE_EXIV2
     // Exiv2 is GPLv2+; when it's linked in, credit it (see docs/metadata.md).
-    body += tr("<br><br>Metadata by <a href=\"https://exiv2.org/\">Exiv2</a> "
-               "(GPLv2+).");
+    body += tr("<br><br>Metadata by <a href=\"https://exiv2.org/\" style=\"color:%1\">"
+               "Exiv2</a> (GPLv2+).").arg(link);
 #endif
+    // Environment line. A "the menus look wrong on my machine" report is close
+    // to unanswerable without knowing which platform style drew them: the
+    // Windows 11 style leaves whole areas unpainted that the Windows 10 one
+    // fills (see the menu-bar entry in CLAUDE.md), so the same build looks
+    // different on two Windows versions. Naming the style, the Qt build and
+    // the OS here means a screenshot of this box carries all three.
+    QString qt = QString::fromLatin1(qVersion());
+    if (qt != QLatin1String(QT_VERSION_STR)) {
+        // Only interesting when they disagree, i.e. the Qt it runs against is
+        // not the Qt it was compiled against.
+        qt = tr("%1 (built with %2)").arg(qt, QLatin1String(QT_VERSION_STR));
+    }
+    body += "<br><br><small>"
+          + tr("Qt %1 &middot; %2 style<br>%3")
+                .arg(qt, QApplication::style()->name(), QSysInfo::prettyProductName())
+          + "</small>";
     QMessageBox::about(this, tr("About Pixee"), body);
 }
 
