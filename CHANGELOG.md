@@ -5,6 +5,43 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
+## [0.5.0] — 2026-09-20
+
+Keyboard-driven navigation in the path bar, an editable *Open with* list, and a
+dark theme that finally covers the parts Qt left to the operating system — which
+also fixes a menu bar that was unreadable on Windows 11.
+
+### Added
+
+- **Path-bar sub-folder suggestions** — typing drops down the sub-folders of the
+  directory left of the caret, as full paths. Up/Down walk them, Enter descends
+  into the highlighted one and immediately offers its children, so a deep tree is
+  walkable from the keyboard alone; Esc closes the list and Enter then navigates
+  as before. The listing is read off-thread and cached per directory, so a slow
+  share doesn't stutter your typing.
+- **Editable *Open with* programs** — an Edit button beside Add and Remove,
+  sharing one dialog, so a mistyped label or a path that moved after an upgrade
+  no longer means deleting the entry and re-adding it.
+- **About reports the environment** — the Qt version, the platform style and the
+  OS, alongside the build timestamp. A screenshot of that box is now enough to
+  explain why the same build looks different on two machines.
+
+### Fixed
+
+- **Menus, dialogs and tooltips follow the dark theme.** They were never named in
+  the stylesheet, so the native style painted them from the system palette. On
+  Windows 11 that produced a **menu bar with black text on the app's own dark
+  background** — the Windows 11 style paints no menu-bar background at all,
+  while Windows 10's fills it light. Menu bar, menus, dialogs, message boxes,
+  buttons, inputs, sliders, lists, tables and tooltips are all themed now.
+- **Shift+Delete permanently deletes again**, on the file list and in the viewer.
+  `QShortcut`'s `StandardKey` constructor also claims Shift+Del for Cut, and the
+  collision silently disabled both; Cut is bound explicitly to Ctrl+X now.
+- **The `.exe` and the installer carry the app icon** — previously only the
+  window did.
+- **The Folders dock title is translatable** — it was the one dock title that
+  wasn't.
+
 ## [0.4.0] — 2026-09-17
 
 Linux packaging. Pixee can now be built and installed as a Flatpak, which also

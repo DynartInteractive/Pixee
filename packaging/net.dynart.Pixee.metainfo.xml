@@ -98,6 +98,23 @@
   </recommends>
 
   <releases>
+    <release version="0.5.0" date="2026-09-20">
+      <description>
+        <p>
+          The path bar now suggests sub-folders as you type, so a deep folder
+          can be reached from the keyboard alone, and the configured
+          &quot;Open with&quot; programs can be edited rather than only added
+          and removed.
+        </p>
+        <p>
+          Menus, dialogs and tooltips follow the dark theme instead of the
+          system palette, which also fixes an unreadable menu bar on Windows
+          11. Shift+Delete permanently deletes again, and About reports the Qt
+          version, the platform style and the OS.
+        </p>
+      </description>
+      <url type="details">https://github.com/DynartInteractive/Pixee/releases/tag/v0.5.0</url>
+    </release>
     <release version="0.4.0" date="2026-09-17">
       <description>
         <p>

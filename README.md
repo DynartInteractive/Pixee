@@ -22,9 +22,9 @@
 
 ## ⬇️ Download
 
-**Windows** — [**Installer** (`Pixee-0.3.0-setup.exe`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.3.0/Pixee-0.3.0-setup.exe) · [**Portable** (`Pixee-0.3.0-portable.zip`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.3.0/Pixee-0.3.0-portable.zip)
+**Windows** — [**Installer** (`Pixee-0.5.0-setup.exe`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.5.0/Pixee-0.5.0-setup.exe) · [**Portable** (`Pixee-0.5.0-portable.zip`)](https://github.com/DynartInteractive/Pixee/releases/download/v0.5.0/Pixee-0.5.0-portable.zip)
 
-The installer registers Pixee in Explorer's **Open with…**; the portable is a self-contained folder — unzip and run `Pixee.exe`. Both are **unsigned** for now, so SmartScreen warns on first run (*More info → Run anyway*). These are still the 0.3.0 builds — 0.4.0 is a Linux packaging release and changes nothing on Windows beyond adding a window icon.
+The installer registers Pixee in Explorer's **Open with…**; the portable is a self-contained folder — unzip and run `Pixee.exe`. Both are **unsigned** for now, so SmartScreen warns on first run (*More info → Run anyway*).
 
 **Linux** — no prebuilt binaries yet, but you can [build a Flatpak](#linux-flatpak) in two commands, or [build from source](#-building) (it's quick with Qt 6.6+). Pixee is **not on Flathub yet**; [`docs/flathub-requirements.md`](docs/flathub-requirements.md) tracks what's left.
 
