@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot-list-v1.jpg" alt="Pixee browsing a folder of images as a thumbnail grid"><br>
+  <img src="docs/screenshot-list-v2.jpg" alt="Pixee browsing a folder of images as a thumbnail grid"><br>
   <em>List view</em>
 </p>
 
@@ -39,14 +39,14 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Image viewer** in the main window — async chunked loading with a cached-thumbnail placeholder, fit / 1:1 / discrete zoom (`0.1×` – `8×`), pan with `Space + LMB` or `Middle-drag`, `F11` fullscreen, and a 5-image preload cache for instant prev/next.
 
   <p align="center">
-    <img src="docs/screenshot-view-v1.jpg" alt="Pixee showing a single image in the viewer, with the Metadata, Adjust and Histogram docks stacked down the right-hand side"><br>
+    <img src="docs/screenshot-view-v2.jpg" alt="Pixee showing a single image in the viewer, with the Metadata, Adjust and Histogram docks stacked down the right-hand side"><br>
     <em>Image view with Metadata, Adjust and Histogram docks</em>
   </p>
 
 - **In-viewer editing** — rotate (`R` / `Shift + R`), flip (`H` / `V`) and **crop** (`C`), from the keys or the viewer's `Edit ▸` menu. The crop marquee has a marching-ants border, eight drag handles, a draggable interior that slides the whole selection, a live pixel-size readout and an optional **fixed aspect ratio** — tick *Fixed ratio* and set the two numbers, e.g. `2 : 3`. `Enter` applies, `Esc` cancels. Edits stay in memory until `File → Save` (`Ctrl + S`) writes them back over the original or `File → Save As…` exports a copy; navigating away with an unsaved edit prompts Save / Discard / Cancel. (Rotate re-encodes the pixels for now — lossless orientation-only rotation comes with metadata write support.)
 
   <p align="center">
-    <img src="docs/screenshot-crop-v2.jpg" alt="Pixee's crop marquee over a photo, with the fixed-ratio bar set to 2 : 3, a 452 x 678 px readout, and the viewer context menu open on the Edit submenu"><br>
+    <img src="docs/screenshot-crop-v3.jpg" alt="Pixee's crop marquee over a photo, with the fixed-ratio bar set to 2 : 3, a 452 x 678 px readout, and the viewer context menu open on the Edit submenu"><br>
     <em>Cropping at a fixed 2 : 3 ratio, with the viewer's <code>Edit ▸</code> menu open</em>
   </p>
 
@@ -78,7 +78,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Batch rename** (`Tools → Batch rename…`) — renames the whole selection at once: find & replace (optionally case-sensitive), a `{name}` / `{n}` pattern with a configurable Start / Step (`{n:3}` zero-pads to three digits; prefix and suffix fall out of typing around `{name}`), and keep-extension. A live before→after table previews every name and flags clashes — two files heading for the same name is blocked, a name that already exists on disk prompts per file. Same task pipeline, so the same progress dock and conflict handling.
 
   <p align="center">
-    <img src="docs/screenshot-batch-rename-dialog-v1.jpg" alt="The Batch rename dialog: find and replace fields, a {name}-{n:3} pattern with its token tooltip open, Start and Step spin boxes, and a before-and-after table of three files"><br>
+    <img src="docs/screenshot-batch-rename-dialog-v2.jpg" alt="The Batch rename dialog: find and replace fields, a {name}-{n:3} pattern with its token tooltip open, Start and Step spin boxes, and a before-and-after table of three files"><br>
     <em>Batch rename, with the pattern tooltip listing the tokens</em>
   </p>
 
@@ -87,7 +87,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Settings window** (`Edit → Settings…`) — a non-modal, always-on-top panel: type to filter any label, groups in an icon sidebar, Save / Cancel. Currently *Select added files* and *Language*.
 
   <p align="center">
-    <img src="docs/screenshot-settings-dialog-v1.jpg" alt="The Settings window: a search box, a File operations / General icon sidebar, and the General page with the Language dropdown open"><br>
+    <img src="docs/screenshot-settings-dialog-v2.jpg" alt="The Settings window: a search box, a File operations / General icon sidebar, and the General page with the Language dropdown open"><br>
     <em>Settings, with the language list open</em>
   </p>
 
