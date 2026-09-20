@@ -8,9 +8,9 @@ This file is the other half — the steps **only you** can do. Roughly in order.
 
 **Where it stands:** steps 1–4 are done. The one thing left before Pixee can be
 on Flathub is **step 5, opening the submission PR**; 6 and 7 follow from it.
-Everything else outstanding is optional and listed where it belongs — the
-GitHub Release object for v0.4.0 (step 3), Windows binaries for 0.4.0 (step 3),
-and a Pixee entry on the `dynart.net` apex page (step 1).
+Everything else outstanding is optional and listed where it belongs — Windows
+binaries for 0.4.0 (step 3) and a Pixee entry on the `dynart.net` apex page
+(step 1).
 
 ---
 
@@ -68,13 +68,10 @@ Two things about v0.4.0 are worth knowing before you submit:
   README's download links still point at the 0.3.0 assets. If you'd rather the
   release page not look half-finished, build and attach the 0.4.0 installer and
   portable before announcing it — Flathub neither needs nor looks at them.
-- **Creating the GitHub Release object is optional** for Flathub, and it still
-  hasn't been done — the API lists release objects for `v0.3.0` and `v0.1.0`
-  only. Nothing is broken by that: the metainfo's
-  `<url type="details">` for 0.4.0 returns 200, because GitHub renders a page
-  for any tag; it just shows the bare tag rather than release notes.
-  `docs/release-0.4.0.md` is written and ready to paste in whenever you want
-  that link to say something.
+- **The GitHub Release object exists** — published as "Pixee 0.4.0", marked
+  pre-release like the others, no assets attached. Flathub doesn't need it, but
+  it is what makes the metainfo's `<url type="details">` show notes rather than
+  a bare tag page.
 
 For future releases the procedure is:
 
