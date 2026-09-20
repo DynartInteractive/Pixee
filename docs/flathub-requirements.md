@@ -95,7 +95,7 @@ For future releases the procedure is:
    pins it to the matching tag. Mark it a pre-release, as every release so far
    is — the website's download buttons depend on that (`website/README.md`).
 
-## 4. Pin the manifest to that tarball — **done and verified**
+## 4. Pin the manifest to that tarball — **pinned to v0.5.0, needs a re-verify**
 
 The submission manifest is `packaging/net.dynart.Pixee.yml` with its `sources:`
 block replaced by the pinned release tarball. Keep the repo copy as a `dir`
@@ -105,13 +105,19 @@ copy you put in the Flathub PR:
 ```yaml
     sources:
       - type: archive
-        url: https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.4.0.tar.gz
-        sha256: 393907fbb8545e20f1562b107ac23e37cbb6a0ad77c91e5a21ff34f916099ae3
+        url: https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.5.0.tar.gz
+        sha256: f53926141b58f19a17500b477c6245c6854eda0fbb6483907f213ed7b00a6d67
 ```
 
-That exact manifest has been built and run: it produces a working Pixee 0.4.0,
-and both linters return only the expected errors (see below). So the buildbot
-should have nothing to say that a reviewer doesn't.
+That hash was taken from the published tarball (9.4 MB) and is what the
+buildbot will check against.
+
+**The 0.5.0 pin has not been built yet.** What was built, run and linted was
+the *0.4.0* manifest, before 0.5.0 existed; the only change since is the
+`sources:` block, but "only the URL changed" is not the same as verified.
+Repeat the pre-flight at the bottom of this file on a Linux box with the 0.5.0
+pin in place before opening the PR — it is a few minutes and it is the whole
+point of submitting something that already builds.
 
 For a future release, regenerate the hash with:
 
