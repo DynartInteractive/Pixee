@@ -6,6 +6,8 @@
 
 <p align="center">A responsive, minimalist image manager built on Qt 6.</p>
 
+<p align="center"><a href="https://pixee.cc"><strong>pixee.cc</strong></a></p>
+
 <p align="center">
   <img src="https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white" alt="Qt 6">
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white" alt="C++17">

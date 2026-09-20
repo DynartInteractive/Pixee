@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixee — a fast, minimalist image browser</title>
+<meta name="description" content="Pixee is a responsive, minimalist image manager for Windows and Linux. Built on Qt 6 for folders full of photos — including the ones on a network share.">
+
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="icon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="canonical" href="https://pixee.cc/">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pixee.cc/">
+<meta property="og:title" content="Pixee — a fast, minimalist image browser">
+<meta property="og:description" content="A responsive, minimalist image manager for Windows and Linux. Built for folders full of photos — including the ones on a network share.">
+<meta property="og:image" content="https://pixee.cc/icon.png">
+<meta name="twitter:card" content="summary">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#download">Skip to download</a>
+
+<header class="hero">
+  <img class="hero-icon" src="icon.png" width="112" height="112" alt="">
+  <h1>Pixee</h1>
+  <p class="tagline">A fast, minimalist image browser for Windows and Linux.</p>
+
+  <!-- DOWNLOAD LINKS: bump the version in the three hrefs and the two
+       .btn-sub lines when a new release is published. -->
+  <div class="downloads" id="download">
+    <a class="btn btn-primary"
+       href="https://github.com/DynartInteractive/Pixee/releases/download/v0.3.0/Pixee-0.3.0-setup.exe">
+      <span class="btn-main">Download for Windows</span>
+      <span class="btn-sub">Installer &middot; v0.3.0 &middot; 50 MB</span>
+    </a>
+    <a class="btn"
+       href="https://github.com/DynartInteractive/Pixee/releases/download/v0.3.0/Pixee-0.3.0-portable.zip">
+      <span class="btn-main">Portable&nbsp;.zip</span>
+      <span class="btn-sub">No install &middot; v0.3.0 &middot; 64 MB</span>
+    </a>
+  </div>
+
+  <p class="fineprint">
+    64-bit Windows 10 or later. The builds are <strong>unsigned</strong>, so SmartScreen warns
+    on first run — choose <em>More info → Run anyway</em>.
+    <br>
+    On Linux, <a href="https://github.com/DynartInteractive/Pixee#linux-flatpak">build a Flatpak</a>
+    or <a href="https://github.com/DynartInteractive/Pixee#-building">build from source</a> —
+    there are no prebuilt binaries yet.
+    <br>
+    <a href="https://github.com/DynartInteractive/Pixee/releases">All releases</a> &middot;
+    <a href="https://github.com/DynartInteractive/Pixee">Source on GitHub</a>
+  </p>
+</header>
+
+<main>
+
+<section class="prose">
+  <h2>Built for folders full of photos</h2>
+  <p>
+    Pixee opens a directory of images and gets out of the way. Thumbnails are decoded on four
+    background threads into a local SQLite cache and prioritised by what's actually on screen,
+    so the grid fills from the top-left down instead of making you wait for the whole folder.
+  </p>
+  <p>
+    It exists because the alternatives crawl on a <strong>network share</strong>. Every directory
+    read, image decode and file operation happens off the UI thread, and Pixee deliberately
+    avoids Qt's stock file models and dialogs — the ones that stall for seconds on an SMB mount.
+    The window stays responsive whether the photos are on an SSD or a NAS across the hall.
+  </p>
+</section>
+
+<section class="gallery" aria-labelledby="shots">
+  <h2 id="shots">A look around</h2>
+
+  <div class="shot-frame">
+    <button class="shot-open" type="button" aria-label="Open the screenshot full size">
+      <img id="shot" src="screenshots/list.jpg" width="1172" height="764"
+           alt="Pixee browsing a folder of photos as a thumbnail grid, with the folder tree on the left">
+    </button>
+  </div>
+  <p class="shot-caption" id="caption" aria-live="polite">Browse — a thumbnail grid with a folder tree, index overlays and instant sorting.</p>
+
+  <div class="tabs" role="group" aria-label="Choose a screenshot">
+    <button type="button" class="tab is-active" aria-pressed="true"
+            data-src="screenshots/list.jpg"
+            data-w="1172" data-h="764"
+            data-alt="Pixee browsing a folder of photos as a thumbnail grid, with the folder tree on the left"
+            data-caption="Browse — a thumbnail grid with a folder tree, index overlays and instant sorting.">Browse</button>
+    <button type="button" class="tab" aria-pressed="false"
+            data-src="screenshots/view.jpg"
+            data-w="1172" data-h="764"
+            data-alt="Pixee showing a single image in the viewer, with the Metadata, Adjust and Histogram docks stacked down the right-hand side"
+            data-caption="View — zoom, pan and fullscreen, with metadata, colour and histogram docks alongside.">View</button>
+    <button type="button" class="tab" aria-pressed="false"
+            data-src="screenshots/edit.jpg"
+            data-w="1172" data-h="845"
+            data-alt="Pixee's crop marquee over a photo, with a fixed 2:3 ratio bar and a live pixel-size readout"
+            data-caption="Edit — crop with a fixed ratio and a live pixel readout, plus rotate, flip and colour adjustment.">Edit</button>
+  </div>
+</section>
+
+<section class="features">
+  <h2>What's in it</h2>
+  <ul class="grid">
+    <li>
+      <h3>Thumbnails that keep up</h3>
+      <p>A four-worker decode pool feeding a SQLite cache, ordered by distance from the viewport, with the rest of the folder filling in behind you.</p>
+    </li>
+    <li>
+      <h3>A real viewer</h3>
+      <p>Fit, 1:1 and stepped zoom from 0.1× to 8×, space-drag panning, fullscreen, and a five-image preload so prev/next is instant.</p>
+    </li>
+    <li>
+      <h3>Edit without leaving</h3>
+      <p>Rotate, flip and crop with a marching-ants marquee and optional fixed ratio. Brightness, contrast, saturation, hue and gamma preview live, then apply at full resolution on save.</p>
+    </li>
+    <li>
+      <h3>File operations that explain themselves</h3>
+      <p>Copy, move, rename, delete and batch rename through a proper task queue. Clashes show both files side by side — thumbnail, size, date — so you choose by eye.</p>
+    </li>
+    <li>
+      <h3>Every format your Qt build can read</h3>
+      <p>JPEG, PNG, WebP, GIF, BMP, TIFF and ICO out of the box; HEIC, AVIF, PSD and XCF come bundled in the Windows builds.</p>
+    </li>
+    <li>
+      <h3>Yours to change</h3>
+      <p>MIT licensed, themeable with plain Qt stylesheets, and translated into English and Hungarian with more scaffolded.</p>
+    </li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    <a href="https://github.com/DynartInteractive/Pixee">GitHub</a> &middot;
+    <a href="https://github.com/DynartInteractive/Pixee/issues">Report an issue</a> &middot;
+    <a href="https://github.com/DynartInteractive/Pixee/blob/main/LICENSE">MIT licence</a>
+  </p>
+  <p class="muted">Made by DynartInteractive.</p>
+</footer>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>
