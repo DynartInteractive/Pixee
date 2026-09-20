@@ -53,6 +53,12 @@ QListView {
 	color: #ccc;
 	background-color: #333;
 	border: 2px solid #333;  /* invisible reserve so drop-zone highlight doesn't shift layout */
+	/* Pins the highlight for the plain list views that let the style draw it —
+	   the path bar's completion popup above all — instead of leaving them on
+	   the OS accent colour. The file grid is unaffected: FileListViewDelegate
+	   paints its own selection from the theme's file-item colours. */
+	selection-background-color: #2b4580;
+	selection-color: #fff;
 }
 #fileListView[dropTarget="true"] {
 	border-color: #5a8dee;
@@ -302,4 +308,298 @@ QHeaderView::section {
 #adjustPanel QLabel:disabled,
 #adjustPanel QCheckBox:disabled {
 	background: transparent;
+}
+
+/* Menus. Nothing named them until now, and for the menu *bar* that was a real
+   bug on Windows 11: the windows11 style's CE_MenuBarEmptyArea is an empty
+   `break` — it paints no background at all — so what showed through the bar
+   was QMainWindow's #333 from this very file, while CE_MenuBarItem drew the
+   labels in the system scheme's text colour, black under a light Windows.
+   Black on #333, unreadable, and invisible from here because the Windows 10
+   windowsvista style fills the bar with the native MENU_BARBACKGROUND part
+   instead, giving a light strip the black text sits fine on. Measured off a
+   user's screenshot: strip exactly rgb(51,51,51), labels rgb(0,0,0), title
+   bar rgb(243,243,243) — a light Windows, not a dark one.
+
+   Naming the bar fixes it because a drawable ::item rule makes
+   QStyleSheetStyle draw the item through QCommonStyle instead of the
+   platform style, so the palette here wins over the platform's text colour.
+   The popups were never broken (nothing painted them either, but their own
+   palette fill did the job) — they are named for consistency, so the menus
+   match the app rather than the OS. */
+QMenuBar {
+	background-color: #333;
+	color: #ccc;
+}
+QMenuBar::item {
+	background: transparent;
+	padding: 4px 8px;
+}
+QMenuBar::item:selected,
+QMenuBar::item:pressed {
+	background-color: #2b4580;
+	color: #fff;
+}
+QMenu {
+	background-color: #3a3a3a;
+	color: #ccc;
+	border: 1px solid #222;
+	padding: 4px 0;
+}
+/* Styling ::item at all hands the row's layout to QStyleSheetStyle, which
+   sizes it from these values instead of the native metrics — so the left
+   padding has to reserve the check-mark gutter itself. No action in Pixee
+   carries an icon, so that gutter only ever holds the View/Sort toggles. */
+QMenu::item {
+	background: transparent;
+	padding: 4px 24px 4px 24px;
+}
+QMenu::item:selected {
+	background-color: #2b4580;
+	color: #fff;
+}
+QMenu::item:disabled {
+	color: #777;
+}
+/* Sub-controls are not covered by the rules above: QStyleSheetStyle draws no
+   submenu arrow unless one is named. branch-closed.png is the theme's
+   existing right chevron, already used by the folder tree. */
+QMenu::right-arrow {
+	image: url(":/images/branch-closed.png");
+	width: 5px;
+	height: 9px;
+	margin-right: 8px;
+}
+QMenu::separator {
+	height: 1px;
+	background-color: #444;
+	margin: 4px 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   Dialogs, buttons and tooltips.
+
+   Same story as the menus above: nothing here was ever named, so every dialog
+   and message box was painted by the native style in the system palette — a
+   white sheet dropped into the middle of a dark app, and on another machine
+   whatever that machine's Windows decided. Naming them pins it, so a dialog
+   reads the same everywhere instead of tracking the OS.
+   --------------------------------------------------------------------------- */
+QDialog {
+	background-color: #333;
+}
+/* Text inside dialogs. Deliberately scoped to QDialog instead of a bare
+   QLabel rule: a tooltip's widget is a QLabel too (QTipLabel), so a global
+   colour would paint tooltip text white on the pale-yellow native tip. */
+QDialog QLabel,
+QDialog QCheckBox,
+QDialog QRadioButton {
+	color: #ccc;
+	background: transparent;
+}
+QDialog QLabel:disabled,
+QDialog QCheckBox:disabled,
+QDialog QRadioButton:disabled {
+	color: #777;
+}
+/* The HLine separators in ConflictDialog / OpenWithDialog. A QFrame line is
+   drawn from the palette's light/dark roles, which a colour alone won't
+   touch — it has to become a 1px filled box instead. */
+QDialog QFrame[frameShape="4"] {
+	border: none;
+	background-color: #444;
+	max-height: 1px;
+}
+
+/* Tooltips are their own top-level window and inherit nothing. */
+QToolTip {
+	color: #eee;
+	background-color: #2a2a2a;
+	border: 1px solid #555;
+	padding: 3px 5px;
+}
+
+QPushButton {
+	color: #eee;
+	background-color: #444;
+	border: 1px solid #555;
+	border-radius: 3px;
+	padding: 4px 14px;
+	min-width: 64px;
+}
+QPushButton:hover {
+	background-color: #4e4e4e;
+}
+QPushButton:pressed {
+	background-color: #2b4580;
+	border-color: #2b4580;
+}
+/* The button box's default button needs to stay findable by eye: once the
+   native styling is gone, nothing else marks it. */
+QPushButton:default,
+QPushButton:focus {
+	border-color: #5a8dee;
+}
+QPushButton:disabled {
+	color: #777;
+	background-color: #3a3a3a;
+	border-color: #444;
+}
+
+QLineEdit {
+	color: #eee;
+	background-color: #2a2a2a;
+	border: 1px solid #555;
+	padding: 3px 5px;
+	selection-background-color: #2b4580;
+	selection-color: #fff;
+}
+QLineEdit:focus {
+	border-color: #5a8dee;
+}
+QLineEdit:disabled {
+	color: #777;
+	background-color: #2f2f2f;
+	border-color: #444;
+}
+/* A spin box and an editable combo each own an internal QLineEdit; without
+   this they draw a second border and background inside the outer frame. */
+QSpinBox QLineEdit,
+QDoubleSpinBox QLineEdit,
+QComboBox QLineEdit {
+	border: none;
+	background: transparent;
+	padding: 0;
+}
+
+/* The panel-scoped copies further up stay — they are more specific and carry
+   their own background — these are for the spin boxes and combos everywhere
+   else (Save As, Settings, Batch rename). */
+QSpinBox,
+QDoubleSpinBox,
+QComboBox {
+	color: #eee;
+	background-color: #2a2a2a;
+	border: 1px solid #555;
+	padding: 2px 4px;
+}
+QSpinBox:disabled,
+QDoubleSpinBox:disabled,
+QComboBox:disabled {
+	color: #777;
+	background-color: #2f2f2f;
+	border-color: #444;
+}
+QComboBox::drop-down {
+	border: none;
+	width: 18px;
+}
+QComboBox::down-arrow {
+	image: url(":/images/branch-open.png");
+	width: 9px;
+	height: 5px;
+}
+/* The popup is a separate top-level view and inherits none of the above. */
+QComboBox QAbstractItemView {
+	color: #eee;
+	background-color: #3a3a3a;
+	border: 1px solid #555;
+	selection-background-color: #2b4580;
+	selection-color: #fff;
+}
+
+QSlider::groove:horizontal {
+	height: 4px;
+	background-color: #2a2a2a;
+	border: 1px solid #444;
+	border-radius: 2px;
+}
+QSlider::handle:horizontal {
+	width: 10px;
+	margin: -5px 0;
+	background-color: #ccc;
+	border: 1px solid #555;
+	border-radius: 2px;
+}
+QSlider::handle:horizontal:hover {
+	background-color: #fff;
+}
+QSlider::handle:horizontal:disabled {
+	background-color: #666;
+	border-color: #444;
+}
+
+/* QListWidget is a QListView, so the QListView rule near the top already
+   colours it; this is the part that rule leaves out — selection — kept off
+   QListView itself so the file grid's own delegate painting is untouched.
+   Users: the Settings group list and the Open with program list. */
+QListWidget {
+	background-color: #2a2a2a;
+	border: 1px solid #444;
+}
+QListWidget::item {
+	padding: 3px 4px;
+}
+QListWidget::item:selected {
+	background-color: #2b4580;
+	color: #fff;
+}
+
+/* The Batch rename preview table. QHeaderView::section is styled further up. */
+QTableView {
+	color: #ccc;
+	background-color: #2a2a2a;
+	alternate-background-color: #2f2f2f;
+	border: 1px solid #444;
+	gridline-color: #444;
+	selection-background-color: #2b4580;
+	selection-color: #fff;
+}
+QTableCornerButton::section {
+	background-color: #2a2a2a;
+	border: none;
+}
+/* The header's own background, not its sections: the strip past the last
+   column (and behind the corner button) is painted by the view itself and
+   stays white without this. */
+QHeaderView {
+	background-color: #2a2a2a;
+	border: none;
+}
+/* Spin buttons. Naming them costs the native arrows — same trap as the combo
+   box above: QStyleSheetStyle draws no sub-control it hasn't been given — so
+   both chevrons have to be supplied. arrow-up.png is branch-open.png flipped
+   vertically, kept as its own asset so the rule doesn't depend on a transform
+   Qt stylesheets can't express. */
+QSpinBox::up-button,
+QSpinBox::down-button,
+QDoubleSpinBox::up-button,
+QDoubleSpinBox::down-button {
+	background-color: #3a3a3a;
+	border: none;
+	width: 14px;
+}
+QSpinBox::up-button:hover,
+QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover,
+QDoubleSpinBox::down-button:hover {
+	background-color: #4e4e4e;
+}
+QSpinBox::up-button:disabled,
+QSpinBox::down-button:disabled,
+QDoubleSpinBox::up-button:disabled,
+QDoubleSpinBox::down-button:disabled {
+	background-color: #2f2f2f;
+}
+QSpinBox::up-arrow,
+QDoubleSpinBox::up-arrow {
+	image: url(":/images/arrow-up.png");
+	width: 9px;
+	height: 5px;
+}
+QSpinBox::down-arrow,
+QDoubleSpinBox::down-arrow {
+	image: url(":/images/branch-open.png");
+	width: 9px;
+	height: 5px;
 }
