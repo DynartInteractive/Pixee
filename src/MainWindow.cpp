@@ -45,6 +45,7 @@
 #include "HistogramPanel.h"
 #include "MetadataPanel.h"
 #include "MetadataReader.h"
+#include "PathCompleter.h"
 #include "PreviewReader.h"
 #include "MoveFileTask.h"
 #include "NewFolderDialog.h"
@@ -132,6 +133,12 @@ void MainWindow::create() {
     _pathLineEdit = new QLineEdit();
     _pathLineEdit->setObjectName("pathLineEdit");
     _pathLineEdit->setFocusPolicy(Qt::ClickFocus);
+
+    // Sub-folder completion for the path bar. It owns its own reader
+    // thread and consumes Return while its popup is up, so
+    // goToPathFromLineEdit below needs no guard of its own.
+    _pathCompleter = new PathCompleter(
+        _pathLineEdit, _pixee->config()->useBackslash(), this);
 
     _viewerWidget = new ViewerWidget();
     _viewerWidget->setObjectName("viewerWidget");
@@ -862,6 +869,10 @@ void MainWindow::navigateTo(FileItem* item) {
     const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(sourceIdx);
     _fileListView->setRootIndex(proxyIdx);
     _pathLineEdit->setText(displayPath(item->fileInfo().filePath()));
+    // Navigating from anywhere else (tree, double-click, Back) rewrites the
+    // path bar without a keystroke, so close any suggestion list still
+    // showing the folder we just left.
+    if (_pathCompleter) _pathCompleter->hidePopup();
     expandFolderTreeTo(item);
     updateStatusBar(item);
 }

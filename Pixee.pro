@@ -65,6 +65,7 @@ SOURCES += \
     src/FolderCleanupTask.cpp \
     src/FolderEnumerator.cpp \
     src/FolderRefresher.cpp \
+    src/FolderSuggester.cpp \
     src/FolderTreeView.cpp \
     src/IcoUtils.cpp \
     src/HistogramPanel.cpp \
@@ -79,6 +80,7 @@ SOURCES += \
     src/SaveAsDialog.cpp \
     src/SaveImageTask.cpp \
     src/MetadataPanel.cpp \
+    src/PathCompleter.cpp \
     src/PreviewReader.cpp \
     src/MetadataReader.cpp \
     src/MoveFileTask.cpp \
@@ -126,6 +128,7 @@ HEADERS += \
     src/FolderCleanupTask.h \
     src/FolderEnumerator.h \
     src/FolderRefresher.h \
+    src/FolderSuggester.h \
     src/FolderTreeView.h \
     src/IcoUtils.h \
     src/BatchRenameDialog.h \
@@ -141,6 +144,7 @@ HEADERS += \
     src/ImageMetadata.h \
     src/MainWindow.h \
     src/MetadataPanel.h \
+    src/PathCompleter.h \
     src/PreviewReader.h \
     src/MetadataReader.h \
     src/MoveFileTask.h \

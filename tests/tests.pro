@@ -14,4 +14,5 @@ SUBDIRS = \
     Histogram \
     FolderExpand \
     Metadata \
-    BatchRename
+    BatchRename \
+    FolderSuggester

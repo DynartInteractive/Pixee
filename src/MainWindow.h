@@ -29,6 +29,7 @@ class AdjustPanel;
 class HistogramPanel;
 class MetadataPanel;
 class MetadataReader;
+class PathCompleter;
 class PreviewReader;
 class QAction;
 class QMenu;
@@ -215,6 +216,7 @@ private:
     FileListView* _fileListView;
     FolderTreeView* _folderTreeView;
     QLineEdit* _pathLineEdit;
+    PathCompleter* _pathCompleter;
     QStackedWidget* _centerStack;
     ViewerWidget* _viewerWidget;
     // Persistent user intent for the tasks dock — what the View → Tasks
