@@ -25,7 +25,7 @@
 <a class="skip" href="#download">Skip to download</a>
 
 <header class="hero">
-  <img class="hero-icon" src="icon.png" width="112" height="112" alt="">
+  <img class="hero-icon" src="icon.png" width="160" height="160" alt="">
   <h1>Pixee</h1>
   <p class="tagline">A fast, minimalist image browser for Windows and Linux.</p>
 
@@ -59,21 +59,6 @@
 
 <main>
 
-<section class="prose">
-  <h2>Built for folders full of photos</h2>
-  <p>
-    Pixee opens a directory of images and gets out of the way. Thumbnails are decoded on four
-    background threads into a local SQLite cache and prioritised by what's actually on screen,
-    so the grid fills from the top-left down instead of making you wait for the whole folder.
-  </p>
-  <p>
-    It exists because the alternatives crawl on a <strong>network share</strong>. Every directory
-    read, image decode and file operation happens off the UI thread, and Pixee deliberately
-    avoids Qt's stock file models and dialogs — the ones that stall for seconds on an SMB mount.
-    The window stays responsive whether the photos are on an SSD or a NAS across the hall.
-  </p>
-</section>
-
 <section class="gallery" aria-labelledby="shots">
   <h2 id="shots">A look around</h2>
 
@@ -103,6 +88,22 @@
             data-caption="Edit — crop with a fixed ratio and a live pixel readout, plus rotate, flip and colour adjustment.">Edit</button>
   </div>
 </section>
+
+<section class="prose">
+  <h2>Built for folders full of photos</h2>
+  <p>
+    Pixee opens a directory of images and gets out of the way. Thumbnails are decoded on four
+    background threads into a local SQLite cache and prioritised by what's actually on screen,
+    so the grid fills from the top-left down instead of making you wait for the whole folder.
+  </p>
+  <p>
+    It exists because the alternatives crawl on a <strong>network share</strong>. Every directory
+    read, image decode and file operation happens off the UI thread, and Pixee deliberately
+    avoids Qt's stock file models and dialogs — the ones that stall for seconds on an SMB mount.
+    The window stays responsive whether the photos are on an SSD or a NAS across the hall.
+  </p>
+</section>
+
 
 <section class="features">
   <h2>What's in it</h2>

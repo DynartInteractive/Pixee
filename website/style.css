@@ -81,8 +81,9 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; }
 }
 
 .hero-icon {
-  width: 112px; height: 112px;
-  filter: drop-shadow(0 10px 22px rgba(43, 58, 143, .30));
+  width: clamp(120px, 22vw, 160px);
+  height: auto;
+  filter: drop-shadow(0 14px 30px rgba(43, 58, 143, .34));
 }
 
 .hero h1 {
