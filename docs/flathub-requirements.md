@@ -89,6 +89,14 @@ For future releases the procedure is:
    screenshot before the Flathub builder does.
 4. Update `CHANGELOG.md`, `README.md` and add a `docs/release-<version>.md`.
 5. Commit, then `git tag v<version> && git push --tags`.
+6. If you publish a GitHub Release, its body is `docs/release-<version>.md`
+   **minus the leading `# Pixee <version>` heading** — that's what the title
+   already says, and it is the transform v0.3.0 got. Absolutise the README
+   link while you're there: `](../README.md)` resolves to
+   `/releases/README.md` on a release page and 404s, as it does on the live
+   0.3.0 notes. `https://github.com/DynartInteractive/Pixee/blob/v<version>/README.md`
+   pins it to the matching tag. Mark it a pre-release, as every release so far
+   is — the website's download buttons depend on that (`website/README.md`).
 
 ## 4. Pin the manifest to that tarball — **done and verified**
 
