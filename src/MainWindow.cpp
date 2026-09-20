@@ -404,7 +404,7 @@ void MainWindow::create() {
 
     // Layout
 
-    _dockWidget = new QDockWidget("Folders");
+    _dockWidget = new QDockWidget(tr("Folders"));
     _dockWidget->setObjectName("foldersDockWidget");
     _dockWidget->setWidget(_folderTreeView);
     _dockWidget->setFeatures(QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);

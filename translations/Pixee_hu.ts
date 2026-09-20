@@ -493,6 +493,11 @@ Előtag/utótag: {name} köré gépelve, pl. IMG_{name}.</translation>
         <translation>Vágás: húzással jelölhető ki, a fogantyúkkal módosítható — Enter alkalmaz, Esc kilép</translation>
     </message>
     <message>
+        <location filename="../src/MainWindow.cpp" line="407"/>
+        <source>Folders</source>
+        <translation>Mappák</translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="414"/>
         <source>Metadata</source>
         <translation>Metaadatok</translation>

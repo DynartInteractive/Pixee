@@ -496,6 +496,11 @@ Prefix/suffix by typing around {name}, e.g. IMG_{name}.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../src/MainWindow.cpp" line="407"/>
+        <source>Folders</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="414"/>
         <source>Metadata</source>
         <translation type="unfinished"></translation>
