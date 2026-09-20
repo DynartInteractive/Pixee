@@ -16,6 +16,28 @@ The main practical consequence is **UI density** — especially **context (right
 
 **Source layout:** all C++ (`*.cpp` / `*.h`) lives under `src/`. Build files and assets stay at the repo root: `Pixee.pro`, `resources.qrc`, and `VERSION.txt`, plus the `translations/` (the `Pixee_*.ts` catalogues), `resources/`, `themes/`, `docs/`, `installer/` (the Windows Inno Setup script), `packaging/` (the Linux desktop entry, AppStream metainfo and Flatpak manifest — see `docs/flatpak.md`), `scripts/`, and `tests/` trees. Includes are flat (`#include "Config.h"`, no path prefix) — they resolve within `src/`, so adding a source file just means listing it in `Pixee.pro`'s `SOURCES`/`HEADERS` with the `src/` prefix.
 
+### App icon
+
+One source of truth: `resources/icons/net.dynart.Pixee.svg` (also the freedesktop
+hicolor scalable icon, and the window icon via the qrc as `:/icons/app.svg`). The
+tile is deliberately **flush with the 256x256 canvas** -- no padding. Platforms add
+their own, and at 16x16 the padded version left only a smeared blue rim with the
+photo unreadable.
+
+Two rasters are **generated from it and checked in** so a build never needs image
+tooling: `resources/icons/Pixee.ico` and `docs/pixee-icon-256.png` (the README
+header image -- transparent, since GitHub renders the page on white in light mode
+and near-black in dark). The `.ico` has two consumers: `Pixee.pro`'s
+`win32: RC_ICONS` (qmake folds it into the `.rc` it already generates for the
+version resource, so the `.exe` carries it) and `installer/Pixee.iss`'s
+`SetupIconFile` (`setup.exe` and the wizard). After editing the SVG, run
+`scripts\make-icon.bat` and commit both outputs -- it is not a build step.
+
+The script needs ImageMagick 7 with the **librsvg** delegate; IM's own MSVG
+renderer gets the gradients and the clip path wrong. The `.ico` holds
+256/128/64/48/40/32/24/20/16 -- 20 and 40 are the 125%/250% Explorer scalings, and
+without them Windows resamples 16/32 and smears.
+
 ### Versioning
 
 The version is **single-sourced from the repo-root `VERSION.txt`** (SemVer; pre-1.0 while unreleased, so features bump minor / fixes bump patch). To release: edit that one line, build, `git tag v<version>`. It flows to: `Pixee.pro` (`VERSION = $$cat($$PWD/VERSION.txt)` → the `.exe` file-properties resource, plus `DEFINES += APP_VERSION=...`), the code (`APP_VERSION`, with a `"0.0.0-dev"` fallback — Help→About and `main.cpp`'s `--version`/`-v`), and the installer (`build-installer.bat` passes `/DAppVersion` to ISCC; a direct `iscc` reads `VERSION.txt` via `SourcePath`). The `.txt` extension is load-bearing: keep it. An extensionless `VERSION` file shadows the C++ `<version>` header on case-insensitive Windows whenever its directory lands on the compiler include path, breaking the build — this bit us when the sources sat at the repo root, and would again if a `VERSION` file ever appeared in `src/`. The `.txt` suffix sidesteps it everywhere.

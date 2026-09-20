@@ -1,33 +1,138 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!-- Pixee application icon. Installed as the freedesktop hicolor scalable
-     icon (net.dynart.Pixee.svg) and used for the window icon via the qrc. -->
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#4F6BED"/>
-      <stop offset="1" stop-color="#2B3A8F"/>
+     icon (net.dynart.Pixee.svg) and used for the window icon via the qrc.
+     The tile is flush with the canvas — platforms add their own padding, and
+     a Windows .ico needs every pixel it can get at 16x16. -->
+
+<svg
+   width="256"
+   height="256"
+   viewBox="0 0 256 256"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="net.dynart.Pixee.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview8"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="3.0438737"
+     inkscape:cx="86.567323"
+     inkscape:cy="147.67367"
+     inkscape:window-width="1200"
+     inkscape:window-height="1857"
+     inkscape:window-x="1912"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg8" />
+  <defs
+     id="defs4">
+    <linearGradient
+       id="tile"
+       x1="0"
+       y1="0"
+       x2="0"
+       y2="1">
+      <stop
+         offset="0"
+         stop-color="#4F6BED"
+         id="stop1" />
+      <stop
+         offset="1"
+         stop-color="#2B3A8F"
+         id="stop2" />
     </linearGradient>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#EAF0FF"/>
-      <stop offset="1" stop-color="#FFFFFF"/>
+    <linearGradient
+       id="sky"
+       x1="0"
+       y1="0"
+       x2="0"
+       y2="1">
+      <stop
+         offset="0"
+         stop-color="#EAF0FF"
+         id="stop3" />
+      <stop
+         offset="1"
+         stop-color="#FFFFFF"
+         id="stop4" />
     </linearGradient>
-    <clipPath id="frame">
-      <rect x="48" y="78" width="160" height="120" rx="14"/>
+    <clipPath
+       id="frame">
+      <rect
+         x="37"
+         y="71"
+         width="183"
+         height="137"
+         rx="16"
+         id="rect4" />
     </clipPath>
   </defs>
-
   <!-- app tile -->
-  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#tile)"/>
-
+  <rect
+     x="0"
+     y="0"
+     width="256"
+     height="256"
+     rx="59"
+     fill="url(#tile)"
+     id="rect5" />
   <!-- the photo behind, hinting at a stack -->
-  <rect x="64" y="50" width="128" height="100" rx="12" fill="#FFFFFF" opacity="0.32"/>
-
+  <rect
+     x="55"
+     y="39"
+     width="146"
+     height="114"
+     rx="14"
+     fill="#FFFFFF"
+     opacity="0.32"
+     id="rect6" />
   <!-- the photo in front -->
-  <rect x="48" y="78" width="160" height="120" rx="14" fill="url(#sky)"/>
-  <circle cx="168" cy="112" r="15" fill="#FFB020"/>
-  <g clip-path="url(#frame)">
-    <path d="M48 176 L96 122 L142 176 Z" fill="#3E8E6A"/>
-    <path d="M118 176 L160 134 L208 176 Z" fill="#2F6F53"/>
-    <rect x="48" y="172" width="160" height="26" fill="#27573F"/>
+  <rect
+     x="37"
+     y="71"
+     width="183"
+     height="137"
+     rx="16"
+     fill="url(#sky)"
+     id="rect7" />
+  <circle
+     cx="174"
+     cy="110"
+     r="17"
+     fill="#FFB020"
+     id="circle7" />
+  <g
+     clip-path="url(#frame)"
+     id="g8"
+     transform="matrix(1.0096747,0,0,1,-0.93872616,2)"
+     style="stroke-width:0.995198">
+    <path
+       d="m 37,183 54,-62 53,62 z"
+       fill="#3e8e6a"
+       id="path7"
+       style="stroke-width:0.995198" />
+    <path
+       d="m 117,183 48,-48 54,48 z"
+       fill="#2f6f53"
+       id="path8"
+       style="stroke-width:0.995198" />
+    <rect
+       x="37"
+       y="178"
+       width="183"
+       height="30"
+       fill="#27573f"
+       id="rect8"
+       style="stroke-width:0.995198" />
   </g>
 </svg>

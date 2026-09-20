@@ -1,4 +1,8 @@
-<h1 align="center">📷 Pixee</h1>
+<p align="center">
+  <img src="docs/pixee-icon-256.png" width="128" height="128" alt="Pixee icon">
+</p>
+
+<h1 align="center">Pixee</h1>
 
 <p align="center">A responsive, minimalist image manager built on Qt 6.</p>
 
@@ -153,6 +157,8 @@ scripts\build-installer.bat
 ```
 
 The installer registers Pixee in Explorer's **Open with…** for the image types it bundles. It's currently **unsigned**, so SmartScreen warns on first run (*More info → Run anyway*). See [`docs/installer.md`](docs/installer.md) for the association details and how to add Azure code-signing.
+
+Both the app `.exe` and `setup.exe` carry the app icon, generated from the same SVG as the Linux hicolor icon. The `.ico` is checked in at [`resources/icons/Pixee.ico`](resources/icons/Pixee.ico) so a build needs no image tooling — after editing `resources/icons/net.dynart.Pixee.svg`, regenerate and commit it with `scripts\make-icon.bat` (needs ImageMagick 7 with the librsvg delegate).
 
 ### Linux: portable
 

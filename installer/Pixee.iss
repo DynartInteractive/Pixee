@@ -32,6 +32,9 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
+; Icon for setup.exe itself and the wizard. Same .ico the app .exe carries
+; (Pixee.pro RC_ICONS) -- regenerate both with scripts\make-icon.bat.
+SetupIconFile=..\resources\icons\Pixee.ico
 OutputDir=..\dist
 OutputBaseFilename=Pixee-{#AppVersion}-setup
 Compression=lzma2/max

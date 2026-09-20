@@ -74,6 +74,7 @@ AppVersion={#AppVersion}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 UninstallDisplayIcon={app}\{#AppExe}
+SetupIconFile=..\resources\icons\Pixee.ico
 OutputBaseFilename=Pixee-{#AppVersion}-setup
 Compression=lzma2/max
 SolidCompression=yes

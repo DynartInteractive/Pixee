@@ -14,6 +14,12 @@ CONFIG += c++17
 VERSION = $$cat($$PWD/VERSION.txt)
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
+# Windows application icon. RC_ICONS makes qmake fold the .ico into the .rc it
+# already generates for the version resource above, so the .exe carries it in
+# Explorer, the taskbar and Alt-Tab. The .ico is generated from the same source
+# SVG as the Linux hicolor icon -- regenerate with scripts\make-icon.bat.
+win32: RC_ICONS = $$PWD/resources/icons/Pixee.ico
+
 # Build timestamp, surfaced in Help -> About and `--version` so a given binary
 # can be identified at a glance. $$_DATE_ is the moment qmake ran; it is passed
 # through a generated header rather than a -D define because the string has
