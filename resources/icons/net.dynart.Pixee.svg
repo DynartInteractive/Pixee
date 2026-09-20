@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Pixee application icon. Installed as the freedesktop hicolor scalable
-     icon (net.dynart.Pixee.svg) and used for the window icon via the qrc.
-     The tile is flush with the canvas — platforms add their own padding, and
-     a Windows .ico needs every pixel it can get at 16x16. -->
-
+<!-- Pixee app icon. Keep this header under 256 bytes - see CLAUDE.md. -->
 <svg
    width="256"
    height="256"

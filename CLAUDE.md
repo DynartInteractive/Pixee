@@ -38,6 +38,21 @@ renderer gets the gradients and the clip path wrong. The `.ico` holds
 256/128/64/48/40/32/24/20/16 -- 20 and 40 are the 125%/250% Explorer scalings, and
 without them Windows resamples 16/32 and smears.
 
+**Keep whatever precedes `<svg` under 256 bytes.** Freedesktop MIME detection
+identifies an SVG by finding the literal `<svg` within the **first 256 bytes** of
+the file; past that the file is typed as generic XML. Nothing warns you --
+librsvg, Inkscape, browsers and `make-icon.bat` all still render it perfectly,
+because they never consult the MIME magic. AppStream does: `appstreamcli compose`
+refuses the file as an icon and the **Flatpak build fails** with
+`icon-file-read-error`, which is a build failure on Flathub's builder rather than
+a warning. A four-line header comment was enough to push `<svg` to byte 349 and
+break it (the previous two-line one sat at 193). So the file carries a one-line
+header and the prose lives here. Check with:
+
+```sh
+python3 -c "print(open('resources/icons/net.dynart.Pixee.svg','rb').read().find(b'<svg'))"
+```
+
 ### Versioning
 
 The version is **single-sourced from the repo-root `VERSION.txt`** (SemVer; pre-1.0 while unreleased, so features bump minor / fixes bump patch). To release: edit that one line, build, `git tag v<version>`. It flows to: `Pixee.pro` (`VERSION = $$cat($$PWD/VERSION.txt)` → the `.exe` file-properties resource, plus `DEFINES += APP_VERSION=...`), the code (`APP_VERSION`, with a `"0.0.0-dev"` fallback — Help→About and `main.cpp`'s `--version`/`-v`), and the installer (`build-installer.bat` passes `/DAppVersion` to ISCC; a direct `iscc` reads `VERSION.txt` via `SourcePath`). The `.txt` extension is load-bearing: keep it. An extensionless `VERSION` file shadows the C++ `<version>` header on case-insensitive Windows whenever its directory lands on the compiler include path, breaking the build — this bit us when the sources sat at the repo root, and would again if a `VERSION` file ever appeared in `src/`. The `.txt` suffix sidesteps it everywhere.
