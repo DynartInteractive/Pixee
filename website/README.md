@@ -1,4 +1,4 @@
-# pixee.cc
+# pixee.dynart.net
 
 The Pixee landing page. Static, no build step and no dependencies — edit the
 files and upload them.
@@ -15,14 +15,21 @@ website/
 
 ## Hosting
 
-Live at <https://pixee.cc>, served by Apache from the host's docroot.
-`pixee.dynart.net` 301s to it. Deploying is just copying the folder's
-contents up — there is no CNAME file because that is a GitHub Pages
+Live at <https://pixee.dynart.net>, served by Apache from the host's docroot.
+`pixee.cc` 301s to it. That direction matters: `pixee.dynart.net` is the
+permanent address and the one the app ID `net.dynart.Pixee` is built from, so
+it is the name that has to keep resolving — `pixee.cc` is a convenience alias
+and may lapse. The `<link rel="canonical">` and `og:` tags in `index.html`
+name `pixee.dynart.net` for the same reason. Deploying is just copying the
+folder's contents up — there is no CNAME file because that is a GitHub Pages
 mechanism and this is not GitHub Pages.
 
 ```sh
 rsync -av --delete website/ <user>@<host>:/var/www/pixee.cc/
 ```
+
+(The docroot path is whatever the `pixee.dynart.net` vhost points at — it was
+`/var/www/pixee.cc/` before the domains were swapped and may not have moved.)
 
 ## After a release
 

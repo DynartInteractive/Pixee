@@ -12,9 +12,10 @@ The icon is `resources/icons/net.dynart.Pixee.svg`, which is both the installed
 hicolor icon and (via `resources.qrc`, as `:/icons/app.svg`) the window icon.
 
 The app ID is **`net.dynart.Pixee`**. Flathub requires the ID to be a domain you
-control, so `dynart.net` must serve something recognisably about Pixee — a
-project page is enough. Get that up before submitting; it is the one prerequisite
-that isn't in this repo.
+control, so `dynart.net` has to serve something recognisably about Pixee — a
+project page is enough, and a subdomain counts. That is in place:
+`pixee.dynart.net` serves `website/` and `pixee.cc` 301s to it, which is also
+what the metainfo's `<url type="homepage">` names.
 
 **This file is the technical reference.** For the ordered list of things a person
 has to do to get Pixee published — the website page, the release, the PR, the

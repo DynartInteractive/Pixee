@@ -8,34 +8,37 @@ This file is the other half — the steps **only you** can do. Roughly in order.
 
 ---
 
-## 1. Serve the landing page at pixee.dynart.net
-
-**Blocks the submission. It is a hosting change, not a code one.**
+## 1. Serve the landing page at pixee.dynart.net — **done**
 
 The app ID is `net.dynart.Pixee`, so Flathub expects `dynart.net` to carry the
-app — a reviewer opens the ID's domain and looks for Pixee. The page exists
-(`website/`), but it is served the wrong way round:
+app — a reviewer opens the ID's domain and looks for Pixee. That now holds, and
+the redirect runs the right way round: the durable name serves the page and the
+disposable one points at it.
+
+Verified live:
 
 ```
-pixee.dynart.net  →  301  →  pixee.cc   (200)
-dynart.net        →  404
+pixee.dynart.net  →  200        (Apache, serves website/)
+pixee.cc          →  301        →  https://pixee.dynart.net/
+dynart.net        →  200        (the Dynart projects page)
 ```
 
-`pixee.dynart.net` is the permanent address and `pixee.cc` may not always be
-around, so the redirect currently points the durable name at the disposable one.
-If `pixee.cc` ever lapses, the ID's domain stops resolving to anything — exactly
-the failure the domain-matching rule exists to prevent.
+`website/index.html`'s `<link rel="canonical">` and its `og:url` / `og:image`
+now name `pixee.dynart.net` too. **They were changed after the last deploy**, so
+the copy currently being served still carries the old `pixee.cc` tags — rsync
+the folder up again (see `website/README.md`) and that's the last of it.
 
-**Flip it:** serve `website/` from `pixee.dynart.net` and 301 `pixee.cc` to it.
-Then update `<link rel="canonical">` and the `og:url` meta in
-`website/index.html`, which still name `pixee.cc`.
+The apex `dynart.net` serves the Dynart projects page, and **it does not mention
+Pixee**. Nothing requires it to: Flathub's domain rule is satisfied by a
+subdomain of the ID's domain, and the metainfo's `<url type="homepage">` points
+at `https://pixee.dynart.net`. But a reviewer checking that `net.dynart.Pixee`
+really belongs to you may well trim the hostname, and adding Pixee to that
+page's project list would make the connection obvious for the cost of one entry.
 
-A redirect *to* the app's real home would probably pass review as-is — it does
-prove you control the domain. The reason to do it properly is the permanence, not
-the reviewer.
-
-The metainfo's `<url type="homepage">` already points at `https://pixee.dynart.net`,
-so it keeps working either way, before and after the flip.
+When checking any of this, **use GET, not HEAD**: `curl -I https://dynart.net`
+returns `404` while a plain GET returns `200` and the full page — something in
+that site's stack doesn't answer HEAD. Checking with `-I` is how this doc
+briefly came to claim the apex was dead.
 
 ## 2. Create a GitHub account for the submission, if you want one separate
 
