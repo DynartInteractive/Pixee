@@ -165,5 +165,13 @@ Timeline is usually days to a couple of weeks, almost all of it waiting on revie
   *distributed binary* GPL-encumbered. That's a licensing decision, not a build
   problem; see `docs/metadata.md`. Without it the metadata panel shows the Qt-only
   basics plus the embedded PNG text chunks, which work in every build.
-- **Screenshots.** The metainfo points at `main` so they track the current UI.
-  Repoint them at a release tag if you'd rather freeze them per version.
+- **Screenshots.** The metainfo points at raw `main` URLs, so they track the
+  current UI — and **break the moment a screenshot is renamed**, which has
+  already happened once: the v1/v2 retake left all four metainfo URLs 404ing.
+  Flathub's builder downloads these to mirror them, so a stale one fails the
+  build rather than degrading quietly.
+
+  `appstreamcli validate` fetches every screenshot URL and is the guard — that
+  is why it's a release step and not optional. If you'd rather they froze per
+  version, repoint them at the release tag instead of `main`, and accept that
+  the listing then shows an older UI until the next release.

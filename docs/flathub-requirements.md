@@ -8,21 +8,34 @@ This file is the other half — the steps **only you** can do. Roughly in order.
 
 ---
 
-## 1. Put a Pixee page on dynart.net
+## 1. Serve the landing page at pixee.dynart.net
 
-**Blocks everything else. Do it first.**
+**Blocks the submission. It is a hosting change, not a code one.**
 
-The app ID is `net.dynart.Pixee`, and Flathub requires the ID to be built from a
-domain you control that carries the app. A reviewer will open `dynart.net` and
-look for Pixee. A single page is enough — name, a sentence, a screenshot, a link
-to the GitHub repo.
+The app ID is `net.dynart.Pixee`, so Flathub expects `dynart.net` to carry the
+app — a reviewer opens the ID's domain and looks for Pixee. The page exists
+(`website/`), but it is served the wrong way round:
 
-If you'd rather not touch the website, the alternative is renaming the app to
-`io.github.DynartInteractive.Pixee`, which needs no proof beyond the public repo
-already existing. That means changing the ID in five places: the manifest, the
-metainfo `<id>`, the three `packaging/` filenames, the icon filename, and
-`setDesktopFileName` in `src/Pixee.cpp`. Say the word and I'll do it — but the
-domain ID is the nicer long-term identity, so the website page is worth the hour.
+```
+pixee.dynart.net  →  301  →  pixee.cc   (200)
+dynart.net        →  404
+```
+
+`pixee.dynart.net` is the permanent address and `pixee.cc` may not always be
+around, so the redirect currently points the durable name at the disposable one.
+If `pixee.cc` ever lapses, the ID's domain stops resolving to anything — exactly
+the failure the domain-matching rule exists to prevent.
+
+**Flip it:** serve `website/` from `pixee.dynart.net` and 301 `pixee.cc` to it.
+Then update `<link rel="canonical">` and the `og:url` meta in
+`website/index.html`, which still name `pixee.cc`.
+
+A redirect *to* the app's real home would probably pass review as-is — it does
+prove you control the domain. The reason to do it properly is the permanence, not
+the reviewer.
+
+The metainfo's `<url type="homepage">` already points at `https://pixee.dynart.net`,
+so it keeps working either way, before and after the flip.
 
 ## 2. Create a GitHub account for the submission, if you want one separate
 
@@ -59,6 +72,8 @@ For future releases the procedure is:
    This text becomes the "What's new" in software centres, so a sentence or two,
    written for users rather than for a changelog.
 3. Validate it: `appstreamcli validate packaging/net.dynart.Pixee.metainfo.xml`
+   — it fetches the screenshot URLs too, so this is what catches a renamed
+   screenshot before the Flathub builder does.
 4. Update `CHANGELOG.md`, `README.md` and add a `docs/release-<version>.md`.
 5. Commit, then `git tag v<version> && git push --tags`.
 

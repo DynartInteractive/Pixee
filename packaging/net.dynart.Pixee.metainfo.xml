@@ -39,7 +39,7 @@
     </p>
   </description>
 
-  <url type="homepage">https://github.com/DynartInteractive/Pixee</url>
+  <url type="homepage">https://pixee.dynart.net</url>
   <url type="bugtracker">https://github.com/DynartInteractive/Pixee/issues</url>
   <url type="vcs-browser">https://github.com/DynartInteractive/Pixee</url>
 
@@ -48,19 +48,19 @@
        to that version's UI. -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-list-v1.jpg</image>
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-list-v2.jpg</image>
       <caption>Browsing a folder as a thumbnail grid</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-view-v1.jpg</image>
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-view-v2.jpg</image>
       <caption>The viewer, with the metadata, adjust and histogram panels</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-crop-v2.jpg</image>
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-crop-v3.jpg</image>
       <caption>Cropping an image to a fixed aspect ratio</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-batch-rename-dialog-v1.jpg</image>
+      <image>https://raw.githubusercontent.com/DynartInteractive/Pixee/main/docs/screenshot-batch-rename-dialog-v2.jpg</image>
       <caption>Renaming a selection of files in one step</caption>
     </screenshot>
   </screenshots>
