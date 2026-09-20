@@ -6,6 +6,12 @@ sandbox. See [`docs/flatpak.md`](flatpak.md) for how that all fits together.
 
 This file is the other half — the steps **only you** can do. Roughly in order.
 
+**Where it stands:** steps 1–4 are done. The one thing left before Pixee can be
+on Flathub is **step 5, opening the submission PR**; 6 and 7 follow from it.
+Everything else outstanding is optional and listed where it belongs — the
+GitHub Release object for v0.4.0 (step 3), Windows binaries for 0.4.0 (step 3),
+and a Pixee entry on the `dynart.net` apex page (step 1).
+
 ---
 
 ## 1. Serve the landing page at pixee.dynart.net — **done**
@@ -24,9 +30,8 @@ dynart.net        →  200        (the Dynart projects page)
 ```
 
 `website/index.html`'s `<link rel="canonical">` and its `og:url` / `og:image`
-now name `pixee.dynart.net` too. **They were changed after the last deploy**, so
-the copy currently being served still carries the old `pixee.cc` tags — rsync
-the folder up again (see `website/README.md`) and that's the last of it.
+name `pixee.dynart.net` too, and that version is deployed — the served page was
+re-checked after the rsync and carries the new tags.
 
 The apex `dynart.net` serves the Dynart projects page, and **it does not mention
 Pixee**. Nothing requires it to: Flathub's domain rule is satisfied by a
@@ -40,12 +45,14 @@ returns `404` while a plain GET returns `200` and the full page — something in
 that site's stack doesn't answer HEAD. Checking with `-I` is how this doc
 briefly came to claim the apex was dead.
 
-## 2. Create a GitHub account for the submission, if you want one separate
+## 2. Pick the submitting account — **done: the usual one**
 
 Flathub submissions happen as GitHub PRs and the merged app repo is tied to the
-account that submitted. Whichever account you use becomes the maintainer of
-`flathub/net.dynart.Pixee`. Using your normal account is fine — just be aware
-this is the one that gets the review notifications and the update PRs forever.
+account that submitted, so that account becomes the maintainer of
+`flathub/net.dynart.Pixee` and gets the review notifications and the update PRs
+from then on. Decision: the normal account (`gopher.hu@gmail.com`, the one
+behind every commit here and a public member of DynartInteractive). Nothing
+separate to create.
 
 ## 3. Cut a release — **done: v0.4.0**
 
@@ -61,10 +68,13 @@ Two things about v0.4.0 are worth knowing before you submit:
   README's download links still point at the 0.3.0 assets. If you'd rather the
   release page not look half-finished, build and attach the 0.4.0 installer and
   portable before announcing it — Flathub neither needs nor looks at them.
-- **Creating the GitHub Release object is optional** for Flathub, but it's what
-  makes the `<url type="details">` link in the metainfo resolve, and it's where
-  release notes live for humans. `docs/release-0.4.0.md` is written and ready to
-  paste in.
+- **Creating the GitHub Release object is optional** for Flathub, and it still
+  hasn't been done — the API lists release objects for `v0.3.0` and `v0.1.0`
+  only. Nothing is broken by that: the metainfo's
+  `<url type="details">` for 0.4.0 returns 200, because GitHub renders a page
+  for any tag; it just shows the bare tag rather than release notes.
+  `docs/release-0.4.0.md` is written and ready to paste in whenever you want
+  that link to say something.
 
 For future releases the procedure is:
 
