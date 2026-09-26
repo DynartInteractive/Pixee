@@ -244,7 +244,7 @@ themes/dark/
 └── style.ini      # extra colours / sizes (checker pattern, index-thumbnail margin, ...)
 ```
 
-Drop a folder at `<data dir>/themes/<name>/` to override the bundled assets without rebuilding, where `<data dir>` is `~/.local/share/Dynart/Pixee` on Linux and `~/.pixee` on Windows. (Pixee also still reads `~/.pixee/themes/` on Linux, so a theme from an older version keeps working.) Anything missing from the user theme falls through to the embedded defaults.
+Drop a folder at `<data dir>/themes/<name>/` to override the bundled assets without rebuilding, where `<data dir>` is `~/.local/share/Dynart/Pixee` on Linux and `%LOCALAPPDATA%\Dynart\Pixee` on Windows. (Pixee also still reads `~/.pixee/themes/`, so a theme from an older version keeps working on either platform.) Anything missing from the user theme falls through to the embedded defaults.
 
 ## 🏗️ Architecture
 

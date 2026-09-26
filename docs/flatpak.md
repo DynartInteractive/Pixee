@@ -72,10 +72,11 @@ bump `runtime-version` in the manifest and rebuild. Reviewers prefer the latest.
 Four things behave differently inside the sandbox, and the code already accounts
 for all of them:
 
-- **Data location.** `Config::userFolder()` uses `QStandardPaths::AppDataLocation`
-  on Linux rather than `~/.pixee`, so the thumbnail DB lands in the app's own
-  data dir (`~/.var/app/net.dynart.Pixee/data/...`) instead of the user's real
-  home — which `--filesystem=host` would otherwise expose to it. An existing
+- **Data location.** `Config::userFolder()` uses
+  `QStandardPaths::AppLocalDataLocation` rather than `~/.pixee` — on Linux that
+  is the same value `AppDataLocation` gives — so the thumbnail DB lands in the
+  app's own data dir (`~/.var/app/net.dynart.Pixee/data/...`) instead of the
+  user's real home, which `--filesystem=host` would otherwise expose to it. An existing
   `~/.pixee/thumbnails.s3db` seeds it once, on first run. Note the sandbox
   **copies** where a native build renames: inside the sandbox that file belongs
   to a natively installed Pixee that is still using it, and the first version of

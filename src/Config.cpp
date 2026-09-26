@@ -47,19 +47,27 @@ bool Config::isSandboxed() {
 }
 
 const QString Config::userFolder() {
-#ifdef __linux__
-    // XDG on Linux: $XDG_DATA_HOME/Dynart/Pixee. This matters for the Flatpak
-    // build, which is granted the host filesystem so it can browse anywhere —
-    // a dot-folder built from homePath() would land in the user's *real* home
-    // rather than the app's sandboxed data dir. AppDataLocation resolves to
-    // ~/.var/app/net.dynart.Pixee/data/... inside the sandbox and to
-    // ~/.local/share/... outside it, which is the right answer both times.
-    // Windows keeps ~/.pixee: existing installs live there and nothing about
-    // that platform is improved by moving it.
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-#else
-    return _legacyUserFolder();
-#endif
+    // One standard location on every platform — no #ifdef. Qt only makes
+    // AppLocalDataLocation differ from AppDataLocation on Windows; on Linux
+    // and macOS it returns the same value, so this is byte-identical to the
+    // XDG path (~/.local/share/Dynart/Pixee) that Linux already used.
+    //
+    // **Local, not roaming, is the point on Windows**: the folder under
+    // %LOCALAPPDATA%, not the one under %APPDATA%. thumbnails.s3db is a
+    // cache and grows with the library — tens to hundreds of MB — and a
+    // roaming profile would copy every byte of it to a domain server on
+    // each login, which is exactly what LocalAppData exists to prevent.
+    //
+    // Using a standard location at all (rather than a dot-folder under $HOME)
+    // additionally matters for the Flatpak build, which holds
+    // --filesystem=host: a path built from homePath() would be written into
+    // the user's *real* home instead of the sandbox's data dir. This resolves
+    // to ~/.var/app/net.dynart.Pixee/data/... inside the sandbox and to the
+    // XDG path outside it, which is the right answer both times.
+    //
+    // _setUpUserFolder migrates an existing ~/.pixee/thumbnails.s3db across on
+    // first run, so a Windows upgrade keeps the thumbnails it already decoded.
+    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
 }
 
 const QString Config::_legacyUserFolder() {

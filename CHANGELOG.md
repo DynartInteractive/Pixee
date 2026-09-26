@@ -5,6 +5,19 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
+## [Unreleased]
+
+### Changed
+
+- **The Windows data folder moved to `%LOCALAPPDATA%`** —
+  `C:\Users\<you>\AppData\Local\Dynart\Pixee` instead of `~/.pixee`. Your
+  thumbnail cache is carried across automatically on first run, and a user
+  theme left in the old folder keeps working. `AppData\Local` rather than
+  `AppData\Roaming` is deliberate: the thumbnail database is a cache that grows
+  with your library, and a roaming profile would copy all of it to the server
+  on every login. Linux and macOS now resolve through the same call and are
+  unchanged on Linux (`~/.local/share/Dynart/Pixee`).
+
 ## [0.5.1] — 2026-10-07
 
 A bug-fix release from a full code review (`review.md`). Several file
