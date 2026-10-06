@@ -14,6 +14,7 @@
 #include <QSlider>
 #include <QVBoxLayout>
 
+#include "FileOpsHelpers.h"
 #include "ImageFormats.h"
 
 namespace {
@@ -58,7 +59,11 @@ SaveAsDialog::SaveAsDialog(const QString& sourcePath,
     // Preselect the source's own format when we can write it; else the first.
     const QString srcExt = srcInfo.suffix().toLower();
     int srcIdx = _formatCombo->findData(srcExt);
-    if (srcIdx < 0 && srcExt == "jpeg") srcIdx = _formatCombo->findData(QStringLiteral("jpg"));
+    // Alias / alternate spellings of JPEG (.jpeg, .jfif) preselect "jpg".
+    if (srcIdx < 0 && ImageFormats::writerFormatFor(srcExt) == "jpeg") {
+        srcIdx = _formatCombo->findData(QStringLiteral("jpg"));
+        if (srcIdx < 0) srcIdx = _formatCombo->findData(QStringLiteral("jpeg"));
+    }
     _formatCombo->setCurrentIndex(srcIdx >= 0 ? srcIdx : 0);
     form->addRow(tr("Format:"), _formatCombo);
 
@@ -135,13 +140,21 @@ void SaveAsDialog::onFormatChanged() {
 
 void SaveAsDialog::validate() {
     const QString name = _nameEdit->text().trimmed();
-    const bool ok = !name.isEmpty() && !_folder.isEmpty();
+    // The name is a single file name: separators or ".." would escape the
+    // chosen folder, and a ':' would write an NTFS alternate data stream.
+    QString problem = _folder.isEmpty() ? tr("Choose a folder.")
+                                        : FileOpsHelpers::fileNameProblem(name);
+    if (problem.isEmpty()) {
+        // The full name with its extension must be valid too ("nul" + ".png").
+        problem = FileOpsHelpers::fileNameProblem(QFileInfo(destPath()).fileName());
+    }
+    const bool ok = problem.isEmpty();
     if (_okButton) _okButton->setEnabled(ok);
 
     if (ok) {
         _targetLabel->setText(tr("Save to: %1")
                                   .arg(QDir::toNativeSeparators(destPath())));
     } else {
-        _targetLabel->setText(tr("Enter a file name."));
+        _targetLabel->setText(name.isEmpty() ? tr("Enter a file name.") : problem);
     }
 }

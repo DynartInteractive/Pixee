@@ -19,19 +19,34 @@ QStringList DeleteFileTask::affectedDirs() const {
 void DeleteFileTask::run() {
     if (!checkPauseStop()) return;
     const QFileInfo info(_path);
-    if (!info.exists()) {
+    if (!info.exists() && !info.isSymLink()) {   // a dangling link still exists
         // Treat as a successful no-op — the user wanted it gone, it's gone.
         emitProgress(100);
         return;
     }
-    // OS trash / recycle bin first if requested. Cross-platform: Windows
-    // Recycle Bin, Linux XDG Trash, macOS Trash. Returns false on volumes
-    // without a trash (typical for network shares / SMB mounts) — fall
-    // through to hard delete in that case so the user's request still
-    // goes through. Same path as the explicit hard-delete (toTrash=false)
-    // used by the external Move-out source cleanup.
-    if (_toTrash && QFile::moveToTrash(_path)) {
-        emitProgress(100);
+    // OS trash / recycle bin if requested. Cross-platform: Windows Recycle
+    // Bin, Linux XDG Trash, macOS Trash. Returns false on volumes without a
+    // trash (typical for network shares / SMB mounts). The user confirmed a
+    // recoverable "Delete", so do NOT silently fall through to a permanent
+    // delete — fail instead and point at the explicit permanent delete.
+    if (_toTrash) {
+        if (QFile::moveToTrash(_path)) {
+            emitProgress(100);
+            return;
+        }
+        setFailed(tr("Could not move \"%1\" to the trash (this drive may not "
+                     "have one). Use Shift+Delete to delete it permanently.")
+                      .arg(info.fileName()));
+        return;
+    }
+    // A symlink / junction: remove the link itself. removeRecursively()
+    // through a link to a folder would delete the target's contents.
+    if (info.isSymLink() || info.isJunction()) {
+        if (QFile::remove(_path) || QDir().rmdir(info.absoluteFilePath())) {
+            emitProgress(100);
+            return;
+        }
+        setFailed(tr("Cannot delete link: %1").arg(_path));
         return;
     }
     if (info.isDir()) {

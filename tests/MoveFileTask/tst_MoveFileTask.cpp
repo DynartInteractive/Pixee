@@ -24,6 +24,8 @@ private slots:
     void conflict_overwrite_replaces_dest_and_removes_source();
     void conflict_rename_creates_uniquified_and_removes_source();
     void cross_volume_falls_back_to_copy_and_delete();
+    void move_onto_itself_is_skipped_and_keeps_file();
+    void case_only_move_renames_without_prompt();
 };
 
 namespace {
@@ -247,6 +249,49 @@ void TstMoveFileTask::cross_volume_falls_back_to_copy_and_delete() {
     QFile d(dst);
     QVERIFY(d.open(QIODevice::ReadOnly));
     QCOMPARE(d.readAll(), srcBytes);
+}
+
+void TstMoveFileTask::move_onto_itself_is_skipped_and_keeps_file() {
+    // "Move to" the folder the file already lives in. This used to reach the
+    // conflict prompt, whose Overwrite deleted the file. Now it must not ask
+    // at all (an unanswered question would hang the group → timeout).
+    TaskTestFixture f;
+    const QString src = f.path("keep.bin");
+    TestHelpers::writeBytes(src, 512);
+
+    MoveFileTask* task = nullptr;
+    TaskGroup* group = makeGroup(task, src, src);
+    const QUuid id = task->id();
+
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved());
+
+    QCOMPARE(f.lastStateOf(id), int(Task::Skipped));
+    QVERIFY(QFile::exists(src));
+    QCOMPARE(QFileInfo(src).size(), qint64(512));
+}
+
+void TstMoveFileTask::case_only_move_renames_without_prompt() {
+#if !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
+    QSKIP("case-insensitive filesystem behaviour only");
+#else
+    TaskTestFixture f;
+    const QString src = f.path("IMG_0001.bin");
+    const QString dst = f.path("img_0001.bin");
+    TestHelpers::writeBytes(src, 300);
+
+    MoveFileTask* task = nullptr;
+    TaskGroup* group = makeGroup(task, src, dst);
+    const QUuid id = task->id();
+
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved());
+
+    QCOMPARE(f.lastStateOf(id), int(Task::Completed));
+    const QStringList names = QDir(f.path()).entryList(QDir::Files);
+    QVERIFY2(names.contains("img_0001.bin"), qPrintable(names.join(',')));
+    QCOMPARE(QFileInfo(dst).size(), qint64(300));
+#endif
 }
 
 QTEST_GUILESS_MAIN(TstMoveFileTask)

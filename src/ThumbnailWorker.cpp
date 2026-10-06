@@ -7,6 +7,8 @@
 #include <QSize>
 #include <QTransform>
 
+#include <new>
+
 #include "IcoUtils.h"
 
 namespace {
@@ -84,12 +86,16 @@ ExifThumbnail findExifThumbnail(const QByteArray& data) {
     else return result;
     if (read16(tiff + 2, le) != 0x002A) return result;
 
+    // All offset arithmetic in 64 bits: the offsets come straight from the
+    // file, and a 32-bit "offset + 2" wraps for 0xFFFFFFFE / 0xFFFFFFFF, slips
+    // past the bounds check, and reads ~4 GB past the buffer.
+    const quint64 len = quint64(tiffLen);
     const quint32 ifd0Offset = read32(tiff + 4, le);
-    if (ifd0Offset + 2 > quint32(tiffLen)) return result;
+    if (quint64(ifd0Offset) + 2 > len) return result;
 
     const quint16 ifd0Entries = read16(tiff + ifd0Offset, le);
-    const quint32 ifd0End = ifd0Offset + 2 + quint32(ifd0Entries) * 12;
-    if (ifd0End + 4 > quint32(tiffLen)) return result;
+    const quint64 ifd0End = quint64(ifd0Offset) + 2 + quint64(ifd0Entries) * 12;
+    if (ifd0End + 4 > len) return result;
 
     // Orientation lives in IFD0 (tag 0x0112). Type SHORT, count 1, so the
     // value sits in the low/high 2 bytes of the entry's value/offset slot.
@@ -105,9 +111,9 @@ ExifThumbnail findExifThumbnail(const QByteArray& data) {
     // IFD1 (the "next IFD" pointer right after IFD0's entries) holds the
     // embedded thumbnail's offset (0x0201) and length (0x0202).
     const quint32 ifd1Offset = read32(tiff + ifd0End, le);
-    if (ifd1Offset == 0 || ifd1Offset + 2 > quint32(tiffLen)) return result;
+    if (ifd1Offset == 0 || quint64(ifd1Offset) + 2 > len) return result;
     const quint16 ifd1Entries = read16(tiff + ifd1Offset, le);
-    if (ifd1Offset + 2 + quint32(ifd1Entries) * 12 > quint32(tiffLen)) return result;
+    if (quint64(ifd1Offset) + 2 + quint64(ifd1Entries) * 12 > len) return result;
 
     quint32 thumbOff = 0;
     quint32 thumbLen = 0;
@@ -126,16 +132,24 @@ ExifThumbnail findExifThumbnail(const QByteArray& data) {
 
 QImage applyExifOrientation(const QImage& src, int orientation) {
     if (orientation <= 1 || src.isNull()) return src;
-    QTransform t;
+    // All eight EXIF orientations, matching what QImageReader's autoTransform
+    // does for the full decode — so a thumbnail from the embedded preview and
+    // one from the full image come out the same way round.
+    // (mirrored() is deprecated in 6.9 for flipped(); kept for the 6.6 floor.)
+    QTransform rot90;
+    rot90.rotate(90);
     switch (orientation) {
-    case 3: t.rotate(180); break;
-    case 6: t.rotate(90);  break;
-    case 8: t.rotate(-90); break;
-    // Mirror cases (2/4/5/7) are rare for camera JPEGs; fall through and
-    // return the unrotated thumbnail rather than misorient it.
+    case 2: return src.mirrored(true, false);                       // flip H
+    case 3: return src.transformed(QTransform().rotate(180), Qt::SmoothTransformation);
+    case 4: return src.mirrored(false, true);                       // flip V
+    case 5: return src.transformed(rot90, Qt::SmoothTransformation)
+                      .mirrored(true, false);                       // transpose
+    case 6: return src.transformed(rot90, Qt::SmoothTransformation);
+    case 7: return src.transformed(rot90, Qt::SmoothTransformation)
+                      .mirrored(false, true);                       // transverse
+    case 8: return src.transformed(QTransform().rotate(-90), Qt::SmoothTransformation);
     default: return src;
     }
-    return src.transformed(t, Qt::SmoothTransformation);
 }
 
 bool readChunked(QFile& file, QByteArray& data, qint64 limit, ThumbnailWorker* worker,
@@ -180,6 +194,19 @@ bool ThumbnailWorker::isAbortedExternal(int taskVersion) const {
 }
 
 void ThumbnailWorker::process(QString path, qint64 mtime, qint64 size, int taskVersion) {
+    // The whole file is read into memory before decoding; a multi-GB file
+    // (or a huge decode) can throw bad_alloc here, on a worker thread where
+    // nothing else would catch it. Treat it as an ordinary decode failure.
+    try {
+        processImpl(path, mtime, size, taskVersion);
+    } catch (const std::bad_alloc&) {
+        qWarning() << "ThumbnailWorker: out of memory on" << path;
+        emit failed(path);
+    }
+}
+
+void ThumbnailWorker::processImpl(const QString& path, qint64 mtime, qint64 size,
+                                  int taskVersion) {
     if (isAborted(taskVersion)) {
         emit aborted(path);
         return;
@@ -264,7 +291,11 @@ void ThumbnailWorker::process(QString path, qint64 mtime, qint64 size, int taskV
             // softens pixel art. We'll handle upscaling ourselves below.
             if (originalSize.isValid()
                     && (originalSize.width() > _targetSize || originalSize.height() > _targetSize)) {
-                const QSize scaled = originalSize.scaled(_targetSize, _targetSize, Qt::KeepAspectRatio);
+                // Clamp: an extreme aspect ratio (a 1024×1 strip) rounds one
+                // side to 0, and the decoder then returns a null image.
+                const QSize scaled = originalSize
+                    .scaled(_targetSize, _targetSize, Qt::KeepAspectRatio)
+                    .expandedTo(QSize(1, 1));
                 reader.setScaledSize(scaled);
             }
             image = reader.read();

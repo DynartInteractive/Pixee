@@ -15,6 +15,8 @@ using FileOpsHelpers::destIsSourceOrDescendant;
 using FileOpsHelpers::dropEffectBytes;
 using FileOpsHelpers::expandToFiles;
 using FileOpsHelpers::isDriveRoot;
+using FileOpsHelpers::isSameFile;
+using FileOpsHelpers::moveAside;
 using FileOpsHelpers::kDropEffectMime;
 using FileOpsHelpers::Pair;
 using FileOpsHelpers::uniqueRenamedPath;
@@ -33,6 +35,9 @@ private slots:
     void destIsSourceOrDescendant_unrelated_paths();
     void destIsSourceOrDescendant_substring_trap();
     void destIsSourceOrDescendant_case_sensitivity();
+    void isSameFile_resolves_case_and_requires_existence();
+    void moveAside_renames_and_can_be_restored();
+    void expandToFiles_destination_inside_source_terminates();
 
     void expandToFiles_file_source();
     void expandToFiles_empty_folder();
@@ -126,11 +131,61 @@ void TstFileOpsHelpers::destIsSourceOrDescendant_substring_trap() {
 }
 
 void TstFileOpsHelpers::destIsSourceOrDescendant_case_sensitivity() {
-    // Documented gap: comparison is case-sensitive even on Windows where
-    // the filesystem itself is case-insensitive. Casing-only difference
-    // returns false. If this surfaces as a real bug, switch to
-    // QString::compare(...,Qt::CaseInsensitive) on Windows.
-    QVERIFY(!destIsSourceOrDescendant("C:/Foo/bar", "C:/foo"));
+    // Follows the filesystem: on Windows / macOS "C:/Foo" and "C:/foo" are
+    // the same folder, so a casing-only difference must still be caught —
+    // missing it let a folder be pasted into itself (runaway recursion).
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+    QVERIFY(destIsSourceOrDescendant("C:/Foo/bar", "C:/foo"));
+#else
+    QVERIFY(!destIsSourceOrDescendant("/Foo/bar", "/foo"));
+#endif
+}
+
+void TstFileOpsHelpers::isSameFile_resolves_case_and_requires_existence() {
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString a = tmp.path() + "/Photo.jpg";
+    TestHelpers::writeBytes(a, 16);
+    QDir().mkpath(tmp.path() + "/sub");
+    QVERIFY(isSameFile(a, a));
+    QVERIFY(isSameFile(a, tmp.path() + "/sub/../Photo.jpg"));
+    QVERIFY(!isSameFile(a, tmp.path() + "/missing.jpg"));
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+    QVERIFY(isSameFile(a, tmp.path() + "/photo.JPG"));
+#endif
+    const QString b = tmp.path() + "/other.jpg";
+    TestHelpers::writeBytes(b, 16);
+    QVERIFY(!isSameFile(a, b));
+}
+
+void TstFileOpsHelpers::moveAside_renames_and_can_be_restored() {
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString p = tmp.path() + "/keep.bin";
+    TestHelpers::writeBytes(p, 32);
+    const QString aside = moveAside(p);
+    QVERIFY(!aside.isEmpty());
+    QVERIFY(!QFile::exists(p));
+    QVERIFY(QFile::exists(aside));
+    QCOMPARE(QFileInfo(aside).absolutePath(), QFileInfo(p).absolutePath());
+    QVERIFY(QFile::rename(aside, p));
+    QCOMPARE(QFileInfo(p).size(), qint64(32));
+}
+
+void TstFileOpsHelpers::expandToFiles_destination_inside_source_terminates() {
+    // Destination inside the source tree: the walk must finish before the
+    // destination folders are created, or it would keep finding them.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString src = tmp.path() + "/trip";
+    QDir().mkpath(src + "/sub");
+    TestHelpers::writeBytes(src + "/a.bin", 8);
+    TestHelpers::writeBytes(src + "/sub/b.bin", 8);
+
+    const QList<Pair> pairs = expandToFiles(src, src + "/sub");
+    QCOMPARE(pairs.size(), 2);
+    QVERIFY(QFileInfo(src + "/sub/trip/sub").isDir());
+    QVERIFY(!QFileInfo(src + "/sub/trip/sub/trip").exists());
 }
 
 // ---------------------------------------------------------------------------

@@ -66,6 +66,11 @@ public:
     // adjustment, or both.
     bool isModified() const;
     void setModified(bool on);
+    // The edit was written out as `saved` (= editedImage() at save time): make
+    // that the new clean baseline. A pending colour adjustment is folded into
+    // the pixels and its parameters reset — setModified(false) alone can't
+    // clear the dirty state while an adjustment is still set.
+    void markSaved(const QImage& saved);
 
     // The image the user is currently looking at, including every pending
     // edit. This is what File → Save / Save As write out. Baked edits are
@@ -172,7 +177,9 @@ private:
         Left, Body
     };
 
-    QSize currentDrawSize() const;
+    QSize currentDrawSize() const { return drawSizeFor(size()); }
+    // Draw size for a widget of size `area` (the fit modes depend on it).
+    QSize drawSizeFor(const QSize& area) const;
     // The logical image: the source with any baked geometry edit applied, but
     // *not* the colour adjustment. Everything that measures or transforms the
     // image works from this - adjustments are per-pixel, so they neither
@@ -199,7 +206,10 @@ private:
     // The on-screen rectangle the image currently occupies (top-left + draw
     // size, honouring pan). Empty when there's no image. Shared by paintEvent
     // and the crop coordinate mapping so they never disagree.
-    QRect imageRectOnWidget() const;
+    QRect imageRectOnWidget() const { return imageRectFor(size()); }
+    // Same, for a widget of size `area` — lets resizeEvent find where the
+    // image was before the resize.
+    QRect imageRectFor(const QSize& area) const;
     // Map a widget-space rectangle to image pixels, clamped to the image.
     QRect mapWidgetRectToImage(const QRect& widgetRect) const;
     // Replace the edited buffer with `img`, mark modified, reset pan, repaint.
@@ -266,6 +276,10 @@ private:
     bool _bypassAdjust = false;    // B held: show the unadjusted image
     // Crop-mode state. _cropRect is in widget coordinates (normalized on use).
     bool _cropMode = false;
+    // Unconsumed wheel rotation (angleDelta units). High-resolution wheels
+    // and touchpads deliver many small deltas per notch; prev/next and zoom
+    // step once per full 120-unit notch.
+    int _wheelAccum = 0;
     bool _cropDragging = false;
     QRect _cropRect;
     // Which handle the live drag grabbed (None == dragging a fresh marquee),

@@ -5,6 +5,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPointer>
 #include <QProgressBar>
 #include <QStyle>
 #include <QToolButton>
@@ -51,12 +52,15 @@ TaskItemWidget::TaskItemWidget(const QUuid& taskId, const QString& name, QWidget
     _stopButton->setToolTip(tr("Abort"));
     _stopButton->setVisible(false);
     connect(_stopButton, &QToolButton::clicked, this, [this]() {
-        if (QMessageBox::question(this, tr("Abort task"),
+        // The task's group can finish while this box is up; the dock then
+        // deletes this row from inside the box's event loop. So the box must
+        // not be our child, and `this` must be re-checked afterwards.
+        const QPointer<TaskItemWidget> self(this);
+        const auto answer = QMessageBox::question(window(), tr("Abort task"),
                 tr("Abort \"%1\"?").arg(_nameLabel->text()),
                 QMessageBox::Yes | QMessageBox::No,
-                QMessageBox::No) != QMessageBox::Yes) {
-            return;
-        }
+                QMessageBox::No);
+        if (!self || answer != QMessageBox::Yes) return;
         emit stopRequested(_taskId);
     });
 

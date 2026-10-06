@@ -171,10 +171,19 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
 
     menu->addSeparator();
 
+    // Label for a recent destination: the folder name, or the whole path for
+    // a drive root (whose fileName() is empty). '&' is doubled so a folder
+    // like "Tom & Jerry" isn't turned into a mnemonic.
+    auto destLabel = [](const QString& dir) {
+        QString name = QFileInfo(dir).fileName();
+        if (name.isEmpty()) name = QDir::toNativeSeparators(dir);
+        return name.replace(QLatin1Char('&'), QStringLiteral("&&"));
+    };
+
     // ---- Copy ----
     const QString lastCopy = settings.value(kLastCopyKey).toString();
     if (!lastCopy.isEmpty()) {
-        QAction* a = menu->addAction(tr("Copy to \"%1\"").arg(QFileInfo(lastCopy).fileName()));
+        QAction* a = menu->addAction(tr("Copy to \"%1\"").arg(destLabel(lastCopy)));
         connect(a, &QAction::triggered, this, [this, lastCopy]() { doCopy(lastCopy); });
     }
     QAction* copyPick = menu->addAction(tr("Copy to..."));
@@ -186,7 +195,7 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     // ---- Move ----
     const QString lastMove = settings.value(kLastMoveKey).toString();
     if (!lastMove.isEmpty()) {
-        QAction* a = menu->addAction(tr("Move to \"%1\"").arg(QFileInfo(lastMove).fileName()));
+        QAction* a = menu->addAction(tr("Move to \"%1\"").arg(destLabel(lastMove)));
         connect(a, &QAction::triggered, this, [this, lastMove]() { doMove(lastMove); });
     }
     QAction* movePick = menu->addAction(tr("Move to..."));
@@ -250,29 +259,33 @@ void FileOpsMenuBuilder::pasteFromClipboardToFolder(const QString& destFolder,
     const bool wasCut = clipboardSaysCut(clip);
     // allowSameFolder=true: pasting a file into its own folder should
     // duplicate it (prompt → Rename), not silently do nothing.
-    handleDropOrPaste(clip, destFolder, /*forceMove=*/false, taskManager, dialogParent,
-                      /*allowSameFolder=*/true);
+    const bool enqueued = handleDropOrPaste(clip, destFolder, /*forceMove=*/false,
+                                            taskManager, dialogParent,
+                                            /*allowSameFolder=*/true);
 
     // After a Cut+Paste, the clipboard's source paths are stale. Mirror
     // Explorer behaviour and clear it so a second paste doesn't try to
-    // move-from-already-gone. Only relevant on the clipboard path — drop
-    // handlers use a transient QMimeData owned by the drag.
-    if (wasCut) {
+    // move-from-already-gone. Only when the paste actually did something —
+    // a rejected paste (into the files' own folder, into a subfolder of
+    // themselves) must leave the Cut in place to retry elsewhere. Only
+    // relevant on the clipboard path — drop handlers use a transient
+    // QMimeData owned by the drag.
+    if (wasCut && enqueued) {
         QApplication::clipboard()->clear();
     }
 }
 
-void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
+bool FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
                                            const QString& destFolder,
                                            bool forceMove,
                                            TaskManager* taskManager,
                                            QWidget* dialogParent,
-                                           bool allowSameFolder) {
-    if (destFolder.isEmpty() || !taskManager) return;
-    if (!mime || !mime->hasUrls()) return;
+                                           bool allowSameFolder,
+                                           bool allowMove) {
+    if (destFolder.isEmpty() || !taskManager) return false;
+    if (!mime || !mime->hasUrls()) return false;
 
-    const bool isMove = forceMove || clipboardSaysCut(mime);
-    const QString destNorm = QDir::cleanPath(QDir(destFolder).absolutePath());
+    const bool isMove = allowMove && (forceMove || clipboardSaysCut(mime));
 
     QStringList sourcePaths;
     for (const QUrl& url : mime->urls()) {
@@ -288,15 +301,16 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
         // Rename prompt (Rename yields the "name (1).ext" copy). Moves and
         // folders keep the silent skip. Mixed selections still process the
         // remaining sources.
-        const QString parentNorm = QDir::cleanPath(QFileInfo(path).absolutePath());
-        if (parentNorm == destNorm) {
+        // Filesystem identity, not string equality: the same folder reached
+        // through a different case or a symlink must still count as "same".
+        if (FileOpsHelpers::isSameFile(QFileInfo(path).absolutePath(), destFolder)) {
             const bool sameFolderDuplicate =
                 allowSameFolder && !isMove && QFileInfo(path).isFile();
             if (!sameFolderDuplicate) continue;
         }
         sourcePaths.append(path);
     }
-    if (sourcePaths.isEmpty()) return;
+    if (sourcePaths.isEmpty()) return false;
 
     // Reject drive roots and descendant-pastes up-front — same protection
     // as direct Copy / Move. (Pasting a folder into itself or one of its
@@ -313,18 +327,18 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
         }
         accepted.append(s);
     }
-    if (!rejectedRoots.isEmpty()) {
-        Toast::show(dialogParent,
-            QObject::tr("Refusing to paste a drive root: %1").arg(rejectedRoots.join(", ")),
-            Toast::Error);
-    }
-    if (!rejectedDescendants.isEmpty()) {
-        Toast::show(dialogParent,
-            QObject::tr("Cannot paste %1 into itself or a subfolder")
-                .arg(rejectedDescendants.join(", ")),
-            Toast::Error);
-    }
-    if (accepted.isEmpty()) return;
+    // One toast: Toast is single-instance, so a second show() would replace
+    // the first message before it could be read.
+    QStringList problems;
+    if (!rejectedRoots.isEmpty())
+        problems << QObject::tr("Refusing to paste a drive root: %1")
+                        .arg(rejectedRoots.join(", "));
+    if (!rejectedDescendants.isEmpty())
+        problems << QObject::tr("Cannot paste %1 into itself or a subfolder")
+                        .arg(rejectedDescendants.join(", "));
+    if (!problems.isEmpty())
+        Toast::show(dialogParent, problems.join('\n'), Toast::Error);
+    if (accepted.isEmpty()) return false;
 
     QList<Pair> pairs;
     QStringList folderRoots;
@@ -332,7 +346,7 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
         if (QFileInfo(src).isDir()) folderRoots.append(src);
         pairs.append(expandToFiles(src, destFolder));
     }
-    if (pairs.isEmpty() && folderRoots.isEmpty()) return;
+    if (pairs.isEmpty() && folderRoots.isEmpty()) return false;
 
     auto* group = new TaskGroup(isMove
         ? QObject::tr("Move %1 file(s) to \"%2\"")
@@ -353,6 +367,7 @@ void FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
     }
 
     taskManager->enqueueGroup(group);
+    return true;
 }
 
 void FileOpsMenuBuilder::enqueueDeleteForExternalMove(const QStringList& paths,
@@ -429,18 +444,19 @@ void FileOpsMenuBuilder::doCopy(const QString& destFolder) {
         }
         pairs.append(expandToFiles(src, destFolder));
     }
-    if (!rejectedRoots.isEmpty()) {
-        Toast::show(_dialogParent,
-            tr("Refusing to copy a drive root: %1").arg(rejectedRoots.join(", ")),
-            Toast::Error);
-    }
-    if (!rejectedDescendants.isEmpty()) {
-        Toast::show(_dialogParent,
-            tr("Cannot copy %1 into itself or a subfolder")
-                .arg(rejectedDescendants.join(", ")),
-            Toast::Error);
-    }
-    if (pairs.isEmpty()) return;
+    // One toast: Toast is single-instance, so a second show() would replace
+    // the first message before it could be read.
+    QStringList problems;
+    if (!rejectedRoots.isEmpty())
+        problems << tr("Refusing to copy a drive root: %1").arg(rejectedRoots.join(", "));
+    if (!rejectedDescendants.isEmpty())
+        problems << tr("Cannot copy %1 into itself or a subfolder")
+                        .arg(rejectedDescendants.join(", "));
+    if (!problems.isEmpty())
+        Toast::show(_dialogParent, problems.join('\n'), Toast::Error);
+    // A folder with no files still counts: expandToFiles has created its
+    // (empty) tree at the destination, and the cleanup task's refresh shows it.
+    if (pairs.isEmpty() && !sawFolder) return;
 
     auto* group = new TaskGroup(summary(
         tr("Copy %1 to \"%2\""),
@@ -463,8 +479,16 @@ void FileOpsMenuBuilder::doMove(const QString& destFolder) {
     QStringList folderRoots;
     QStringList rejectedRoots;
     QStringList rejectedDescendants;
+    QStringList alreadyThere;
     for (const QString& src : _paths) {
         if (isDriveRoot(src)) { rejectedRoots.append(src); continue; }
+        // Moving an item into the folder it already lives in is a no-op —
+        // and every file of it would map onto itself. That used to reach the
+        // conflict prompt, whose Overwrite deleted the file.
+        if (FileOpsHelpers::isSameFile(QFileInfo(src).absolutePath(), destFolder)) {
+            alreadyThere.append(QFileInfo(src).fileName());
+            continue;
+        }
         if (QFileInfo(src).isDir()) {
             if (destIsSourceOrDescendant(destFolder, src)) {
                 rejectedDescendants.append(QFileInfo(src).fileName());
@@ -474,18 +498,22 @@ void FileOpsMenuBuilder::doMove(const QString& destFolder) {
         }
         pairs.append(expandToFiles(src, destFolder));
     }
-    if (!rejectedRoots.isEmpty()) {
-        Toast::show(_dialogParent,
-            tr("Refusing to move a drive root: %1").arg(rejectedRoots.join(", ")),
-            Toast::Error);
-    }
-    if (!rejectedDescendants.isEmpty()) {
-        Toast::show(_dialogParent,
-            tr("Cannot move %1 into itself or a subfolder")
-                .arg(rejectedDescendants.join(", ")),
-            Toast::Error);
-    }
-    if (pairs.isEmpty()) return;
+    // One toast: Toast is single-instance (see doCopy).
+    QStringList problems;
+    if (!rejectedRoots.isEmpty())
+        problems << tr("Refusing to move a drive root: %1").arg(rejectedRoots.join(", "));
+    if (!rejectedDescendants.isEmpty())
+        problems << tr("Cannot move %1 into itself or a subfolder")
+                        .arg(rejectedDescendants.join(", "));
+    if (!alreadyThere.isEmpty())
+        problems << tr("Already in that folder: %1").arg(alreadyThere.join(", "));
+    if (!problems.isEmpty())
+        Toast::show(_dialogParent, problems.join('\n'),
+                    rejectedRoots.isEmpty() && rejectedDescendants.isEmpty()
+                        ? Toast::Info : Toast::Error);
+    // A folder with no files still has to move: its empty tree already
+    // exists at the destination, and the cleanup task removes the source.
+    if (pairs.isEmpty() && folderRoots.isEmpty()) return;
 
     if (_advance) _advance();
     auto* group = new TaskGroup(summary(

@@ -81,6 +81,8 @@ private:
 
     void dispatch();
     void markIdle(QObject* worker);
+    // Re-queue `path` if a request for it arrived while a worker held it.
+    bool requeueIfRequested(const QString& path);
 
     quint64 _seq = 0;
     std::priority_queue<QueueItem, std::vector<QueueItem>, ItemCompare> _queue;

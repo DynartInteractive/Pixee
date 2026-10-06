@@ -616,6 +616,33 @@ QImage FileModel::thumbnailFor(const QString& path) const {
     return _thumbnails.value(path);
 }
 
+void FileModel::releaseThumbnailsOutside(FileItem* folder) {
+    QSet<QString> keep;
+    if (folder && folder != _rootItem) {
+        for (int i = 0; i < folder->childCount(); ++i) {
+            FileItem* c = folder->child(i);
+            if (!c) continue;
+            const QString p = c->fileInfo().filePath();
+            if (c->fileType() == FileType::Image) {
+                keep.insert(p);
+            } else if (c->fileType() == FileType::Folder) {
+                const QString src = _folderIndexes.value(p);
+                if (!src.isEmpty()) keep.insert(src);
+            }
+        }
+    }
+    for (auto it = _thumbnails.begin(); it != _thumbnails.end();) {
+        if (keep.contains(it.key())) ++it;
+        else it = _thumbnails.erase(it);
+    }
+    // Their subscriptions were abandoned with the folder change, so a pending
+    // marker would never clear.
+    for (auto it = _pending.begin(); it != _pending.end();) {
+        if (keep.contains(*it)) ++it;
+        else it = _pending.erase(it);
+    }
+}
+
 void FileModel::requestEnumerate(FileItem* parent) {
     if (!parent || parent == _rootItem) return;
     // Already populated (no Loading placeholder) — nothing to do.
@@ -744,6 +771,38 @@ bool FileModel::renameItem(FileItem* item, const QString& newName) {
 
     const bool wasFolder = (item->fileType() == FileType::Folder);
 
+    // A file whose new extension changes its classification ("x.jpg_" →
+    // "x.jpg", or the reverse). The type is fixed at construction and the
+    // refresh diff matches by path, so patching in place would leave a plain
+    // file that never gets a thumbnail (or an image cell that can't decode)
+    // until restart. Replace the row with a freshly classified item instead.
+    if (!wasFolder) {
+        const FileType newType =
+            _imageExtensions.contains(QFileInfo(newPath).suffix().toLower())
+                ? FileType::Image : FileType::File;
+        FileItem* parent = item->parent();
+        if (newType != item->fileType() && parent) {
+            const QModelIndex parentIdx = indexFor(parent);
+            const int row = item->row();
+            beginRemoveRows(parentIdx, row, row);
+            forgetSubtree(item);           // still keyed on oldPath here
+            parent->removeChild(row);      // deletes item
+            endRemoveRows();
+
+            const int newRow = parent->childCount();
+            beginInsertRows(parentIdx, newRow, newRow);
+            FileItem* fresh = createItemForFileInfo(QFileInfo(newPath), parent);
+            parent->appendChild(fresh);
+            if (newType == FileType::Image) _itemsByPath.insert(newPath, fresh);
+            endInsertRows();
+
+            repickFolderIndex(parent);
+            emit pathRenamed(oldPath, newPath);
+            requestRefreshFolder(parent);
+            return true;
+        }
+    }
+
     item->setFileInfo(QFileInfo(newPath));
 
     // Path-keyed caches: rekey only when the old key actually maps to
@@ -845,6 +904,16 @@ FileItem* FileModel::createFolder(FileItem* parent, const QString& name) {
 
     const QString newPath = dir.filePath(name);
     const QFileInfo info(newPath);
+
+    // Parent never enumerated (only its Loading placeholder): populate it now
+    // — the read includes the new folder. Appending next to the placeholder
+    // instead left the placeholder in place for good and the folder without
+    // its ".." row, since both only come from the first enumeration.
+    if (parent->childCount() == 1
+            && parent->child(0)->fileType() == FileType::Loading) {
+        appendFileItems(parentDir, parent);
+        return itemForPath(newPath);
+    }
 
     // Append the row at the end of the parent's child list. The proxy's
     // alphabetical sort handles the visible position.

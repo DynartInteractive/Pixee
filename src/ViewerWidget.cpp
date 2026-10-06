@@ -1,5 +1,6 @@
 #include "ViewerWidget.h"
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QCursor>
 #include <QFontMetrics>
@@ -162,6 +163,19 @@ void ViewerWidget::clearAdjustments() {
     emit adjustmentsChanged(_adjust);
 }
 
+void ViewerWidget::markSaved(const QImage& saved) {
+    if (saved.isNull()) return;
+    const bool was = isModified();
+    if (!_adjust.isIdentity()) {
+        _baked = saved;        // the adjustment now lives in the pixels
+        clearAdjustments();    // so its parameters must not apply twice
+        invalidatePreview();
+        update();
+    }
+    _modified = false;
+    if (isModified() != was) emit modifiedChanged(isModified());
+}
+
 void ViewerWidget::resetAdjustments() {
     setAdjustments(ImageAdjust::Adjustments());
 }
@@ -245,8 +259,12 @@ void ViewerWidget::commitEdit(const QImage& img) {
     emit imageEdited(img.size());
 }
 
+// Rotate / flip reached mid-crop (the context menu's Edit ▸ entries are
+// enabled whenever an image is shown) would transform the image under a
+// marquee that stays put in widget coordinates — so end the crop first.
 void ViewerWidget::rotateLeft() {
     if (_placeholder || currentImage().isNull()) return;
+    cancelCrop();
     QTransform xform;
     xform.rotate(-90);
     commitEdit(currentImage().transformed(xform, Qt::SmoothTransformation));
@@ -254,6 +272,7 @@ void ViewerWidget::rotateLeft() {
 
 void ViewerWidget::rotateRight() {
     if (_placeholder || currentImage().isNull()) return;
+    cancelCrop();
     QTransform xform;
     xform.rotate(90);
     commitEdit(currentImage().transformed(xform, Qt::SmoothTransformation));
@@ -261,11 +280,13 @@ void ViewerWidget::rotateRight() {
 
 void ViewerWidget::flipHorizontal() {
     if (_placeholder || currentImage().isNull()) return;
+    cancelCrop();
     commitEdit(currentImage().mirrored(/*horizontal=*/true, /*vertical=*/false));
 }
 
 void ViewerWidget::flipVertical() {
     if (_placeholder || currentImage().isNull()) return;
+    cancelCrop();
     commitEdit(currentImage().mirrored(/*horizontal=*/false, /*vertical=*/true));
 }
 
@@ -307,7 +328,13 @@ void ViewerWidget::endCropMode() {
     _cropHandle = CropHandle::None;
     _cropRect = QRect();
     if (_antsTimer) _antsTimer->stop();
-    if (_cropBar) _cropBar->hide();
+    if (_cropBar) {
+        // Ending from the bar (Enter / Esc in a spin box) would otherwise
+        // leave focus wherever Qt moves it when the bar hides — often not the
+        // viewer, so arrows, Esc and R/H/V stopped working until a click.
+        if (_cropBar->isAncestorOf(QApplication::focusWidget())) setFocus();
+        _cropBar->hide();
+    }
     updateCursor();
 }
 
@@ -371,12 +398,12 @@ void ViewerWidget::reapplyRatio() {
     update();
 }
 
-QRect ViewerWidget::imageRectOnWidget() const {
+QRect ViewerWidget::imageRectFor(const QSize& area) const {
     const QImage& img = currentImage();
     if (img.isNull()) return QRect();
-    const QSize ds = currentDrawSize();
+    const QSize ds = drawSizeFor(area);
     if (ds.isEmpty()) return QRect();
-    const QPoint center(width() / 2, height() / 2);
+    const QPoint center(area.width() / 2, area.height() / 2);
     const QPoint topLeft(
         center.x() - ds.width()  / 2 + _translate.x(),
         center.y() - ds.height() / 2 + _translate.y());
@@ -476,17 +503,24 @@ QRect ViewerWidget::rectFromEdge(CropHandle h, const QPoint& moving) const {
     QRect sel = _cropRect.normalized();
     if (bounds.isEmpty() || sel.isEmpty()) return sel;
     switch (h) {
+    // The inner limits are clamped into bounds: a 1 px marquee on the
+    // image's edge would otherwise give qBound a max below its min (an
+    // assert in debug builds).
     case CropHandle::Left:
-        sel.setLeft(qBound(bounds.left(), moving.x(), sel.right() - 1));
+        sel.setLeft(qBound(bounds.left(), moving.x(),
+                           qMax(bounds.left(), sel.right() - 1)));
         break;
     case CropHandle::Right:
-        sel.setRight(qBound(sel.left() + 1, moving.x(), bounds.right()));
+        sel.setRight(qBound(qMin(sel.left() + 1, bounds.right()), moving.x(),
+                            bounds.right()));
         break;
     case CropHandle::Top:
-        sel.setTop(qBound(bounds.top(), moving.y(), sel.bottom() - 1));
+        sel.setTop(qBound(bounds.top(), moving.y(),
+                          qMax(bounds.top(), sel.bottom() - 1)));
         break;
     case CropHandle::Bottom:
-        sel.setBottom(qBound(sel.top() + 1, moving.y(), bounds.bottom()));
+        sel.setBottom(qBound(qMin(sel.top() + 1, bounds.bottom()), moving.y(),
+                             bounds.bottom()));
         break;
     default:
         return sel;
@@ -602,22 +636,25 @@ void ViewerWidget::positionCropBar() {
     _cropBar->move(qMax(0, (width() - _cropBar->width()) / 2), 12);
 }
 
-QSize ViewerWidget::currentDrawSize() const {
+QSize ViewerWidget::drawSizeFor(const QSize& area) const {
     const QImage& img = currentImage();
     if (img.isNull()) return QSize();
+    // Never let a dimension round to 0 (a 5 px image at 10 %, a 20000×10
+    // strip in Fit): an empty draw rect paints nothing at all.
+    const QSize minSize(1, 1);
     switch (_fitMode) {
     case FitMode::Fit:
-        return img.size().scaled(size(), Qt::KeepAspectRatio);
+        return img.size().scaled(area, Qt::KeepAspectRatio).expandedTo(minSize);
     case FitMode::FitLargeOnly:
         // Only scale down — small images stay at native size so a
         // 32×32 icon doesn't blow up to fill the viewport.
-        if (img.width() <= width() && img.height() <= height()) {
+        if (img.width() <= area.width() && img.height() <= area.height()) {
             return img.size();
         }
-        return img.size().scaled(size(), Qt::KeepAspectRatio);
+        return img.size().scaled(area, Qt::KeepAspectRatio).expandedTo(minSize);
     case FitMode::NoFit: {
         const double z = kZoomLevels[_zoomIndex];
-        return QSize(int(img.width() * z), int(img.height() * z));
+        return QSize(int(img.width() * z), int(img.height() * z)).expandedTo(minSize);
     }
     }
     return img.size();
@@ -1032,7 +1069,23 @@ void ViewerWidget::focusOutEvent(QFocusEvent* event) {
 
 void ViewerWidget::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
-    if (_cropMode) positionCropBar();
+    if (!_cropMode) return;
+    positionCropBar();
+    // The marquee lives in widget coordinates, but in a fit mode the image
+    // moves / rescales with the widget (F11, a dock toggled). Carry the
+    // marquee along so it keeps covering the same part of the image.
+    const QRect sel = _cropRect.normalized();
+    const QRect oldR = imageRectFor(event->oldSize());
+    const QRect newR = imageRectOnWidget();
+    if (sel.isEmpty() || oldR.isEmpty() || newR.isEmpty() || oldR == newR) return;
+    const double sx = double(newR.width())  / oldR.width();
+    const double sy = double(newR.height()) / oldR.height();
+    const QRect mapped(
+        QPoint(newR.left() + qRound((sel.left() - oldR.left()) * sx),
+               newR.top()  + qRound((sel.top()  - oldR.top())  * sy)),
+        QSize(qMax(1, qRound(sel.width() * sx)), qMax(1, qRound(sel.height() * sy))));
+    _cropRect = mapped.intersected(newR);
+    update();
 }
 
 bool ViewerWidget::eventFilter(QObject* watched, QEvent* event) {
@@ -1088,14 +1141,31 @@ void ViewerWidget::wheelEvent(QWheelEvent* event) {
         QWidget::wheelEvent(event);
         return;
     }
-    if (event->modifiers() & Qt::ControlModifier) {
-        if (dy > 0) zoomIn();
-        else        zoomOut();
+    // Mid-crop the wheel does nothing: navigating would throw the marquee
+    // away, and zooming would move the image under it (keyPressEvent
+    // swallows the keyboard equivalents for the same reason).
+    if (_cropMode) {
         event->accept();
         return;
     }
-    if (dy > 0) emit prevRequested();
-    else        emit nextRequested();
+    // One step per full notch. A high-resolution wheel or a touchpad sends
+    // many small deltas per gesture; acting on each one skipped dozens of
+    // images (or ran zoom to its limit) in a single swipe. Reset when the
+    // direction reverses so a turn-back responds immediately.
+    if ((_wheelAccum > 0 && dy < 0) || (_wheelAccum < 0 && dy > 0)) _wheelAccum = 0;
+    _wheelAccum += dy;
+    const bool zoom = event->modifiers() & Qt::ControlModifier;
+    while (qAbs(_wheelAccum) >= 120) {
+        const bool up = _wheelAccum > 0;
+        _wheelAccum += up ? -120 : 120;
+        if (zoom) {
+            if (up) zoomIn(); else zoomOut();
+        } else {
+            if (up) emit prevRequested(); else emit nextRequested();
+            _wheelAccum = 0;   // one image per event at most; don't queue up skips
+            break;
+        }
+    }
     event->accept();
 }
 

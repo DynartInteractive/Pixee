@@ -31,6 +31,13 @@ void SaveImageTask::run() {
         setFailed(tr("Nothing to save (empty image)."));
         return;
     }
+    // Refuse up front if no plugin can encode the format (GIF, SVG, ... are
+    // readable but not writable) — before any prompt or file is touched.
+    if (!ImageFormats::canWrite(_format)) {
+        setFailed(tr("Saving as %1 is not supported")
+                      .arg(QString::fromLatin1(_format).toUpper()));
+        return;
+    }
 
     if (QFile::exists(_dst)) {
         // The deliberate "Save over the original" case bypasses the prompt;
@@ -47,11 +54,12 @@ void SaveImageTask::run() {
             setSkipped();
             return;
         case Overwrite:
-            // We hold the pixels in memory, so removing the destination first
-            // is safe — a failed write can't lose the (only-in-memory) edit's
-            // source, but it does destroy the old file, so bail if remove fails.
-            if (!QFile::remove(_dst)) {
-                setFailed(tr("Cannot remove existing destination: %1").arg(_dst));
+            // Nothing removed up front: writeImage replaces the existing file
+            // only once the new bytes are completely on disk, so a failed
+            // write (unsupported format, full disk) leaves the original —
+            // usually the very file the edit was made from — intact.
+            if (QFileInfo(_dst).isDir()) {
+                setFailed(tr("Cannot overwrite a folder: %1").arg(_dst));
                 return;
             }
             break;
@@ -64,12 +72,9 @@ void SaveImageTask::run() {
     if (!checkPauseStop()) return;
     emitProgress(30);
 
-    QImageWriter writer(_dst, _format);
-    if (ImageFormats::isLossy(QString::fromLatin1(_format))) {
-        writer.setQuality(_quality);
-    }
-    if (!writer.write(_image)) {
-        setFailed(tr("Cannot write: %1").arg(writer.errorString()));
+    QString error;
+    if (!ImageFormats::writeImage(_image, _dst, _format, _quality, &error)) {
+        setFailed(error);
         return;
     }
 

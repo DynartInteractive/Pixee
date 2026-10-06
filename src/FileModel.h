@@ -89,6 +89,15 @@ public:
     // Used as a placeholder while the viewer's full-res load is in flight.
     QImage thumbnailFor(const QString& path) const;
 
+    // Drop the in-memory thumbnails of everything outside `folder` — keeping
+    // its own images and its subfolders' index images. Without this every
+    // thumbnail ever delivered stayed in memory for the whole session
+    // (~200 KB each; gigabytes after browsing a few large folders). Safe
+    // because only the central list paints thumbnails and it re-subscribes
+    // from scratch on every folder change, so a revisited folder is refilled
+    // from the on-disk cache. Call after switching the list to `folder`.
+    void releaseThumbnailsOutside(FileItem* folder);
+
     // Force a single item's thumbnail to be rebuilt from its current bytes.
     // For an image: drops this model's cached state for the path, re-stats
     // the file so the row's mtime/size are current, and asks the cache to

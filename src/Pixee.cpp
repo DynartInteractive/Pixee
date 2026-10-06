@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QImageReader>
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QSettings>
@@ -43,6 +44,12 @@ Pixee::Pixee(int argc, char** argv) : _argc(argc) {
     if (icon.isNull()) icon = QIcon(QStringLiteral(":/icons/app.svg"));
     if (!icon.isNull()) QApplication::setWindowIcon(icon);
 
+    // Qt 6 refuses to decode any image over 256 MB decoded (about 64 MP at
+    // 32 bpp) — ordinary for panoramas and high-end camera files. Raise it so
+    // the viewer can open them; the loaders catch bad_alloc for the truly
+    // impossible ones. Process-wide, so it covers every reader.
+    QImageReader::setAllocationLimit(sizeof(void*) >= 8 ? 4096 : 1024);
+
     // Must precede any widget construction (below) so tr() picks up the
     // chosen language while the UI is built.
     installTranslators();
@@ -79,21 +86,32 @@ void Pixee::installTranslators() {
 
 int Pixee::run() {
     _mainWindow->show();
-    return _app->exec();
+    const int rc = _app->exec();
+
+    // Tear down only after the event loop has returned. exit() runs inside
+    // the main window's own closeEvent; deleting the window there unwound the
+    // stack into a destroyed object (and, for File → Quit, into the menu and
+    // action that triggered it).
+    delete _mainWindow;      // also deletes the models (FileModel joins its threads)
+    _mainWindow = nullptr;
+    delete _taskManager;
+    _taskManager = nullptr;
+    delete _thumbnailCache;  // joins the decode pool and the DB thread
+    _thumbnailCache = nullptr;
+    delete _theme;
+    delete _config;
+    return rc;
 }
 
 void Pixee::exit() {
     _mainWindow->exit();
-    QApplication::quit();
-    // Drain the task manager BEFORE deleting the main window so any
+    // Drain the task manager BEFORE the main window goes away so any
     // in-flight task signals (progress / state changes) don't fire onto
     // a dangling dock widget.
     if (_taskManager) {
         _taskManager->shutdown();
     }
-    delete _mainWindow;
-    delete _taskManager;
-    delete _thumbnailCache;
+    QApplication::quit();
 }
 
 Theme* Pixee::theme() const {

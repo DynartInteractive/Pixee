@@ -44,6 +44,9 @@ private slots:
     void save_null_image_fails();
     void save_overwrite_flag_bypasses_prompt();
     void save_skip_conflict_leaves_dest_untouched();
+    void convert_onto_itself_overwrite_keeps_image();
+    void save_unwritable_format_keeps_original();
+    void save_jfif_extension_maps_to_jpeg();
 };
 
 namespace {
@@ -394,6 +397,76 @@ void TstImageTasks::save_skip_conflict_leaves_dest_untouched() {
     QFile after(dst);
     QVERIFY(after.open(QIODevice::ReadOnly));
     QCOMPARE(after.readAll(), dstBefore);
+}
+
+void TstImageTasks::convert_onto_itself_overwrite_keeps_image() {
+    // Save As with the dialog defaults targets the source itself. Overwrite
+    // used to delete the source before decoding it — the image was lost.
+    TaskTestFixture f;
+    const QString src = f.path("photo.png");
+    TestHelpers::writeImage(src, 64, 48, "png");
+
+    auto* group = new TaskGroup(QStringLiteral("Convert"));
+    auto* task = addConvert(group, src, src, "png");
+    const QUuid id = task->id();
+
+    f.mgr.enqueueGroup(group);
+    QUuid askedId; int kind = -1; QVariantMap ctx;
+    QVERIFY(f.waitForQuestion(&askedId, &kind, &ctx));
+    f.mgr.provideAnswer(id, kind, int(Task::Overwrite), false);
+    QVERIFY(f.waitForGroupRemoved(10000));
+
+    QCOMPARE(f.lastStateOf(id), int(Task::Completed));
+    QImageReader reader(src);
+    QVERIFY2(reader.canRead(), qPrintable(reader.errorString()));
+    QCOMPARE(reader.size(), QSize(64, 48));
+}
+
+void TstImageTasks::save_unwritable_format_keeps_original() {
+    // File → Save on a readable-but-unwritable format (stock Qt has no GIF
+    // writer): the task used to delete the original and then fail the write.
+    const QByteArray unwritable = "gif";
+    if (QImageWriter::supportedImageFormats().contains(unwritable))
+        QSKIP("this Qt build can write GIF — no unwritable format to test with");
+
+    TaskTestFixture f;
+    const QString dst = f.path("anim.gif");
+    TestHelpers::writeBytes(dst, 128);
+    QFile before(dst);
+    QVERIFY(before.open(QIODevice::ReadOnly));
+    const QByteArray bytesBefore = before.readAll();
+    before.close();
+
+    QImage img(20, 20, QImage::Format_RGB32);
+    img.fill(Qt::red);
+    auto* group = new TaskGroup(QStringLiteral("Save"));
+    auto* task = addSave(group, img, dst, unwritable, 92, /*overwrite=*/true);
+    const QUuid id = task->id();
+
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved(10000));
+
+    QCOMPARE(f.lastStateOf(id), int(Task::Failed));
+    QFile after(dst);
+    QVERIFY(after.open(QIODevice::ReadOnly));
+    QCOMPARE(after.readAll(), bytesBefore);
+}
+
+void TstImageTasks::save_jfif_extension_maps_to_jpeg() {
+    TaskTestFixture f;
+    const QString dst = f.path("edited.jfif");
+    QImage img(30, 20, QImage::Format_RGB32);
+    img.fill(Qt::blue);
+
+    auto* group = new TaskGroup(QStringLiteral("Save"));
+    auto* task = addSave(group, img, dst, "jfif");
+    const QUuid id = task->id();
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved(10000));
+
+    QCOMPARE(f.lastStateOf(id), int(Task::Completed));
+    QImageReader reader(dst);
+    QCOMPARE(reader.format(), QByteArray("jpeg"));
 }
 
 QTEST_GUILESS_MAIN(TstImageTasks)

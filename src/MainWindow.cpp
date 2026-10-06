@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QAction>
 #include <QActionGroup>
+#include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -40,6 +41,7 @@
 #include "FolderTreeView.h"
 #include "FileListView.h"
 #include "ConvertFormatTask.h"
+#include "FileOpsHelpers.h"
 #include "FileOpsMenuBuilder.h"
 #include "ImageFormats.h"
 #include "ImageLoader.h"
@@ -82,7 +84,10 @@ void MainWindow::create() {
 
     // Models
 
-    _fileModel = new FileModel(_pixee->config(), _pixee->theme(), _pixee->thumbnailCache());
+    // Parented to the window so they're destroyed with it — FileModel's
+    // destructor is what stops and joins its enumeration / refresh threads.
+    _fileModel = new FileModel(_pixee->config(), _pixee->theme(),
+                               _pixee->thumbnailCache(), this);
     QObject::connect(_fileModel, &FileModel::pathRenamed,
                      this, &MainWindow::onPathRenamed);
     // A single-file rename keeps the bytes — repoint its cached thumbnail to
@@ -90,13 +95,13 @@ void MainWindow::create() {
     QObject::connect(_fileModel, &FileModel::pathRenamed,
                      _pixee->thumbnailCache(), &ThumbnailCache::moveThumbnail);
 
-    _folderFilterModel = new FileFilterModel();
+    _folderFilterModel = new FileFilterModel(this);
     _folderFilterModel->setSourceModel(_fileModel);
     _folderFilterModel->setAcceptedFileTypes({ FileType::Loading, FileType::Folder });
     _folderFilterModel->setShowDotDot(false);
     _folderFilterModel->sort(0, Qt::AscendingOrder);
 
-    _fileFilterModel = new FileFilterModel();
+    _fileFilterModel = new FileFilterModel(this);
     _fileFilterModel->setSourceModel(_fileModel);
     _fileFilterModel->setAcceptedFileTypes({ FileType::Folder, FileType::Image, FileType::File });
     _fileFilterModel->setShowDotDot(true);
@@ -552,6 +557,16 @@ void MainWindow::create() {
     // thumbnail (old → new path) rather than regenerating after the refresh.
     connect(_pixee->taskManager(), &TaskManager::pathMoved,
             _pixee->thumbnailCache(), &ThumbnailCache::moveThumbnail);
+    // ...and keep the viewer's path list / image cache pointing at the file:
+    // a batch rename (reachable from the menu bar while the viewer is up)
+    // otherwise left the viewer on a dead path, so Save would write a new
+    // file under the old name and Delete / Rename / Save As would fail.
+    connect(_pixee->taskManager(), &TaskManager::pathMoved,
+            this, &MainWindow::onPathRenamed);
+    // Save / Save As outcomes: the edit is only marked clean once the write
+    // has actually succeeded (see saveEditedOverOriginal).
+    connect(_pixee->taskManager(), &TaskManager::taskStateChanged,
+            this, &MainWindow::onSaveTaskStateChanged);
 
     // Tasks dock visibility model:
     //   - View → Tasks menu = persistent intent (sticky across runs).
@@ -604,6 +619,9 @@ void MainWindow::create() {
     QSettings settings;
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
     restoreState(settings.value("mainWindowState").toByteArray());
+    // restoreState re-applies the dock visibility from the saved blob, which
+    // would override the metadataDockEnabled intent applied at construction.
+    _metadataDock->setVisible(settings.value("metadataDockEnabled", false).toBool());
 
     // restoreState rebuilds the whole dock layout from saved data, so a dock
     // added since that data was written is unknown to it and gets dropped out
@@ -656,7 +674,10 @@ void MainWindow::create() {
     // Override Qt's restored visibility with our persistent intent —
     // the source of truth lives in tasksDockEnabled, not the saved
     // QMainWindow state blob.
-    _suppressDockVisibilitySync = true;
+    // No suppress flag here: whatever visibilityChanged this produces (if
+    // any — none for a widget that was never shown) just writes the same
+    // intent back. Arming the flag when nothing was emitted used to leave it
+    // set, swallowing the user's next genuine X-close.
     _taskDockWidget->setVisible(_userTasksDockEnabled);
 
     // Path edit drives navigation on Enter.
@@ -753,7 +774,9 @@ void MainWindow::create() {
     for (const QString& a : qApp->arguments().mid(1)) {
         const QFileInfo fi(a);
         if (fi.exists() && fi.isFile()) {
-            _startupImagePath = fi.absoluteFilePath();
+            // Cleaned: absoluteFilePath() keeps any "..", which would never
+            // match the folder the restore chain arrives at.
+            _startupImagePath = QDir::cleanPath(fi.absoluteFilePath());
             break;
         }
     }
@@ -767,13 +790,25 @@ void MainWindow::create() {
     QObject::connect(_fileModel, &FileModel::folderPopulated, this,
         [this](const QString& dirPath) {
             if (_startupImagePath.isEmpty()) return;
-            if (QFileInfo(_startupImagePath).absolutePath() != dirPath) return;
+            // Filesystem identity, not string equality: the command line may
+            // spell the folder in a different case ("c:\photos" for
+            // C:\Photos), which the case-insensitive restore chain follows.
+            if (!FileOpsHelpers::isSameFile(QFileInfo(_startupImagePath).absolutePath(),
+                                            dirPath)) return;
             FileItem* folder = currentFolder();
             if (!folder || folder->fileInfo().filePath() != dirPath) return;
-            FileItem* item = _fileModel->itemForPath(_startupImagePath);
+            // Look the image up by name among the folder's children, so the
+            // model's own spelling of the path is used.
+            const QString wantedName = QFileInfo(_startupImagePath).fileName();
             _startupImagePath.clear();
-            if (item && item->fileType() == FileType::Image) {
-                activateImage(item);
+            for (int i = 0; i < folder->childCount(); ++i) {
+                FileItem* item = folder->child(i);
+                if (item && item->fileType() == FileType::Image
+                        && item->fileInfo().fileName().compare(
+                               wantedName, FileOpsHelpers::pathCaseSensitivity()) == 0) {
+                    activateImage(item);
+                    break;
+                }
             }
         });
 
@@ -830,13 +865,18 @@ void MainWindow::navigateTo(FileItem* item) {
     if (_restorePending) {
         cancelPathRestore();
     }
-    // Folder navigation always pulls the user out of viewer mode.
-    if (_centerStack && _centerStack->currentIndex() != 0) {
-        _centerStack->setCurrentIndex(0);
-        _viewerWidget->clear();
-        if (_dockWasVisible) _dockWidget->show();
-        // Resume thumbnail generation paused by activateImage.
-        if (_pixee->thumbnailCache()) _pixee->thumbnailCache()->setPaused(false);
+    // Folder navigation always pulls the user out of viewer mode — through
+    // the unsaved-edits guard (a folder click in the tree dock reaches here
+    // while the viewer is up) and the full dismiss path, so the preload
+    // cache, in-flight loads and window title are cleaned up too.
+    if (_centerStack && _centerStack->currentWidget() == _viewerWidget) {
+        if (!maybeDiscardEdits()) {
+            // Cancelled: put the tree's selection back on the folder the
+            // viewer came from (signal-blocked, so this doesn't re-navigate).
+            expandFolderTreeTo(currentFolder());
+            return;
+        }
+        dismissViewer();
     }
     _fileListView->selectionModel()->clear();
     // With no drive list there is nothing above "/" worth showing, so every
@@ -871,6 +911,10 @@ void MainWindow::navigateTo(FileItem* item) {
     const QModelIndex sourceIdx = _fileModel->indexFor(item);
     const QModelIndex proxyIdx = _fileFilterModel->mapFromSource(sourceIdx);
     _fileListView->setRootIndex(proxyIdx);
+    // The list has just abandoned the previous folder's thumbnails; drop
+    // their in-memory copies too, or every thumbnail ever shown stays
+    // resident for the session.
+    _fileModel->releaseThumbnailsOutside(item);
     _pathLineEdit->setText(displayPath(item->fileInfo().filePath()));
     // Navigating from anywhere else (tree, double-click, Back) rewrites the
     // path bar without a keystroke, so close any suggestion list still
@@ -1052,6 +1096,12 @@ void MainWindow::saveImage() {
     if (!_viewerWidget->isModified()) return;
     const QString path = currentContextImagePath();
     if (path.isEmpty()) return;
+    if (writableFormatFor(path).isEmpty()) {
+        QMessageBox::warning(this, tr("Save"),
+            tr("%1 files can't be saved. Use Save As to keep your edit in "
+               "another format.").arg(QFileInfo(path).suffix().toUpper()));
+        return;
+    }
 
     // Confirm — this replaces the original, and re-encoding a lossy format
     // (JPEG/WebP/…) costs a little quality every save.
@@ -1076,6 +1126,14 @@ void MainWindow::saveImage() {
     saveEditedOverOriginal();
 }
 
+QByteArray MainWindow::writableFormatFor(const QString& path) const {
+    // Format follows the original file's extension so a JPEG stays a JPEG
+    // etc. — via the alias table (".jfif" is JPEG; a bare "jfif" is not a
+    // format name any writer knows). Empty when no plugin can write it.
+    const QByteArray fmt = ImageFormats::writerFormatFor(QFileInfo(path).suffix());
+    return ImageFormats::canWrite(fmt) ? fmt : QByteArray();
+}
+
 bool MainWindow::saveEditedOverOriginal() {
     if (_centerStack->currentWidget() != _viewerWidget) return false;
     if (!_viewerWidget->isModified()) return true;   // nothing to do
@@ -1084,25 +1142,102 @@ bool MainWindow::saveEditedOverOriginal() {
     const QImage edited = _viewerWidget->editedImage();
     if (edited.isNull()) return false;
 
-    // Format follows the original file's extension so a JPEG stays a JPEG etc.
-    const QByteArray fmt = QFileInfo(path).suffix().toLower().toLatin1();
+    const QByteArray fmt = writableFormatFor(path);
+    if (fmt.isEmpty()) {
+        // GIF, SVG, ... open fine but can't be written back. Refuse here —
+        // the edit stays in the viewer, so Save As can still keep it.
+        QMessageBox::warning(this, tr("Save"),
+            tr("%1 files can't be saved. Use Save As to keep your edit in "
+               "another format.").arg(QFileInfo(path).suffix().toUpper()));
+        return false;
+    }
 
     // overwriteExisting bypasses the conflict prompt — the user already
     // committed to replacing the original (via the confirm dialog or the
     // unsaved-changes guard). The task holds its own copy of the pixels, so
-    // navigating away while it writes is safe.
+    // navigating away while it writes is safe, and it writes via a temp file
+    // so a failure leaves the original intact.
     auto* group = new TaskGroup(tr("Save %1").arg(QFileInfo(path).fileName()));
-    group->addTask(new SaveImageTask(edited, path, fmt, /*quality=*/92, group,
-                                     nullptr, /*overwriteExisting=*/true));
-    _pixee->taskManager()->enqueueGroup(group);
+    auto* task = new SaveImageTask(edited, path, fmt, /*quality=*/92, group,
+                                   nullptr, /*overwriteExisting=*/true);
+    group->addTask(task);
+    _pendingSaves.insert(task->id(), { path, edited, /*overOriginal=*/true });
 
-    // The edit is now committed to disk; clear the dirty flag so navigation
-    // doesn't re-prompt. The on-disk refresh picks up the rewritten bytes.
-    _viewerWidget->setModified(false);
+    // The viewer cache must hold what will be on disk: otherwise navigating
+    // away and back showed the pre-edit pixels, and a second edit + save of
+    // that stale copy silently reverted the first save. (Rolled back below
+    // if the write fails.)
+    if (_viewerImageCache.contains(path)) _viewerImageCache.insert(path, edited);
+
+    _pixee->taskManager()->enqueueGroup(group);
+    // The dirty flag is cleared when the task reports success
+    // (onSaveTaskStateChanged) — not here, before anything was written.
     return true;
 }
 
-bool MainWindow::maybeDiscardEdits() {
+bool MainWindow::saveEditedOverOriginalNow() {
+    // Synchronous variant for window close: the task pipeline is about to be
+    // shut down, which would abort a queued save.
+    if (_centerStack->currentWidget() != _viewerWidget) return true;
+    if (!_viewerWidget->isModified()) return true;
+    const QString path = currentContextImagePath();
+    const QImage edited = _viewerWidget->editedImage();
+    if (path.isEmpty() || edited.isNull()) return false;
+    const QByteArray fmt = writableFormatFor(path);
+    QString error;
+    if (fmt.isEmpty()) {
+        error = tr("%1 files can't be saved.").arg(QFileInfo(path).suffix().toUpper());
+    } else if (ImageFormats::writeImage(edited, path, fmt, 92, &error)) {
+        _viewerWidget->markSaved(edited);
+        return true;
+    }
+    QMessageBox::warning(this, tr("Save"),
+        tr("Could not save %1: %2").arg(QFileInfo(path).fileName(), error));
+    return false;
+}
+
+void MainWindow::onSaveTaskStateChanged(QUuid taskId, int state) {
+    const auto it = _pendingSaves.constFind(taskId);
+    if (it == _pendingSaves.constEnd()) return;
+    if (state != Task::Completed && state != Task::Failed
+            && state != Task::Aborted && state != Task::Skipped) return;
+    const PendingSave save = it.value();
+    _pendingSaves.erase(it);
+
+    const bool viewerOnIt = _centerStack->currentWidget() == _viewerWidget
+        && _viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size()
+        && _viewerImagePaths.at(_viewerIndex) == save.viewerPath;
+
+    if (state == Task::Completed) {
+        // Mark clean only if the viewer still shows exactly what was saved —
+        // a further edit made while the write ran is still unsaved.
+        // (QImage== short-circuits on shared data, so this is cheap without a
+        // colour adjustment; with one it is a single full-image compare.)
+        // markSaved, not setModified(false): a pending adjustment would keep
+        // the viewer "modified" — it gets folded into the pixels instead.
+        if (viewerOnIt && _viewerWidget->isModified()
+                && _viewerWidget->editedImage() == save.image) {
+            _viewerWidget->markSaved(save.image);
+        }
+        return;
+    }
+    if (save.overOriginal) {
+        // The original on disk is unchanged; stop serving the edit from the
+        // cache as if it had been saved.
+        if (_viewerImageCache.value(save.viewerPath) == save.image) {
+            _viewerImageCache.remove(save.viewerPath);
+            _viewerCacheOrder.removeAll(save.viewerPath);
+        }
+    }
+    if (state == Task::Failed) {
+        Toast::show(this,
+            tr("Saving %1 failed — see the Tasks panel for details.")
+                .arg(QFileInfo(save.viewerPath).fileName()),
+            Toast::Error);
+    }
+}
+
+bool MainWindow::maybeDiscardEdits(bool saveSynchronously) {
     if (_centerStack->currentWidget() != _viewerWidget) return true;
     if (!_viewerWidget->isModified()) return true;
 
@@ -1116,8 +1251,13 @@ bool MainWindow::maybeDiscardEdits() {
     box.setDefaultButton(QMessageBox::Save);
     const int choice = box.exec();
     if (choice == QMessageBox::Cancel) return false;
-    if (choice == QMessageBox::Save) return saveEditedOverOriginal();
-    // Discard — drop the edit so we don't ask again, then let the caller go.
+    if (choice == QMessageBox::Save) {
+        return saveSynchronously ? saveEditedOverOriginalNow()
+                                 : saveEditedOverOriginal();
+    }
+    // Discard — drop the edit (adjustment included) so we don't ask again,
+    // then let the caller go.
+    _viewerWidget->resetAdjustments();
     _viewerWidget->setModified(false);
     return true;
 }
@@ -1143,18 +1283,24 @@ void MainWindow::saveImageAs() {
     auto* group = new TaskGroup(tr("Save %1").arg(QFileInfo(dst).fileName()));
     if (haveEdit) {
         const QImage edited = _viewerWidget->editedImage();
-        group->addTask(new SaveImageTask(edited, dst, dlg.format(), dlg.quality(),
-                                         group));
+        auto* task = new SaveImageTask(edited, dst, dlg.format(), dlg.quality(), group);
+        group->addTask(task);
+        // Saving onto the viewed file itself replaces what's on disk, so the
+        // viewer cache must follow (see saveEditedOverOriginal).
+        const bool overOriginal = FileOpsHelpers::isSameFile(src, dst);
+        if (overOriginal && _viewerImageCache.contains(src))
+            _viewerImageCache.insert(src, edited);
+        _pendingSaves.insert(task->id(), { src, edited, overOriginal });
     } else {
         group->addTask(new ConvertFormatTask(src, dst, dlg.format(), dlg.quality(),
                                              group));
     }
     _pixee->taskManager()->enqueueGroup(group);
 
-    // The user has saved their edited pixels to a file, so treat the pending
-    // edit as resolved — the original on disk is untouched, and re-entering the
-    // folder reloads it clean, so this stays consistent.
-    if (haveEdit) _viewerWidget->setModified(false);
+    // The edit counts as resolved once the edited pixels are safely in a
+    // file — onSaveTaskStateChanged clears the dirty flag on success. Not
+    // here: a Skip in the conflict prompt or a failed write would otherwise
+    // leave the edit marked clean, to be dropped on the next navigation.
 }
 
 void MainWindow::updateSaveActions() {
@@ -1334,6 +1480,13 @@ void MainWindow::createMenus() {
             [this](bool visible) {
                 const QSignalBlocker block(_metadataToggleAction);
                 _metadataToggleAction->setChecked(visible);
+                // Closing the dock with its X button is a persistent choice
+                // too (the toggled() handler is blocked above, so record it
+                // here). Minimise / window close / being tabbed behind
+                // another dock also report "not visible" but leave the dock
+                // itself un-hidden — those aren't the user's intent.
+                if (visible || _metadataDock->isHidden())
+                    QSettings().setValue("metadataDockEnabled", visible);
             });
     viewMenu->addAction(_metadataToggleAction);
 
@@ -1388,6 +1541,11 @@ void MainWindow::createMenus() {
                     _suppressDockVisibilitySync = false;
                     return;
                 }
+                // visibilityChanged(false) also fires when the window is
+                // minimised or closed, or the dock is tabbed behind another
+                // — none of which is the user closing it. Only an explicit
+                // hide (the X button) leaves the dock itself hidden.
+                if (!visible && !_taskDockWidget->isHidden()) return;
                 _userTasksDockEnabled = visible;
                 QSettings().setValue("tasksDockEnabled", visible);
                 const QSignalBlocker block(_tasksToggleAction);
@@ -1683,9 +1841,11 @@ void MainWindow::showViewerImageAt(int index) {
     auto cachedIt = _viewerImageCache.constFind(path);
     if (cachedIt != _viewerImageCache.constEnd()) {
         _viewerWidget->setImage(cachedIt.value());
+        _viewerFullResPath = path;
         touchViewerCache(path);
         updateViewerStatusBar(cachedIt.value().size());
     } else {
+        _viewerFullResPath.clear();
         // Show whatever placeholder we have so the user sees something
         // immediately. Thumbnail first; otherwise the dark canvas.
         const QImage placeholder = _fileModel ? _fileModel->thumbnailFor(path) : QImage();
@@ -1736,6 +1896,15 @@ void MainWindow::touchViewerCache(const QString& path) {
 }
 
 void MainWindow::onImageLoaded(QString path, QImage image) {
+    // A load that lands after the viewer was dismissed would re-fill the
+    // cache dismissViewer just freed, and keep it until the next session.
+    if (_centerStack->currentWidget() != _viewerWidget) return;
+    // Already showing this image at full resolution — a duplicate request
+    // finishing late. setImage() again would wipe an edit, crop or zoom the
+    // user made in the meantime, and the cache could be holding a just-saved
+    // edit that must not be replaced by the older decode.
+    if (path == _viewerFullResPath) return;
+
     // Cache regardless of whether this is the current image — preloaded
     // neighbours go into the same pool, so navigating to them is instant.
     constexpr int kMaxViewerCacheSize = 5;  // current + a couple prev/next + slack
@@ -1755,6 +1924,7 @@ void MainWindow::onImageLoaded(QString path, QImage image) {
     if (_viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size()
             && path == _viewerImagePaths.at(_viewerIndex)) {
         _viewerWidget->setImage(image);
+        _viewerFullResPath = path;
         updateViewerStatusBar(image.size());
         updateSaveActions();   // hasImage() is now true for the viewed image
     }
@@ -1762,6 +1932,16 @@ void MainWindow::onImageLoaded(QString path, QImage image) {
 
 void MainWindow::onImageLoadFailed(QString path) {
     qWarning() << "Viewer: load failed for" << path;
+    // Say so when it's the image being looked at — otherwise the viewer just
+    // sits on the blurry thumbnail with the edit keys silently doing nothing.
+    if (_centerStack->currentWidget() == _viewerWidget
+            && _viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size()
+            && path == _viewerImagePaths.at(_viewerIndex)) {
+        Toast::show(this,
+            tr("Could not open %1 — the file may be damaged, unsupported, or "
+               "too large.").arg(QFileInfo(path).fileName()),
+            Toast::Error);
+    }
 }
 
 void MainWindow::onImageLoadAborted(QString /*path*/) {
@@ -1778,6 +1958,15 @@ QString MainWindow::currentContextImagePath() const {
         return QString();
     }
     if (!_fileListView || !_fileFilterModel) return QString();
+    // Exactly one item selected → that item. This is what updateSaveActions
+    // gates Save As on; the current index can sit elsewhere (rubber-band
+    // selection, Ctrl-click deselect), and Save As used to act on it.
+    const FileListView::Selection sel = _fileListView->selectionPaths();
+    if (sel.paths.size() == 1) {
+        FileItem* item = _fileModel->itemForPath(sel.paths.first());
+        return (item && item->fileType() == FileType::Image) ? sel.paths.first()
+                                                             : QString();
+    }
     const QModelIndex cur = _fileListView->currentIndex();
     if (!cur.isValid()) return QString();
     const QModelIndex src = _fileFilterModel->mapToSource(cur);
@@ -2061,6 +2250,7 @@ void MainWindow::dismissViewer() {
                                : QString();
     _centerStack->setCurrentIndex(0);     // back to the browser page
     _viewerWidget->clear();
+    _viewerFullResPath.clear();
     _viewerImagePaths.clear();
     _viewerIndex = -1;
     _viewerMultiSelect = false;
@@ -2105,7 +2295,26 @@ QSize MainWindow::sizeHint() const {
     return QSize(1280, 720); // Default size
 }
 
-void MainWindow::closeEvent([[maybe_unused]] QCloseEvent* event) {
+void MainWindow::closeEvent(QCloseEvent* event) {
+    // Unsaved viewer edits: same Save / Discard / Cancel guard as leaving the
+    // image. Saved synchronously — the task pipeline is shut down below.
+    if (!maybeDiscardEdits(/*saveSynchronously=*/true)) {
+        event->ignore();
+        return;
+    }
+    // Quitting stops running file operations; a multi-file move would be
+    // left half done, so confirm first.
+    if (_pixee->taskManager() && _pixee->taskManager()->hasGroups()) {
+        const auto answer = QMessageBox::question(this, tr("Operations in progress"),
+            tr("File operations are still running. Quit anyway?\n\n"
+               "Unfinished operations will be stopped."),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes) {
+            event->ignore();
+            return;
+        }
+    }
+    event->accept();
     _pixee->exit();
 }
 
@@ -2313,6 +2522,15 @@ void MainWindow::renameItemAt(const QString& path) {
     const QString newName = dlg.newName();
     if (newName.isEmpty()) return;  // unchanged-name treated as no-op cancel
 
+    // Re-resolve: a folder refresh during the modal loop (a running task, the
+    // activation refresh, another app deleting the file) may have removed the
+    // row and deleted the FileItem we looked up before exec().
+    item = _fileModel->itemForPath(path);
+    if (!item) {
+        Toast::show(this, tr("\"%1\" no longer exists").arg(currentName),
+                    Toast::Error);
+        return;
+    }
     if (!_fileModel->renameItem(item, newName)) {
         Toast::show(this,
             tr("Could not rename \"%1\" — file may be in use or read-only")
@@ -2335,6 +2553,13 @@ void MainWindow::createFolderIn(const QString& parentDir) {
     const QString name = dlg.newName();
     if (name.isEmpty()) return;
 
+    // Re-resolve after the modal loop — see renameItemAt.
+    parent = _fileModel->itemForPath(parentDir);
+    if (!parent) {
+        Toast::show(this, tr("Cannot create folder — parent no longer exists"),
+                    Toast::Error);
+        return;
+    }
     FileItem* created = _fileModel->createFolder(parent, name);
     if (!created) {
         Toast::show(this,
@@ -2372,8 +2597,23 @@ void MainWindow::onPathRenamed(QString oldPath, QString newPath) {
         }
         return p;
     };
+    const QString viewedBefore =
+        (_viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size())
+            ? _viewerImagePaths.at(_viewerIndex) : QString();
     for (QString& p : _viewerImagePaths) p = rewritePath(p);
     for (QString& p : _viewerCacheOrder) p = rewritePath(p);
+    _viewerFullResPath = rewritePath(_viewerFullResPath);
+    for (auto& save : _pendingSaves) save.viewerPath = rewritePath(save.viewerPath);
+
+    // The viewed image itself was renamed: refresh what shows its name.
+    if (!viewedBefore.isEmpty()
+            && _centerStack->currentWidget() == _viewerWidget) {
+        const QString viewedNow = rewritePath(viewedBefore);
+        if (viewedNow != viewedBefore) {
+            setWindowTitle(QStringLiteral("Pixee - %1").arg(displayPath(viewedNow)));
+            requestMetadataFor(viewedNow);
+        }
+    }
 
     // Image cache: rebuild with rewritten keys, preserving the cached
     // QImages so the renamed image stays decoded under its new name.
@@ -2386,10 +2626,12 @@ void MainWindow::onPathRenamed(QString oldPath, QString newPath) {
 
     // Path edit reflects the current folder; if the user is inside a
     // renamed folder, update the displayed path so it matches reality.
-    const QString currentText = _pathLineEdit->text();
-    const QString rewrittenCurrent = rewritePath(currentText);
-    if (rewrittenCurrent != currentText) {
-        _pathLineEdit->setText(rewrittenCurrent);
+    // The edit shows displayPath() (native separators on Windows) while the
+    // renamed paths use '/', so compare in '/' form and display natively.
+    const QString currentPath = QDir::fromNativeSeparators(_pathLineEdit->text());
+    const QString rewrittenCurrent = rewritePath(currentPath);
+    if (rewrittenCurrent != currentPath) {
+        _pathLineEdit->setText(displayPath(rewrittenCurrent));
     }
 
     // Recent-destination QSettings: rekey if they pointed at the

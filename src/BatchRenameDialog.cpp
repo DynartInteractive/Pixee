@@ -17,20 +17,32 @@
 #include <QVBoxLayout>
 
 #include "BatchRenamePlan.h"
+#include "FileOpsHelpers.h"
 
 namespace {
 // Preview-row status → drives colour + whether it blocks OK.
 enum class Status { Ok, Unchanged, Duplicate, Exists, Invalid };
 
-// A file name Qt/Windows will reject outright. Kept deliberately small — the
-// task still fails gracefully on anything the OS rejects, this just flags the
-// obvious cases live.
+// A file name the OS will reject or silently alter (same rules as the single
+// Rename / New folder dialogs). The task still fails gracefully on anything
+// else the OS rejects; this flags the known cases live.
 bool looksIllegal(const QString& name) {
-    if (name.isEmpty()) return true;
-    static const QString bad = QStringLiteral("<>:\"/\\|?*");
-    for (const QChar c : name)
-        if (bad.contains(c) || c.unicode() < 0x20) return true;
-    return name == QStringLiteral(".") || name == QStringLiteral("..");
+    return !FileOpsHelpers::fileNameProblem(name).isEmpty();
+}
+
+// Key for comparing names the way the filesystem does: "A.jpg" and "a.jpg"
+// are one file on Windows / macOS, so clash and vacated-name checks must not
+// tell them apart there.
+QString nameKey(const QString& name) {
+    return FileOpsHelpers::pathCaseSensitivity() == Qt::CaseInsensitive
+        ? name.toLower() : name;
+}
+
+// Folders have no extension: "Trip 2024.05" must not keep ".05" as one.
+QString newNameForSource(const QString& sourcePath, BatchRename::Options opts, int index) {
+    const QFileInfo fi(sourcePath);
+    if (fi.isDir()) opts.keepExtension = false;
+    return BatchRename::newNameFor(fi.fileName(), opts, index);
 }
 }  // namespace
 
@@ -139,18 +151,20 @@ void BatchRenameDialog::recompute() {
     for (int i = 0; i < n; ++i) {
         const QString oldName = QFileInfo(_sources.at(i)).fileName();
         oldNames << oldName;
-        newNames << BatchRename::newNameFor(oldName, opts, i);
+        newNames << newNameForSource(_sources.at(i), opts, i);
     }
 
     // Names of files that are actually changing — used to tell a "clash with a
     // sibling that will be vacated" (fine, ordering handles it) from a clash
     // with one we're keeping (a real overwrite the task must prompt for).
+    // Keyed per the filesystem's case rule: a case-only rename (a.jpg → A.jpg)
+    // "exists" on disk only as the file itself, which is being vacated.
     QSet<QString> vacatedOldNames;
     QHash<QString, int> newNameCounts;  // among changing rows only
     for (int i = 0; i < n; ++i) {
         if (newNames.at(i) == oldNames.at(i)) continue;  // unchanged
-        vacatedOldNames.insert(oldNames.at(i));
-        newNameCounts[newNames.at(i)]++;
+        vacatedOldNames.insert(nameKey(oldNames.at(i)));
+        newNameCounts[nameKey(newNames.at(i))]++;
     }
 
     int changing = 0, hardProblems = 0, willPrompt = 0;
@@ -162,10 +176,10 @@ void BatchRenameDialog::recompute() {
             st = Status::Unchanged;
         } else if (looksIllegal(newName)) {
             st = Status::Invalid;
-        } else if (newNameCounts.value(newName) > 1) {
+        } else if (newNameCounts.value(nameKey(newName)) > 1) {
             st = Status::Duplicate;
         } else if (QFileInfo::exists(QDir(_dir).filePath(newName))
-                   && !vacatedOldNames.contains(newName)) {
+                   && !vacatedOldNames.contains(nameKey(newName))) {
             st = Status::Exists;  // an on-disk file we are NOT vacating
         } else {
             st = Status::Ok;
@@ -218,7 +232,7 @@ void BatchRenameDialog::onAccept() {
     _accepted.clear();
     for (int i = 0; i < _sources.size(); ++i) {
         const QString oldName = QFileInfo(_sources.at(i)).fileName();
-        const QString newName = BatchRename::newNameFor(oldName, opts, i);
+        const QString newName = newNameForSource(_sources.at(i), opts, i);
         if (newName == oldName || looksIllegal(newName)) continue;
         _accepted.append({ _sources.at(i), QDir(_dir).filePath(newName) });
     }

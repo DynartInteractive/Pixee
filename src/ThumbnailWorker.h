@@ -40,6 +40,7 @@ signals:
 
 private:
     bool isAborted(int taskVersion) const;
+    void processImpl(const QString& path, qint64 mtime, qint64 size, int taskVersion);
 
     int _targetSize;
     int _jpegQuality;

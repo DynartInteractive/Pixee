@@ -2,7 +2,9 @@
 #define MAINWINDOW_H
 
 #include <QAtomicInt>
+#include <QHash>
 #include <QMainWindow>
+#include <QUuid>
 #include <QDockWidget>
 #include <QImage>
 #include <QLineEdit>
@@ -118,6 +120,10 @@ private slots:
     // the file list when the parent matches the currently-viewed
     // folder. Toast on disk failure.
     void createFolderIn(const QString& parentDir);
+    // Completion of a Save / Save As task tracked in _pendingSaves: clears
+    // the dirty flag on success, rolls back the viewer cache and reports on
+    // failure.
+    void onSaveTaskStateChanged(QUuid taskId, int state);
 
 signals:
     void requestImageLoad(QString path, int taskVersion);
@@ -144,14 +150,23 @@ private:
     // context can change (viewer show/dismiss, image loaded, list selection).
     void updateSaveActions();
     // Enqueue a SaveImageTask that overwrites the viewer's original file with
-    // its edited buffer (bypassing the conflict prompt) and clear the dirty
-    // flag. Returns false when there's nothing to save. Does NOT confirm — the
-    // Ctrl+S slot (saveImage) and the unsaved-changes guard confirm first.
+    // its edited buffer (bypassing the conflict prompt). The dirty flag is
+    // cleared only when the task succeeds (onSaveTaskStateChanged). Returns
+    // false when there's nothing to save or the format can't be written
+    // (warns). Does NOT confirm — the Ctrl+S slot (saveImage) and the
+    // unsaved-changes guard confirm first.
     bool saveEditedOverOriginal();
-    // Unsaved-changes gate for prev/next/dismiss. Returns true when it's safe
-    // to proceed: no viewer edit pending, or the user chose Save (enqueued) or
-    // Discard. Returns false only when the user cancels.
-    bool maybeDiscardEdits();
+    // Synchronous counterpart for window close, where the task pipeline is
+    // about to shut down. Warns and returns false on failure.
+    bool saveEditedOverOriginalNow();
+    // QImageWriter format for saving back over `path` (alias-mapped), or
+    // empty when no installed plugin can write that format.
+    QByteArray writableFormatFor(const QString& path) const;
+    // Unsaved-changes gate for prev/next/dismiss/close. Returns true when it's
+    // safe to proceed: no viewer edit pending, or the user chose Save
+    // (enqueued, or written synchronously when `saveSynchronously`) or
+    // Discard. Returns false when the user cancels or a sync save fails.
+    bool maybeDiscardEdits(bool saveSynchronously = false);
     void updateStatusBar(FileItem* folder);
     // Shows "Width: w | Height: h" in the status bar while the viewer is
     // active. Pass an invalid QSize() to clear (e.g. while the full-res
@@ -252,6 +267,18 @@ private:
     // Bounded by count; LRU-evicted via _viewerCacheOrder.
     QHash<QString, QImage> _viewerImageCache;
     QStringList _viewerCacheOrder;
+    // Path whose full-resolution image the viewer is showing (empty while a
+    // thumbnail placeholder or nothing is up). A second `loaded` for the same
+    // path — a duplicate load request finishing late — must not setImage()
+    // again: that resets the edit buffer, crop mode and zoom.
+    QString _viewerFullResPath;
+    // Save / Save As tasks whose outcome decides the viewer's dirty flag.
+    struct PendingSave {
+        QString viewerPath;   // the image the edit was made on
+        QImage image;         // the pixels being written
+        bool overOriginal;    // writing back over viewerPath itself
+    };
+    QHash<QUuid, PendingSave> _pendingSaves;
     // Metadata info panel (right dock) + its off-thread reader. Same
     // supersede-on-navigate pattern as the image loader: _metadataAbortVersion
     // is bumped per request so a slow read of a superseded file self-aborts.

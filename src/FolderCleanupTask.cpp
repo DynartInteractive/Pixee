@@ -42,7 +42,11 @@ void FolderCleanupTask::run() {
     // paths before their parents, so each rmdir attempt sees an actually-
     // empty dir if every file beneath it was successfully moved/deleted.
     QStringList dirs;
-    QDirIterator it(_root, QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden,
+    // NoSymLinks: a folder move doesn't carry symlinked folders / junctions
+    // across, so they stay behind — and rmdir() on a junction removes the
+    // link even when its target is full, silently losing it.
+    QDirIterator it(_root,
+                    QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::NoSymLinks,
                     QDirIterator::Subdirectories);
     while (it.hasNext()) {
         if (!checkPauseStop()) return;

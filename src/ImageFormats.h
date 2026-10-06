@@ -4,6 +4,7 @@
 #include <QList>
 #include <QStringList>
 
+class QImage;
 class QString;
 
 // Facts about image formats that Qt won't tell us, in one place.
@@ -43,5 +44,24 @@ QStringList aliasExtensionsFor(const QList<QByteArray>& supportedFormats);
 // the plugin *accepts* a quality value, and the PNG handler does — it maps the
 // number onto a zlib compression level, which is lossless.
 bool isLossy(const QString& nameOrExtension);
+
+// -- Writing -----------------------------------------------------------------
+// The QImageWriter format name for a file extension: the alias target when
+// `extension` is an alias (jfif → jpeg), otherwise the extension lower-cased.
+QByteArray writerFormatFor(const QString& extension);
+
+// True when an installed QImageWriter plugin can encode `format` (after
+// alias mapping). Reading support is a strict superset — GIF, SVG and others
+// open fine but can't be written back.
+bool canWrite(const QByteArray& format);
+
+// Encode `image` as `format` into `path`, replacing any existing file only
+// once the new bytes are completely on disk (QSaveFile: temp file + rename).
+// An existing file therefore survives a failed encode, a full disk, or a
+// path that is also the source being re-encoded. `quality` is applied for
+// lossy formats only. On failure returns false and, if `error` is non-null,
+// stores a user-facing reason there.
+bool writeImage(const QImage& image, const QString& path,
+                const QByteArray& format, int quality, QString* error);
 
 }

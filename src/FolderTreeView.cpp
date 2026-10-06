@@ -30,10 +30,14 @@ bool dropHasLocalFile(const QMimeData* mime) {
 // Pixee policy: drop = copy by default; Shift forces move. Modifiers
 // read fresh each tick — see FileListView for why event->dropAction()
 // can't be used as a secondary signal (feedback loop).
+// Only offers what the drag source allows: a Copy-only source never gets
+// its files moved, and a Move-only source is moved rather than copied.
 Qt::DropAction pickDropAction(const QDropEvent* event) {
-    if (event->modifiers().testFlag(Qt::ShiftModifier)) {
-        return Qt::MoveAction;
-    }
+    const Qt::DropActions possible = event->possibleActions();
+    const bool wantMove = event->modifiers().testFlag(Qt::ShiftModifier);
+    if (wantMove && possible.testFlag(Qt::MoveAction)) return Qt::MoveAction;
+    if (possible.testFlag(Qt::CopyAction)) return Qt::CopyAction;
+    if (possible.testFlag(Qt::MoveAction)) return Qt::MoveAction;
     return Qt::CopyAction;
 }
 }
@@ -72,6 +76,10 @@ void FolderTreeView::dragEnterEvent(QDragEnterEvent* event) {
     }
     event->setDropAction(pickDropAction(event));
     event->accept();
+    // The base dragEnterEvent isn't called (the model doesn't accept drops
+    // itself), but the auto-expand timer only expands a hovered folder in
+    // DraggingState — set it ourselves. dragLeave / drop reset it.
+    setState(DraggingState);
 }
 
 void FolderTreeView::dragLeaveEvent(QDragLeaveEvent* event) {
@@ -100,6 +108,10 @@ void FolderTreeView::dragMoveEvent(QDragMoveEvent* event) {
         event->ignore();
         return;
     }
+    // Base first, for its side effects only: it (re)arms the auto-expand
+    // timer and starts edge auto-scroll. Its accept/ignore verdict is
+    // overridden below.
+    QTreeView::dragMoveEvent(event);
     // Per-row targeting: only accept when the cursor is over an actual
     // folder row. Empty area / between-rows / past-end → ignore, which
     // gives the OS the "no-drop" cursor for that exact spot. Qt's auto-
@@ -189,6 +201,10 @@ void FolderTreeView::startDrag(Qt::DropActions supportedActions) {
 }
 
 void FolderTreeView::dropEvent(QDropEvent* event) {
+    // The base dropEvent isn't called (it would ask the model to handle the
+    // drop), so end the drag state the base dragEnter/Move started here.
+    stopAutoScroll();
+    setState(NoState);
     const QPersistentModelIndex hovered = _dropHoverIndex;
     _dropHoverIndex = QPersistentModelIndex();
     viewport()->update();
@@ -224,8 +240,14 @@ void FolderTreeView::dropEvent(QDropEvent* event) {
 
     FileOpsMenuBuilder::handleDropOrPaste(
         event->mimeData(), item->fileInfo().filePath(), isMove,
-        _taskManager, _dialogParent);
+        _taskManager, _dialogParent, /*allowSameFolder=*/false,
+        /*allowMove=*/event->possibleActions().testFlag(Qt::MoveAction));
 
-    event->setDropAction(action);
-    event->acceptProposedAction();
+    // Our own tasks perform the move, including deleting the sources. Tell
+    // a drag source in another process (Explorer, a second Pixee window)
+    // "Copy", or it would delete the files itself while our move is still
+    // reading them. accept(), not acceptProposedAction(): the latter resets
+    // the action to the proposed one.
+    event->setDropAction(event->source() ? action : Qt::CopyAction);
+    event->accept();
 }

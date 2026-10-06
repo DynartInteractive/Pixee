@@ -26,6 +26,7 @@ signals:
 
 private:
     bool isAborted(int taskVersion) const;
+    void loadImpl(const QString& path, int taskVersion);
     QAtomicInt* _abortVersion;
 };
 

@@ -1,6 +1,10 @@
 #include "ImageFormats.h"
 
+#include <QImage>
+#include <QImageWriter>
 #include <QLatin1String>
+#include <QObject>
+#include <QSaveFile>
 #include <QString>
 
 namespace {
@@ -53,6 +57,49 @@ bool isLossy(const QString& nameOrExtension) {
         if (needle == QLatin1String(format)) return true;
     }
     return false;
+}
+
+QByteArray writerFormatFor(const QString& extension) {
+    const QByteArray aliased = aliasedFormat(extension);
+    if (!aliased.isEmpty()) return aliased;
+    return extension.toLower().toLatin1();
+}
+
+bool canWrite(const QByteArray& format) {
+    if (format.isEmpty()) return false;
+    const QByteArray f = writerFormatFor(QString::fromLatin1(format));
+    return QImageWriter::supportedImageFormats().contains(f);
+}
+
+bool writeImage(const QImage& image, const QString& path,
+                const QByteArray& format, int quality, QString* error) {
+    auto fail = [error](const QString& why) {
+        if (error) *error = why;
+        return false;
+    };
+    const QByteArray f = writerFormatFor(QString::fromLatin1(format));
+    if (!canWrite(f)) {
+        return fail(QObject::tr("Saving as %1 is not supported")
+                        .arg(QString::fromLatin1(format).toUpper()));
+    }
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        return fail(QObject::tr("Cannot write: %1").arg(file.errorString()));
+    }
+    QImageWriter writer(&file, f);
+    if (isLossy(QString::fromLatin1(f))) {
+        writer.setQuality(quality);
+    }
+    if (!writer.write(image)) {
+        const QString why = writer.errorString();
+        file.cancelWriting();
+        return fail(QObject::tr("Cannot write: %1").arg(why));
+    }
+    if (!file.commit()) {
+        return fail(QObject::tr("Cannot write: %1").arg(file.errorString()));
+    }
+    return true;
 }
 
 }

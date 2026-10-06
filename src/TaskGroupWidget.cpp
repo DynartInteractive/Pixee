@@ -4,6 +4,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPointer>
 #include <QProgressBar>
 #include <QStyle>
 #include <QToolButton>
@@ -78,12 +79,16 @@ TaskGroupWidget::TaskGroupWidget(TaskGroup* group, QWidget* parent)
     _stopGroupButton->setAutoRaise(true);
     _stopGroupButton->setToolTip(tr("Abort all tasks in group"));
     connect(_stopGroupButton, &QToolButton::clicked, this, [this]() {
-        if (QMessageBox::question(this, tr("Abort task group"),
+        // The group can finish while this box is up; the dock then deletes
+        // this widget from inside the box's event loop. So the box must not
+        // be our child (it would be deleted out from under exec()), and
+        // `this` must be re-checked before use afterwards.
+        const QPointer<TaskGroupWidget> self(this);
+        const auto answer = QMessageBox::question(window(), tr("Abort task group"),
                 tr("Abort all remaining tasks in \"%1\"?").arg(_nameLabel->text()),
                 QMessageBox::Yes | QMessageBox::No,
-                QMessageBox::No) != QMessageBox::Yes) {
-            return;
-        }
+                QMessageBox::No);
+        if (!self || answer != QMessageBox::Yes) return;
         emit stopGroupRequested(_groupId);
     });
 

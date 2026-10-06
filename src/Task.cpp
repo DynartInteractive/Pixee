@@ -107,11 +107,17 @@ Task::ConflictAnswer Task::resolveOrAsk(QuestionKind kind, const QVariantMap& co
         }
     }
 
+    // Clear any stale answer BEFORE posing the question: resetting after the
+    // emit could erase an answer that arrived in between, leaving the
+    // worker waiting forever.
+    {
+        QMutexLocker lock(&_answerMutex);
+        _pendingAnswer.reset();
+    }
     setState(AwaitingAnswer);
     emit needsAnswer(_id, static_cast<int>(kind), context);
 
     QMutexLocker lock(&_answerMutex);
-    _pendingAnswer.reset();
     while (!_pendingAnswer.has_value() && !_stopRequested.loadAcquire()) {
         _answerCv.wait(&_answerMutex);
     }

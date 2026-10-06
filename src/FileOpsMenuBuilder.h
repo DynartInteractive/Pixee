@@ -136,12 +136,17 @@ public:
     // false: dragging onto the folder a file already lives in is almost
     // always accidental. Only applies to file copies; moves and folders are
     // still skipped.
-    static void handleDropOrPaste(const QMimeData* mime,
+    // `allowMove` = false forces a copy regardless of forceMove or the Cut
+    // flag — set by drop handlers when the drag source only offers Copy.
+    // Returns true when a task group was enqueued (false: nothing to do, or
+    // everything was rejected) — a Cut clipboard is only cleared on true.
+    static bool handleDropOrPaste(const QMimeData* mime,
                                   const QString& destFolder,
                                   bool forceMove,
                                   TaskManager* taskManager,
                                   QWidget* dialogParent,
-                                  bool allowSameFolder = false);
+                                  bool allowSameFolder = false,
+                                  bool allowMove = true);
 
 private:
     void doCopyToClipboard();

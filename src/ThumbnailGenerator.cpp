@@ -27,6 +27,9 @@ ThumbnailGenerator::ThumbnailGenerator(int targetSize, int jpegQuality, int work
 }
 
 ThumbnailGenerator::~ThumbnailGenerator() {
+    // Make in-flight decodes bail at their next chunk instead of reading a
+    // possibly huge file off a slow share to completion before exit.
+    _abortVersion.fetchAndAddRelease(1);
     for (const auto& slot : _workers) {
         slot.thread->quit();
     }
@@ -79,6 +82,11 @@ void ThumbnailGenerator::abandonAll() {
 void ThumbnailGenerator::onWorkerGenerated(QString path, qint64 mtime, qint64 size, int width, int height, QImage image, QByteArray jpegBytes) {
     emit generated(path, mtime, size, width, height, image, jpegBytes);
     _processing.remove(path);
+    // A request that arrived mid-decode (typically just a priority bump from
+    // scrolling) is satisfied by this result — drop it rather than decode
+    // the same file twice.
+    _meta.remove(path);
+    _currentPriority.remove(path);
     markIdle(sender());
     dispatch();
 }
@@ -86,15 +94,34 @@ void ThumbnailGenerator::onWorkerGenerated(QString path, qint64 mtime, qint64 si
 void ThumbnailGenerator::onWorkerFailed(QString path) {
     emit failed(path);
     _processing.remove(path);
+    // The file genuinely failed; a request queued meanwhile would only fail
+    // again (and the cache has just recorded the failure).
+    _meta.remove(path);
+    _currentPriority.remove(path);
     markIdle(sender());
     dispatch();
 }
 
 void ThumbnailGenerator::onWorkerAborted(QString path) {
-    emit aborted(path);
     _processing.remove(path);
+    // Cancelled and then requested again while the worker was still winding
+    // down: the request is still live, so it isn't "aborted" from the cache's
+    // point of view — requeue it silently instead of reporting an abort that
+    // would make the cache drop its bookkeeping for a pending path.
+    if (!requeueIfRequested(path)) emit aborted(path);
     markIdle(sender());
     dispatch();
+}
+
+bool ThumbnailGenerator::requeueIfRequested(const QString& path) {
+    // dispatch() drops queue entries whose path is still being decoded, and
+    // nothing used to put them back — the request was lost and its subscriber
+    // waited forever. A live _currentPriority entry means such a request
+    // exists; push it again now that the worker has let go of the path.
+    const auto it = _currentPriority.constFind(path);
+    if (it == _currentPriority.constEnd()) return false;
+    _queue.push({ it.value(), ++_seq, path });
+    return true;
 }
 
 void ThumbnailGenerator::markIdle(QObject* worker) {

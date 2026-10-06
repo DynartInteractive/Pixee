@@ -8,24 +8,12 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace {
-const QString kInvalidChars = QStringLiteral("/\\:*?\"<>|");
+#include "FileOpsHelpers.h"
 
+namespace {
 QString validate(const QString& proposed, const QString& parentDir) {
-    if (proposed.isEmpty()) {
-        return QObject::tr("Name cannot be empty.");
-    }
-    if (proposed.trimmed().isEmpty()) {
-        return QObject::tr("Name cannot be only whitespace.");
-    }
-    if (proposed == "." || proposed == "..") {
-        return QObject::tr("Reserved name.");
-    }
-    for (QChar c : kInvalidChars) {
-        if (proposed.contains(c)) {
-            return QObject::tr("Name cannot contain: %1").arg(kInvalidChars);
-        }
-    }
+    const QString problem = FileOpsHelpers::fileNameProblem(proposed);
+    if (!problem.isEmpty()) return problem;
     if (QFileInfo::exists(QDir(parentDir).filePath(proposed))) {
         return QObject::tr("A file or folder named \"%1\" already exists here.")
                    .arg(proposed);

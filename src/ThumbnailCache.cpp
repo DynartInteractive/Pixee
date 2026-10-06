@@ -69,28 +69,40 @@ void ThumbnailCache::subscribe(const QString& path, qint64 mtime, qint64 size, i
     // Deferred, not emitted inline: subscribe() is called from inside
     // FileListView::updateSubscriptions' row loop, and a direct emit would
     // re-enter it through onCacheJobDone -> tryExpandWindow.
-    if (_failures.contains(path)) {
-        QMetaObject::invokeMethod(this, [this, path] {
-            // Re-check: the subscriber may have gone away while queued.
-            if (_subscribers.contains(path)) emit thumbnailMiss(path);
-        }, Qt::QueuedConnection);
-        return;
+    //
+    // The failure is remembered together with the file's mtime/size: a file
+    // that failed while still being written (a long export) and has changed
+    // since gets a fresh attempt instead of staying failed all session.
+    const auto failIt = _failures.constFind(path);
+    if (failIt != _failures.constEnd()) {
+        if (failIt.value() == qMakePair(mtime, size)) {
+            QMetaObject::invokeMethod(this, [this, path] {
+                // Re-check: the subscriber may have gone away while queued.
+                if (_subscribers.contains(path)) emit thumbnailMiss(path);
+            }, Qt::QueuedConnection);
+            return;
+        }
+        _failures.remove(path);   // file changed since it failed — retry
     }
 
-    if (count == 1) {
-        // First subscriber. If not already in flight, start a DB lookup.
+    if (_inDb.contains(path)) {
+        // A lookup is already running; its result reaches every subscriber.
+    } else if (_inGen.contains(path)) {
+        // Already past DB and queued in generator — push priority update.
+        if (count > 1) emit requestEnqueueGenerate(path, mtime, size, distance);
+    } else {
+        // Nothing in flight: either the first subscriber, or a later one for
+        // a path whose result was already delivered to the others (e.g. the
+        // conflict dialog subscribing to a thumbnail the file list already
+        // shows). Either way this subscriber needs its own answer — a DB
+        // lookup is cheap, and a hit fans out to all subscribers.
         // We do not emit thumbnailPending here — that fires when the
         // generator actually picks the path up for decoding (see the
         // generator's "started" signal forwarded in the constructor),
         // so the queued placeholder reflects active work, not just queueing.
-        if (!_inDb.contains(path) && !_inGen.contains(path)) {
-            _inDb.insert(path);
-            _pendingMeta.insert(path, qMakePair(mtime, size));
-            emit requestLookup(path, mtime, size);
-        }
-    } else if (_inGen.contains(path)) {
-        // Already past DB and queued in generator — push priority update.
-        emit requestEnqueueGenerate(path, mtime, size, distance);
+        _inDb.insert(path);
+        _pendingMeta.insert(path, qMakePair(mtime, size));
+        emit requestLookup(path, mtime, size);
     }
 }
 
@@ -208,10 +220,12 @@ void ThumbnailCache::onGenerated(QString path, qint64 mtime, qint64 size, int wi
 }
 
 void ThumbnailCache::onGenerationFailed(QString path) {
+    // Remember the failure for the rest of the session — keyed to the file
+    // version that failed, so a later change to the file earns a retry.
+    _failures.insert(path, _pendingMeta.value(path, qMakePair(qint64(-1), qint64(-1))));
     _inGen.remove(path);
     _pendingMeta.remove(path);
     _priorities.remove(path);
-    _failures.insert(path);  // remember the failure for the rest of the session
     if (_subscribers.contains(path)) {
         emit thumbnailMiss(path);
     }

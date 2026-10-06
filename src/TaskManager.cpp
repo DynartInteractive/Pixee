@@ -35,7 +35,12 @@ void TaskManager::shutdown() {
     _shutdown = true;
 
     // Tell every group / task to stop. Wakes any pause / answer waits.
-    for (TaskGroup* g : _groups) g->stopAll();
+    // Iterate a copy: stopping a group with no running task aborts all its
+    // tasks synchronously, which can remove it from _groups mid-loop — and a
+    // skipped group could leave a worker blocked on a conflict answer, so
+    // the wait() below would never return.
+    const QList<TaskGroup*> groups = _groups;
+    for (TaskGroup* g : groups) g->stopAll();
 
     // Quit + wait each runner thread.
     for (auto& slot : _runners) {
@@ -146,12 +151,20 @@ void TaskManager::provideAnswer(const QUuid& taskId, int kind, int answer, bool 
 void TaskManager::onRunnerIdle() {
     TaskRunner* r = qobject_cast<TaskRunner*>(sender());
     if (!r) return;
+    QUuid finishedGroupId;
     for (auto& slot : _runners) {
         if (slot.runner == r) {
+            finishedGroupId = slot.groupId;
             slot.current = nullptr;
             slot.groupId = QUuid();
             break;
         }
+    }
+    // The task's terminal signal may already have found the group all-
+    // terminal while this runner was still inside execute(); removal was
+    // deferred until now (see maybeRemoveGroup).
+    if (!finishedGroupId.isNull()) {
+        if (TaskGroup* g = findGroup(finishedGroupId)) maybeRemoveGroup(g);
     }
     dispatch();
 }
@@ -191,6 +204,13 @@ void TaskManager::maybeRemoveGroup(TaskGroup* group) {
     if (!group) return;
     if (!group->allTerminal()) return;
     const QUuid id = group->id();
+    // A task reaches its terminal state a moment before execute() returns on
+    // the worker thread. Deleting the group (and its tasks) in that window
+    // would free a task the worker is still using, so wait for the runner to
+    // report idle — onRunnerIdle calls back in here.
+    for (const auto& slot : _runners) {
+        if (slot.current && slot.groupId == id) return;
+    }
 
     // Collect the files the group's completed tasks created, before the
     // group (and its tasks) are deleted. Skipped/failed/aborted tasks

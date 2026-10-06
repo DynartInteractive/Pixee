@@ -5,6 +5,8 @@
 #include <QFile>
 #include <QImageReader>
 
+#include <new>
+
 #include "IcoUtils.h"
 
 namespace {
@@ -19,6 +21,17 @@ bool ImageLoader::isAborted(int taskVersion) const {
 }
 
 void ImageLoader::load(QString path, int taskVersion) {
+    // The file is read whole into memory, then decoded; either can throw
+    // bad_alloc for a huge file, on this thread where nothing else catches it.
+    try {
+        loadImpl(path, taskVersion);
+    } catch (const std::bad_alloc&) {
+        qWarning() << "ImageLoader: out of memory loading" << path;
+        emit failed(path);
+    }
+}
+
+void ImageLoader::loadImpl(const QString& path, int taskVersion) {
     if (isAborted(taskVersion)) {
         emit aborted(path);
         return;
@@ -74,6 +87,12 @@ void ImageLoader::load(QString path, int taskVersion) {
     if (image.isNull()) {
         qWarning() << "ImageLoader: decode failed for" << path << ":" << reader.errorString();
         emit failed(path);
+        return;
+    }
+    // Superseded while decoding (the user moved on): don't deliver a result
+    // nobody asked for any more.
+    if (isAborted(taskVersion)) {
+        emit aborted(path);
         return;
     }
     emit loaded(path, image);

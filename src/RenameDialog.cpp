@@ -9,39 +9,27 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace {
-// Characters that aren't valid in a filename on Windows (also covers
-// the union of restrictions on macOS / Linux except '/').
-const QString kInvalidChars = QStringLiteral("/\\:*?\"<>|");
+#include "FileOpsHelpers.h"
 
+namespace {
 QString validate(const QString& proposed,
                  const QString& currentName,
                  const QString& parentDir,
                  bool isFolder) {
-    if (proposed.isEmpty()) {
-        return QObject::tr("Name cannot be empty.");
-    }
-    const QString trimmed = proposed.trimmed();
-    if (trimmed.isEmpty()) {
-        return QObject::tr("Name cannot be only whitespace.");
-    }
-    if (trimmed == "." || trimmed == "..") {
-        return QObject::tr("Reserved name.");
-    }
-    for (QChar c : kInvalidChars) {
-        if (proposed.contains(c)) {
-            return QObject::tr("Name cannot contain: %1").arg(kInvalidChars);
-        }
-    }
     if (proposed == currentName) {
         // Caller treats this as no-op cancel — return empty (no error)
         // so the OK button stays enabled, but newName() will be empty.
         return QString();
     }
-    // Same-folder uniqueness. Case-insensitive on Windows where two
-    // names that differ only in case would clash on disk.
+    const QString problem = FileOpsHelpers::fileNameProblem(proposed);
+    if (!problem.isEmpty()) return problem;
+    // Same-folder uniqueness. On a case-insensitive filesystem a case-only
+    // change ("img.jpg" → "IMG.jpg") "exists" only as the item itself —
+    // that's a legitimate rename, not a clash.
     const QString destPath = QDir(parentDir).filePath(proposed);
-    if (QFileInfo::exists(destPath)) {
+    if (QFileInfo::exists(destPath)
+            && !FileOpsHelpers::isSameFile(destPath,
+                                           QDir(parentDir).filePath(currentName))) {
         return isFolder
             ? QObject::tr("A file or folder named \"%1\" already exists here.").arg(proposed)
             : QObject::tr("A file or folder named \"%1\" already exists here.").arg(proposed);

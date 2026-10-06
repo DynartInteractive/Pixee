@@ -12,9 +12,10 @@ namespace BatchRename {
 
 // The transform applied to every selected file, in this fixed order:
 //   1. find & replace on the (extension-stripped, if keepExtension) base name
-//   2. substitute into `pattern`: {name} → the result of step 1,
-//      {n} / {n:<width>} → a per-file counter (startNumber + index*step,
-//      zero-padded to <width>)
+//   2. substitute into `pattern`: {n} / {n:<width>} → a per-file counter
+//      (startNumber + index*step, zero-padded to <width>, capped at 32),
+//      then {name} → the result of step 1 — numbering first, so a literal
+//      "{n}" inside a file name is left alone
 //   3. re-attach the original extension when keepExtension is set
 // Prefix / suffix are expressed through the pattern, e.g. "IMG_{name}" or
 // "{name}_edited"; plain "{name}" is a no-op template.
@@ -49,6 +50,8 @@ struct Plan {
 // ever overwrites a file that is still waiting to be renamed. Chains like
 // a→b→c are handled by scheduling the tail first. A true cycle (a→b, b→a) has
 // no safe plain-rename order → hasCycle is set and the caller should refuse.
+// Paths compare case-insensitively on Windows / macOS (as the filesystem
+// does), so "a.jpg" → "A.jpg" is a plain rename, not a self-cycle.
 Plan planRenameSteps(const QList<QPair<QString, QString>>& renames);
 
 }  // namespace BatchRename

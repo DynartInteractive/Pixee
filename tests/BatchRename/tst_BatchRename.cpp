@@ -122,6 +122,45 @@ private slots:
         QVERIFY(p.steps.isEmpty());
     }
 
+    void literalBracesInNameAreNotNumbered() {
+        // {name} is substituted after numbering, so a "{n}" that comes from
+        // the file name itself stays literal.
+        Options o;
+        o.pattern = QStringLiteral("{name}_{n}");
+        QCOMPARE(newNameFor(QStringLiteral("x{n}.jpg"), o, 0),
+                 QStringLiteral("x{n}_1.jpg"));
+    }
+
+    void hugeNumberWidthIsCapped() {
+        Options o;
+        o.pattern = QStringLiteral("{n:999999999}");
+        const QString out = newNameFor(QStringLiteral("a.jpg"), o, 0);
+        QVERIFY(out.size() <= 32 + 4);
+        QVERIFY(out.endsWith(QStringLiteral("1.jpg")));
+    }
+
+    void planCaseOnlyRenameIsNotACycle() {
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+        const Plan p = planRenameSteps({ { "C:/d/IMG.jpg", "C:/d/img.jpg" } });
+        QVERIFY(!p.hasCycle);
+        QCOMPARE(p.steps.size(), 1);
+#else
+        QSKIP("case-insensitive filesystems only");
+#endif
+    }
+
+    void planCaseInsensitiveChainOrdersTailFirst() {
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+        // "a"→"B" must wait for "b"→"c": on these filesystems B and b clash.
+        const Plan p = planRenameSteps({ { "a", "B" }, { "b", "c" } });
+        QVERIFY(!p.hasCycle);
+        QCOMPARE(p.steps.size(), 2);
+        QCOMPARE(p.steps.at(0).from, QStringLiteral("b"));
+#else
+        QSKIP("case-insensitive filesystems only");
+#endif
+    }
+
 private:
     static bool hasStep(const Plan& p, const QString& from, const QString& to) {
         for (const auto& s : p.steps)

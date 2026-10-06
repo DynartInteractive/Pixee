@@ -103,6 +103,11 @@ private:
     // A pass that queues nothing produces no completion signal, and job
     // completion is what drives tryExpandWindow — see the loop there.
     bool _lastPassAddedJobs = false;
+    // True while tryExpandWindow's loop is running its passes. Those passes
+    // must not also post the "nothing queued" kick — the loop itself is the
+    // continuation, and the extra queued expansions would grow the window
+    // again later while a batch is still active.
+    bool _inExpandLoop = false;
 };
 
 #endif // FILELISTVIEW_H

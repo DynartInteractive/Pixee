@@ -5,6 +5,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMimeData>
+#include <QObject>
+#include <QStringList>
 
 namespace FileOpsHelpers {
 
@@ -15,11 +17,47 @@ bool isDriveRoot(const QString& path) {
     return QFileInfo(path).isRoot();
 }
 
+Qt::CaseSensitivity pathCaseSensitivity() {
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+    return Qt::CaseInsensitive;
+#else
+    return Qt::CaseSensitive;
+#endif
+}
+
+QString normalizedPath(const QString& path) {
+    const QFileInfo info(path);
+    const QString canonical = info.canonicalFilePath();
+    if (!canonical.isEmpty()) return canonical;
+    return QDir::cleanPath(info.absoluteFilePath());
+}
+
+bool isSameFile(const QString& a, const QString& b) {
+    if (a.isEmpty() || b.isEmpty()) return false;
+    const QFileInfo ia(a);
+    const QFileInfo ib(b);
+    if (!ia.exists() || !ib.exists()) return false;
+    return normalizedPath(a).compare(normalizedPath(b), pathCaseSensitivity()) == 0;
+}
+
 bool destIsSourceOrDescendant(const QString& dest, const QString& source) {
-    const QString d = QDir::cleanPath(QDir(dest).absolutePath());
-    const QString s = QDir::cleanPath(QDir(source).absolutePath());
-    if (d == s) return true;
-    return d.startsWith(s + QLatin1Char('/'));
+    const QString d = normalizedPath(dest);
+    const QString s = normalizedPath(source);
+    const Qt::CaseSensitivity cs = pathCaseSensitivity();
+    if (d.compare(s, cs) == 0) return true;
+    // A root ("C:/", "/") already ends in a separator.
+    const QString prefix = s.endsWith(QLatin1Char('/')) ? s : s + QLatin1Char('/');
+    return d.startsWith(prefix, cs);
+}
+
+QString moveAside(const QString& path) {
+    const QFileInfo info(path);
+    const QString aside = uniqueRenamedPath(
+        QDir(info.absolutePath()).filePath(
+            QStringLiteral(".%1.pixee-replaced").arg(info.fileName())));
+    if (QFile::exists(aside)) return QString();   // uniqueRenamedPath gave up
+    if (!QFile::rename(path, aside)) return QString();
+    return aside;
 }
 
 QList<Pair> expandToFiles(const QString& src, const QString& destBase) {
@@ -35,28 +73,64 @@ QList<Pair> expandToFiles(const QString& src, const QString& destBase) {
 
     const QString folderName = info.fileName();
     const QString folderDest = QDir(destBase).filePath(folderName);
-    QDir().mkpath(folderDest);
 
-    // Replicate the directory structure first so empty subfolders are
-    // preserved at the destination.
+    // Walk the whole source tree BEFORE creating anything at the
+    // destination. If the destination lies inside the source (an alias the
+    // descendant guard couldn't see — a mapped drive vs its UNC path), a
+    // walk interleaved with mkpath would keep discovering the folders it
+    // had just created and nest forever.
+    QStringList relDirs;
     QDirIterator dirIt(src,
         QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot | QDir::NoSymLinks,
         QDirIterator::Subdirectories);
     while (dirIt.hasNext()) {
-        const QString d = dirIt.next();
-        const QString rel = QDir(src).relativeFilePath(d);
-        QDir().mkpath(QDir(folderDest).filePath(rel));
+        relDirs.append(QDir(src).relativeFilePath(dirIt.next()));
     }
 
+    // Symlinked files are included (QDirIterator doesn't follow links into
+    // folders without FollowSymlinks, so only file links come through).
     QDirIterator fileIt(src,
-        QDir::Files | QDir::Hidden | QDir::NoSymLinks,
+        QDir::Files | QDir::Hidden,
         QDirIterator::Subdirectories);
     while (fileIt.hasNext()) {
         const QString f = fileIt.next();
         const QString rel = QDir(src).relativeFilePath(f);
         out.append({ f, QDir(folderDest).filePath(rel) });
     }
+
+    // Replicate the directory structure so empty subfolders are preserved
+    // at the destination.
+    QDir().mkpath(folderDest);
+    for (const QString& rel : relDirs) {
+        QDir().mkpath(QDir(folderDest).filePath(rel));
+    }
     return out;
+}
+
+QString fileNameProblem(const QString& name) {
+    if (name.isEmpty()) return QObject::tr("Name cannot be empty.");
+    if (name.trimmed().isEmpty()) return QObject::tr("Name cannot be only whitespace.");
+    if (name == QLatin1String(".") || name == QLatin1String(".."))
+        return QObject::tr("Reserved name.");
+    static const QString kInvalid = QStringLiteral("/\\:*?\"<>|");
+    for (const QChar c : name) {
+        if (kInvalid.contains(c))
+            return QObject::tr("Name cannot contain: %1").arg(kInvalid);
+        if (c.unicode() < 0x20)
+            return QObject::tr("Name cannot contain control characters.");
+    }
+    if (name.endsWith(QLatin1Char('.')) || name.endsWith(QLatin1Char(' ')))
+        return QObject::tr("Name cannot end with a dot or a space.");
+    // Device names are reserved with any extension ("nul.txt" too).
+    const QString stem = name.section(QLatin1Char('.'), 0, 0).trimmed().toUpper();
+    static const QStringList kReserved = {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    };
+    if (kReserved.contains(stem))
+        return QObject::tr("\"%1\" is a reserved device name.").arg(stem);
+    return QString();
 }
 
 QString uniqueRenamedPath(const QString& path) {

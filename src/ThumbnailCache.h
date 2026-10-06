@@ -85,10 +85,12 @@ private:
     // Phase tracking: in DB lookup, or already handed to generator.
     QSet<QString> _inDb;
     QSet<QString> _inGen;
-    // Per-session negative cache: paths the generator has already failed on.
-    // Skipped on subsequent subscribe() calls so we don't keep retrying a
-    // corrupt or unreadable file every time the user revisits a folder.
-    QSet<QString> _failures;
+    // Per-session negative cache: paths the generator has already failed on,
+    // with the (mtime, size) of the version that failed. Skipped on later
+    // subscribe() calls for that same version so we don't keep retrying a
+    // corrupt or unreadable file every time the user revisits a folder; a
+    // changed file is retried.
+    QHash<QString, QPair<qint64, qint64>> _failures;
 };
 
 #endif // THUMBNAILCACHE_H

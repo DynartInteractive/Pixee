@@ -39,8 +39,11 @@ void ScaleImageTask::run() {
             setSkipped();
             return;
         case Overwrite:
-            if (!QFile::remove(_dst)) {
-                setFailed(tr("Cannot remove existing destination: %1").arg(_dst));
+            // Nothing removed up front — writeImage replaces the existing
+            // file only once the new one is complete (and dst == src is safe:
+            // the source is decoded before anything is written).
+            if (QFileInfo(_dst).isDir()) {
+                setFailed(tr("Cannot overwrite a folder: %1").arg(_dst));
                 return;
             }
             break;
@@ -53,12 +56,17 @@ void ScaleImageTask::run() {
     if (!checkPauseStop()) return;
     emitProgress(10);
 
-    QImageReader reader(_src);
-    reader.setAutoTransform(true);
-    QImage img = reader.read();
-    if (img.isNull()) {
-        setFailed(tr("Cannot decode: %1").arg(reader.errorString()));
-        return;
+    // Scoped: the reader holds the source open until destroyed, and Windows
+    // won't let writeImage replace a file that is still open (dst == src).
+    QImage img;
+    {
+        QImageReader reader(_src);
+        reader.setAutoTransform(true);
+        img = reader.read();
+        if (img.isNull()) {
+            setFailed(tr("Cannot decode: %1").arg(reader.errorString()));
+            return;
+        }
     }
 
     if (!checkPauseStop()) return;
@@ -82,16 +90,11 @@ void ScaleImageTask::run() {
     // with "Unsupported image format"), and a writer constructed from a
     // bare filename reports an empty format(), so testing it to decide on
     // setQuality() never matched and JPEG quality was silently ignored.
-    const QString suffix = QFileInfo(_dst).suffix().toLower();
-    QByteArray format = ImageFormats::aliasedFormat(suffix);
-    if (format.isEmpty()) format = suffix.toLatin1();
+    const QByteArray format = ImageFormats::writerFormatFor(QFileInfo(_dst).suffix());
 
-    QImageWriter writer(_dst, format);
-    if (ImageFormats::isLossy(QString::fromLatin1(format))) {
-        writer.setQuality(_quality);
-    }
-    if (!writer.write(img)) {
-        setFailed(tr("Cannot write: %1").arg(writer.errorString()));
+    QString error;
+    if (!ImageFormats::writeImage(img, _dst, format, _quality, &error)) {
+        setFailed(error);
         return;
     }
 }

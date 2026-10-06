@@ -84,6 +84,10 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
     // of just bumping priority — the cache is what re-delivers the image.
     connect(fileFilterModel, &QAbstractItemModel::rowsAboutToBeRemoved,
             this, &FileListView::onRowsAboutToBeRemoved);
+    // After a removal, rows below shift up into view; subscribe them now
+    // rather than on the next scroll / resize.
+    connect(fileFilterModel, &QAbstractItemModel::rowsRemoved,
+            this, &FileListView::scheduleSubscriptionUpdate);
 
     if (_cache) {
         connect(_cache, &ThumbnailCache::thumbnailReady, this, &FileListView::onCacheReady);
@@ -202,8 +206,12 @@ void FileListView::updateSubscriptions() {
     const QModelIndex root = rootIndex();
     const int totalRows = model()->rowCount(root);
     if (totalRows == 0) {
+        // Unsubscribed paths will never signal back, so they must leave
+        // _activeJobs too — a stale entry would hold the background fill
+        // (which only advances once the set drains) dead for this folder.
         for (const QString& path : _lastSubscribed) _cache->unsubscribe(path);
         _lastSubscribed.clear();
+        _activeJobs.clear();
         return;
     }
 
@@ -238,6 +246,7 @@ void FileListView::updateSubscriptions() {
     if (firstAny == -1) {
         for (const QString& path : _lastSubscribed) _cache->unsubscribe(path);
         _lastSubscribed.clear();
+        _activeJobs.clear();   // see the totalRows == 0 branch above
         return;
     }
 
@@ -342,9 +351,15 @@ void FileListView::updateSubscriptions() {
     // any time the window's leading edge lands on a run of non-image rows.
     // Queued: this runs inside tryExpandWindow's own loop as well as from
     // the debounce timer, so a direct call would recurse.
-    if (!_lastPassAddedJobs && _activeJobs.isEmpty() && !_windowCoversFolder) {
-        QMetaObject::invokeMethod(this, [this] { tryExpandWindow(); },
-                                  Qt::QueuedConnection);
+    // Not from inside tryExpandWindow's own loop: that loop already continues
+    // while passes queue nothing, and the posted extras used to fire later
+    // and grow the window while a batch was still active. The lambda
+    // re-checks, since a later pass may have queued work by the time it runs.
+    if (!_inExpandLoop && !_lastPassAddedJobs && _activeJobs.isEmpty()
+            && !_windowCoversFolder) {
+        QMetaObject::invokeMethod(this, [this] {
+            if (_activeJobs.isEmpty()) tryExpandWindow();
+        }, Qt::QueuedConnection);
     }
 }
 
@@ -495,10 +510,14 @@ bool dropHasLocalFile(const QMimeData* mime) {
 // secondary signal would create a feedback loop, since our own setDropAction
 // from a previous tick gets remembered and would stick on Move even after
 // the user releases Shift.
+// Only offers what the drag source allows: a Copy-only source never gets its
+// files moved, and a Move-only source is moved rather than copied.
 Qt::DropAction pickDropAction(const QDropEvent* event) {
-    if (event->modifiers().testFlag(Qt::ShiftModifier)) {
-        return Qt::MoveAction;
-    }
+    const Qt::DropActions possible = event->possibleActions();
+    const bool wantMove = event->modifiers().testFlag(Qt::ShiftModifier);
+    if (wantMove && possible.testFlag(Qt::MoveAction)) return Qt::MoveAction;
+    if (possible.testFlag(Qt::CopyAction)) return Qt::CopyAction;
+    if (possible.testFlag(Qt::MoveAction)) return Qt::MoveAction;
     return Qt::CopyAction;
 }
 }
@@ -519,6 +538,9 @@ void FileListView::dragEnterEvent(QDragEnterEvent* event) {
     setDropTargetActive(true);
     event->setDropAction(pickDropAction(event));
     event->accept();
+    // Edge auto-scroll only runs in DraggingState; the base dragEnterEvent
+    // (not called — the model doesn't take drops) would have set it.
+    setState(DraggingState);
 }
 
 void FileListView::dragMoveEvent(QDragMoveEvent* event) {
@@ -526,6 +548,10 @@ void FileListView::dragMoveEvent(QDragMoveEvent* event) {
         event->ignore();
         return;
     }
+    // Base for its side effect only — starting edge auto-scroll. Its
+    // accept/ignore verdict is overridden below. (QAbstractItemView's, not
+    // QListView's, so no internal-move item shuffling is involved.)
+    QAbstractItemView::dragMoveEvent(event);
     // Detect folder item under cursor — that becomes the drop target
     // (drop INTO that sub-folder), and the per-item highlight replaces
     // the full-view border. Otherwise drop targets the current folder
@@ -563,6 +589,8 @@ void FileListView::dragLeaveEvent(QDragLeaveEvent* event) {
 }
 
 void FileListView::dropEvent(QDropEvent* event) {
+    stopAutoScroll();
+    setState(NoState);
     setDropTargetActive(false);
     const QPersistentModelIndex hovered = _dropHoverIndex;
     _dropHoverIndex = QPersistentModelIndex();
@@ -612,10 +640,17 @@ void FileListView::dropEvent(QDropEvent* event) {
     const bool isMove = (action == Qt::MoveAction);
 
     FileOpsMenuBuilder::handleDropOrPaste(
-        event->mimeData(), destPath, isMove, _taskManager, _dialogParent);
+        event->mimeData(), destPath, isMove, _taskManager, _dialogParent,
+        /*allowSameFolder=*/false,
+        /*allowMove=*/event->possibleActions().testFlag(Qt::MoveAction));
 
-    event->setDropAction(action);
-    event->acceptProposedAction();
+    // Our own tasks perform the move, including deleting the sources. Tell
+    // a drag source in another process (Explorer, a second Pixee window)
+    // "Copy", or it would delete the files itself while our move is still
+    // reading them. accept(), not acceptProposedAction(): the latter resets
+    // the action to the proposed one.
+    event->setDropAction(event->source() ? action : Qt::CopyAction);
+    event->accept();
 }
 
 void FileListView::paintEvent(QPaintEvent* event) {
@@ -656,8 +691,10 @@ void FileListView::tryExpandWindow() {
     // nothing visible), which leave _windowCoversFolder untouched.
     const int totalRows = model()->rowCount(rootIndex());
     int guard = totalRows / kExpansionStep + 2;
+    _inExpandLoop = true;
     do {
         _windowExpansion += kExpansionStep;
         updateSubscriptions();
     } while (!_windowCoversFolder && !_lastPassAddedJobs && --guard > 0);
+    _inExpandLoop = false;
 }
