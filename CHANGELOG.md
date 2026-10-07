@@ -5,6 +5,54 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
+## [0.5.1] — 2026-10-07
+
+A bug-fix release from a full code review (`review.md`). Several file
+operations could permanently lose files; none of them can now.
+
+### Fixed
+
+- **Overwrite never deletes the file it was meant to keep.** Moving an item into
+  the folder it already lives in, a case-only rename (`IMG.jpg` → `img.jpg`) on
+  Windows, *Save As* with the dialog's defaults (onto the source itself), and
+  *File → Save* on a format Qt can read but not write (GIF, SVG) all deleted the
+  file. Each is now caught before any prompt; a move into the same folder is
+  refused, and Save offers Save As instead.
+- **A failed Overwrite leaves the existing file in place.** Copies and image
+  saves are written to a temporary file and swapped in only when complete;
+  moves and renames set the old file aside and put it back if they fail.
+- **A cross-volume move checks the copy before removing the source**, so a full
+  disk or a dropped network share can no longer leave a truncated copy and no
+  original. Moves keep the file's modification date.
+- **Delete no longer silently becomes a permanent delete** on drives without a
+  Recycle Bin / Trash (most network shares) — it stops with a message;
+  Shift+Delete still deletes permanently.
+- **Unsaved viewer edits are no longer dropped** when closing the window or
+  clicking a folder in the tree; quitting while file operations run asks first.
+  An edit counts as saved only once the write succeeds.
+- **After Save, going back to the image shows the saved version**, not the
+  pre-edit decode (which a second edit would then have saved over the first).
+- **Dragging files between two Pixee windows** (or from Explorer) with Shift no
+  longer lets the source delete files the destination is still moving.
+- **Crashes:** clicking Abort on a task group that finishes while the
+  confirmation is open, and browsing a folder holding a malformed JPEG (an
+  out-of-bounds read in the EXIF thumbnail parser).
+- **Thumbnails:** background fill no longer stalls after scrolling back and
+  forth over a large file; memory is released when leaving a folder (it used to
+  grow by ~200 KB per thumbnail for the whole session); a file that failed while
+  still being written is retried once it changes; mirrored EXIF orientations and
+  extremely thin images render correctly.
+- **Viewer:** images over 64 megapixels open; a file that can't be opened says
+  so; the mouse wheel steps one image per notch on high-resolution wheels and
+  touchpads; crop mode ignores the wheel and survives resizing the window.
+- **Smaller fixes:** renaming a file to or from an image extension updates its
+  thumbnail; Save As acts on the selected image; Rename, New folder, Batch
+  rename and Save As reject names Windows would refuse or alter (`CON`, a
+  trailing dot, `:`); Batch rename handles case-only renames, `{n}` inside file
+  names and folder names containing dots; Cut is kept on the clipboard when a
+  paste does nothing; drag-and-drop over the folder tree expands collapsed
+  folders and auto-scrolls.
+
 ## [0.5.0] — 2026-09-20
 
 Keyboard-driven navigation in the path bar, an editable *Open with* list, and a

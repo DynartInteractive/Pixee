@@ -98,6 +98,22 @@
   </recommends>
 
   <releases>
+    <release version="0.5.1" date="2026-10-07">
+      <description>
+        <p>
+          A bug-fix release. Moving a file into its own folder, a case-only
+          rename, Save As onto the open file and saving an edit to a format
+          that cannot be written no longer delete the file, and a failed
+          overwrite leaves the existing file in place.
+        </p>
+        <p>
+          Unsaved edits are kept when closing the window, two crashes are
+          fixed, thumbnail memory is released when leaving a folder, and very
+          large images open in the viewer.
+        </p>
+      </description>
+      <url type="details">https://github.com/DynartInteractive/Pixee/releases/tag/v0.5.1</url>
+    </release>
     <release version="0.5.0" date="2026-09-20">
       <description>
         <p>
