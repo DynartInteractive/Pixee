@@ -7,7 +7,9 @@ sandbox. See [`docs/flatpak.md`](flatpak.md) for how that all fits together.
 This file is the other half — the steps **only you** can do. Roughly in order.
 
 **Where it stands:** steps 1–5 are done — **the submission PR is open**:
-<https://github.com/flathub/flathub/pull/10328> (2026-09-21, pinned to v0.5.0).
+<https://github.com/flathub/flathub/pull/10328> (2026-09-21, pinned to v0.5.0;
+the pin in step 4 has since moved to v0.5.1, and the PR's manifest follows once
+that is re-verified).
 What remains is step 6, working the review, which is mostly waiting. Its CI is
 **red on purpose**; see step 6 before reading that as a problem. Everything
 else outstanding is optional and listed where it belongs — Windows binaries
@@ -99,7 +101,7 @@ For future releases the procedure is:
    pins it to the matching tag. Mark it a pre-release, as every release so far
    is — the website's download buttons depend on that (`website/README.md`).
 
-## 4. Pin the manifest to that tarball — **done: pinned to v0.5.0, verified**
+## 4. Pin the manifest to that tarball — **pinned to v0.5.1, needs a re-verify**
 
 The submission manifest is `packaging/net.dynart.Pixee.yml` with its `sources:`
 block replaced by the pinned release tarball. Keep the repo copy as a `dir`
@@ -109,20 +111,26 @@ copy you put in the Flathub PR:
 ```yaml
     sources:
       - type: archive
-        url: https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.5.0.tar.gz
-        sha256: f53926141b58f19a17500b477c6245c6854eda0fbb6483907f213ed7b00a6d67
+        url: https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.5.1.tar.gz
+        sha256: f5367cb0defe5b6a83bf181863f59248f5cd6157e4ae9198c683676c4a11679e
 ```
 
 That hash was taken from the published tarball (9.4 MB) and is what the
 buildbot will check against.
 
-**The 0.5.0 pin was verified on 2026-09-21** — the pre-flight at the bottom of
-this file, run on `mini` against the pinned manifest rather than the repo copy,
-so the tarball URL and hash were exercised too. It builds clean, the app runs
-in the sandbox, and `flatpak-builder-lint manifest` reports exactly one error,
-`finish-args-host-filesystem-access`.
+**The 0.5.1 pin has not been built yet.** What was verified (2026-09-21, on
+`mini`, against the pinned manifest so the tarball URL and hash were exercised
+too) is the *0.5.0* manifest: it built clean, the app ran in the sandbox, and
+`flatpak-builder-lint manifest` reported exactly one error,
+`finish-args-host-filesystem-access`. 0.5.1 is a fixes-only release with no
+build-system change, but repeat the pre-flight at the bottom of this file on a
+Linux box with the 0.5.1 pin in place before moving the PR to it.
 
-Worth knowing why that re-verify was not a formality. Between 0.4.0 (the only
+**The open PR (#10328) still carries the v0.5.0 manifest** — this file moving
+does not touch it. Once re-verified, push the updated `net.dynart.Pixee.yml` to
+the PR branch (`net.dynart.Pixee` in your fork).
+
+Worth knowing why the 0.5.0 re-verify was not a formality. Between 0.4.0 (the only
 manifest ever built before) and 0.5.0, `Pixee.pro` gained a **`QMAKE_SUBSTITUTES`
 step generating `BuildInfo.h` into `$$OUT_PWD`** for the build timestamp. That
 is new code generation running under flatpak-builder's shadow build, and it had
