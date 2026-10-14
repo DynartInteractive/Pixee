@@ -98,6 +98,23 @@
   </recommends>
 
   <releases>
+    <release version="0.6.0" date="2026-10-14">
+      <description>
+        <p>
+          Eight new settings on four pages: theme, where Pixee starts, how
+          many thumbnails decode at once, the thumbnail cell size, what the
+          mouse wheel does in the viewer, how an image opens, whether delete
+          asks first, and the save quality. A first JavaScript plugin system
+          with its own Plugins menu.
+        </p>
+        <p>
+          Images in hidden folders open from the command line and the path
+          bar, the crop bar can be dragged out of the way, and the Windows
+          data folder moved to AppData\Local.
+        </p>
+      </description>
+      <url type="details">https://github.com/DynartInteractive/Pixee/releases/tag/v0.6.0</url>
+    </release>
     <release version="0.5.1" date="2026-10-07">
       <description>
         <p>

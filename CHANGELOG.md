@@ -5,7 +5,7 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
-## [Unreleased]
+## [0.6.0] — 2026-10-14
 
 ### Added
 
@@ -42,6 +42,22 @@ fixes bump the patch).
   with your library, and a roaming profile would copy all of it to the server
   on every login. Linux and macOS now resolve through the same call and are
   unchanged on Linux (`~/.local/share/Dynart/Pixee`).
+- **The path bar is the same height as the Folders title** next to it, so the
+  two read as one strip (the dark theme's padding was a pixel short).
+
+### Fixed
+
+- **The crop bar could sit on top of a marquee handle** and there was no way
+  to get it out of the way. It now has a dotted grip at its left end; drag it
+  anywhere over the image. The position lasts for that crop only — the next
+  crop starts with the bar back at the top centre.
+- **Opening an image from a hidden folder showed the drive list instead.**
+  Pixee keeps hidden folders (`AppData`, say) out of its listings, and the
+  startup walk down to the image's folder stopped at the last visible one.
+  An image passed on the command line, or a hidden path typed into the path
+  bar, now opens where it should: the one hidden folder on the way is added
+  to the tree, the way Explorer shows a hidden folder you navigate into by
+  name. Hidden images named on the command line open too.
 
 ## [0.5.1] — 2026-10-07
 
