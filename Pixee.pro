@@ -1,4 +1,4 @@
-QT       += core gui sql
+QT       += core gui sql qml
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -89,6 +89,8 @@ SOURCES += \
     src/OpenWithDialog.cpp \
     src/OpenWithProgramDialog.cpp \
     src/Pixee.cpp \
+    src/PluginApi.cpp \
+    src/PluginManager.cpp \
     src/RenameDialog.cpp \
     src/ScaleImageTask.cpp \
     src/SettingsDialog.cpp \
@@ -153,6 +155,9 @@ HEADERS += \
     src/OpenWithDialog.h \
     src/OpenWithProgramDialog.h \
     src/Pixee.h \
+    src/Plugin.h \
+    src/PluginApi.h \
+    src/PluginManager.h \
     src/RenameDialog.h \
     src/ScaleImageTask.h \
     src/SettingsDialog.h \
@@ -203,13 +208,16 @@ isEmpty(DESTDIR) {
 
 !equals(PWD, $$TARGET_DIR) {
     copy_themes.commands = $(COPY_DIR) $$shell_path($$PWD/themes) $$shell_path($$TARGET_DIR/themes)
+    copy_plugins.commands = $(COPY_DIR) $$shell_path($$PWD/plugins) $$shell_path($$TARGET_DIR/plugins)
 } else {
     copy_themes.commands = @echo \"In-source build — themes already in place, skipping copy.\"
+    copy_plugins.commands = @echo \"In-source build — plugins already in place, skipping copy.\"
 }
-first.depends = $(first) copy_themes
+first.depends = $(first) copy_themes copy_plugins
 export(first.depends)
 export(copy_themes.commands)
-QMAKE_EXTRA_TARGETS += first copy_themes
+export(copy_plugins.commands)
+QMAKE_EXTRA_TARGETS += first copy_themes copy_plugins
 
 # Default rules for deployment.
 qnx {
@@ -231,6 +239,9 @@ unix:!android:!qnx:!macx {
     themes_install.path = $$PREFIX/share/pixee/themes
     themes_install.files = $$PWD/themes/*
 
+    plugins_install.path = $$PREFIX/share/pixee/plugins
+    plugins_install.files = $$PWD/plugins/*
+
     desktop_install.path = $$PREFIX/share/applications
     desktop_install.files = $$PWD/packaging/$${APP_ID}.desktop
 
@@ -240,5 +251,5 @@ unix:!android:!qnx:!macx {
     icon_install.path = $$PREFIX/share/icons/hicolor/scalable/apps
     icon_install.files = $$PWD/resources/icons/$${APP_ID}.svg
 
-    INSTALLS += target themes_install desktop_install metainfo_install icon_install
+    INSTALLS += target themes_install plugins_install desktop_install metainfo_install icon_install
 }

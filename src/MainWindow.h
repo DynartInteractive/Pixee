@@ -31,6 +31,7 @@ class AdjustPanel;
 class HistogramPanel;
 class MetadataPanel;
 class MetadataReader;
+class PluginManager;
 class PathCompleter;
 class PreviewReader;
 class QAction;
@@ -214,8 +215,15 @@ private:
     void requestHistogramFor(const QString& path);
     QString displayPath(const QString& storedPath) const;
     FileItem* currentFolder() const;
+    // Discovers and evaluates the JS plugins, then fills _pluginsMenu from
+    // whatever they registered. Called once from create(); the menu is
+    // hidden outright when nothing registered anything, so a stock install
+    // with no plugins shows no empty menu.
+    void loadPlugins();
 
     Pixee* _pixee;
+    PluginManager* _pluginManager = nullptr;
+    QMenu* _pluginsMenu = nullptr;
     FileModel* _fileModel;
     FileFilterModel* _folderFilterModel;
     FileFilterModel* _fileFilterModel;

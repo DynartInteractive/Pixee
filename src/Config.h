@@ -31,6 +31,11 @@ public:
     // the user's own folder first, then the legacy dot-folder, then the two
     // install layouts (next to the binary, and the FHS share dir).
     const QStringList themeSearchPaths();
+    // Roots holding "<plugin-id>/" folders, same priority order and the same
+    // four locations as themeSearchPaths. First hit per folder name wins, so
+    // a plugin the user drops in their data folder shadows a bundled one of
+    // the same name rather than colliding with it.
+    const QStringList pluginSearchPaths();
     const QString theme();
 
 private:

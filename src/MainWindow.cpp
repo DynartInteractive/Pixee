@@ -50,6 +50,7 @@
 #include "MetadataPanel.h"
 #include "MetadataReader.h"
 #include "PathCompleter.h"
+#include "PluginManager.h"
 #include "PreviewReader.h"
 #include "MoveFileTask.h"
 #include "NewFolderDialog.h"
@@ -595,6 +596,10 @@ void MainWindow::create() {
 
     // Menu bar + status bar
     createMenus();
+    // After createMenus, which is what builds the (empty) Plugins menu this
+    // fills. A plugin script that throws is logged and skipped, so a bad
+    // plugin cannot stop the window coming up.
+    loadPlugins();
     updateSaveActions();   // set the initial Save / Save As enabled state
     statusBar();  // force-create so it appears even when empty
     // Disable the bottom-right resize grip — the main window resizes
@@ -1557,9 +1562,35 @@ void MainWindow::createMenus() {
     QAction* batchRenameAction = toolsMenu->addAction(tr("&Batch rename..."));
     connect(batchRenameAction, &QAction::triggered, this, &MainWindow::openBatchRename);
 
+    // Created empty and hidden here so it keeps its place in the menu bar
+    // between Tools and Help; loadPlugins() fills it and shows it if
+    // anything registered an action.
+    _pluginsMenu = mb->addMenu(tr("&Plugins"));
+    _pluginsMenu->menuAction()->setVisible(false);
+
     QMenu* helpMenu = mb->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About"));
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
+}
+
+void MainWindow::loadPlugins() {
+    _pluginManager = new PluginManager(this);
+
+    // Both providers are pulled live, at the moment a script asks, rather
+    // than pushed on selection change: a plugin callback runs while the menu
+    // action fires, so "what is selected" is only ever wanted right then.
+    _pluginManager->setSelectedFilesProvider([this]() {
+        return _fileListView->selectionPaths().paths;
+    });
+    _pluginManager->setCurrentFolderProvider([this]() {
+        FileItem* folder = currentFolder();
+        return folder ? folder->fileInfo().absoluteFilePath() : QString();
+    });
+
+    _pluginManager->load(_pixee->config()->pluginSearchPaths());
+
+    const int added = _pluginManager->populateMenu(_pluginsMenu);
+    _pluginsMenu->menuAction()->setVisible(added > 0);
 }
 
 void MainWindow::showAbout() {

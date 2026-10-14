@@ -91,6 +91,21 @@ const QStringList Config::themeSearchPaths() {
     return paths;
 }
 
+const QStringList Config::pluginSearchPaths() {
+    // Same four roots as themeSearchPaths, in the same order, each with a
+    // "plugins" subdirectory. Kept as its own function rather than a
+    // parameterised one because the two are free to diverge -- themes have a
+    // legacy location plugins never had, and plugins may later want a
+    // per-plugin data dir that themes have no use for.
+    QStringList paths;
+    paths << userFolder() + "/plugins";
+    paths << _legacyUserFolder() + "/plugins";
+    paths << appFolder() + "/plugins";
+    paths << QFileInfo(appFolder() + "/../share/pixee/plugins").absoluteFilePath();
+    paths.removeDuplicates();
+    return paths;
+}
+
 
 const QStringList Config::imageExtensions() {
     return _imageExtensions;

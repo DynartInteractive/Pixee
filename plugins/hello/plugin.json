@@ -1,0 +1,7 @@
+{
+    "name": "Hello",
+    "version": "1.0.0",
+    "description": "Example plugin. Shows what the pixee object exposes.",
+    "author": "Dynart Interactive",
+    "entry": "main.js"
+}

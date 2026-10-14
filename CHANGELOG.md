@@ -7,6 +7,17 @@ fixes bump the patch).
 
 ## [Unreleased]
 
+### Added
+
+- **JavaScript plugins** — a plugin is a folder with a `plugin.json` and a
+  script, dropped at `<data dir>/plugins/<name>/`. Whatever it registers shows
+  up under a new **Plugins** menu, which stays hidden when you have none. This
+  first iteration gives a plugin the current selection, the current folder and
+  a log; async HTTP, dialogs and progress-tracked jobs come next. Each plugin
+  runs in its own JavaScript engine, so one cannot interfere with another, and
+  a broken plugin is skipped with an explanation instead of stopping Pixee
+  from starting. See [`docs/plugins.md`](docs/plugins.md).
+
 ### Changed
 
 - **The Windows data folder moved to `%LOCALAPPDATA%`** —

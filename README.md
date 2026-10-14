@@ -246,6 +246,24 @@ themes/dark/
 
 Drop a folder at `<data dir>/themes/<name>/` to override the bundled assets without rebuilding, where `<data dir>` is `~/.local/share/Dynart/Pixee` on Linux and `%LOCALAPPDATA%\Dynart\Pixee` on Windows. (Pixee also still reads `~/.pixee/themes/`, so a theme from an older version keeps working on either platform.) Anything missing from the user theme falls through to the embedded defaults.
 
+## 🧩 Plugins
+
+Pixee runs plugins written in JavaScript. A plugin is a folder with a `plugin.json` and a script; whatever it registers appears under the **Plugins** menu.
+
+```
+plugins/hello/
+├── plugin.json    # name, version, entry
+└── main.js
+```
+
+```js
+pixee.addAction("Count selected files", function () {
+    pixee.log(pixee.selectedFiles().length + " selected");
+});
+```
+
+Drop plugin folders at `<data dir>/plugins/<name>/`, same `<data dir>` as above. Each plugin runs in its own JavaScript engine, and a broken one is skipped with a warning rather than stopping the app. The API is small so far — register a menu entry, read the selection and the current folder — with async HTTP, dialogs and progress-tracked jobs still to come. See [`docs/plugins.md`](docs/plugins.md).
+
 ## 🏗️ Architecture
 
 - **Threads** — GUI for view & model; dedicated workers for the SQLite thumbnail cache, four parallel thumbnail decoders, directory enumeration, and full-res viewer loads. Cross-thread communication is exclusively via Qt signals/slots with queued connections.
