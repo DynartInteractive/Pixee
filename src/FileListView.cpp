@@ -22,6 +22,7 @@
 #include "FileItem.h"
 #include "FileListViewDelegate.h"
 #include "FileModel.h"
+#include "DragPaths.h"
 #include "FileOpsMenuBuilder.h"
 #include "Theme.h"
 #include "ThumbnailCache.h"
@@ -477,7 +478,7 @@ void FileListView::startDrag(Qt::DropActions supportedActions) {
     const Selection sel = selectionPaths();
     if (sel.paths.isEmpty()) return;
 
-    QMimeData* mime = FileOpsMenuBuilder::buildPathsMimeData(sel.paths);
+    QMimeData* mime = DragPaths::makeDragMimeData(sel.paths);
     if (!mime) return;
 
     auto* drag = new QDrag(this);
@@ -506,15 +507,10 @@ void FileListView::startDrag(Qt::DropActions supportedActions) {
 }
 
 namespace {
-// True iff the mime data carries at least one local file URL — what we
-// can actually act on. Remote URLs (http://...) and pure-text drags
-// don't apply.
+// True iff the drag carries something we can act on: Pixee's own path list
+// or at least one local file URL. Remote URLs and text drags don't apply.
 bool dropHasLocalFile(const QMimeData* mime) {
-    if (!mime || !mime->hasUrls()) return false;
-    for (const QUrl& url : mime->urls()) {
-        if (url.isLocalFile()) return true;
-    }
-    return false;
+    return DragPaths::hasLocalPaths(mime);
 }
 
 // Pixee policy: drop = copy by default (Windows convention); Shift forces

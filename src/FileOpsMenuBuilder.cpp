@@ -18,6 +18,7 @@
 #include "Config.h"
 #include "CopyFileTask.h"
 #include "DeleteFileTask.h"
+#include "DragPaths.h"
 #include "FileOpsHelpers.h"
 #include "FolderCleanupTask.h"
 #include "MoveFileTask.h"
@@ -284,14 +285,14 @@ bool FileOpsMenuBuilder::handleDropOrPaste(const QMimeData* mime,
                                            bool allowSameFolder,
                                            bool allowMove) {
     if (destFolder.isEmpty() || !taskManager) return false;
-    if (!mime || !mime->hasUrls()) return false;
+    if (!DragPaths::hasLocalPaths(mime)) return false;
 
     const bool isMove = allowMove && (forceMove || clipboardSaysCut(mime));
 
     QStringList sourcePaths;
-    for (const QUrl& url : mime->urls()) {
-        if (!url.isLocalFile()) continue;  // skip http/data/etc. URLs
-        const QString path = url.toLocalFile();
+    // Pixee's own drags carry a private path list, everything else URLs;
+    // DragPaths reads both and already drops remote (http/data/…) URLs.
+    for (const QString& path : DragPaths::localPaths(mime)) {
         // Same-folder source handling. Dragging a file onto the folder it
         // already lives in (e.g. list selection onto the tree node of the
         // currently-viewed folder) is almost always an accidental gesture,

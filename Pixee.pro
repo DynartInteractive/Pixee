@@ -60,6 +60,7 @@ SOURCES += \
     src/FileListView.cpp \
     src/FileListViewDelegate.cpp \
     src/FileModel.cpp \
+    src/DragPaths.cpp \
     src/FileOpsHelpers.cpp \
     src/FileOpsMenuBuilder.cpp \
     src/FolderCleanupTask.cpp \
@@ -124,6 +125,7 @@ HEADERS += \
     src/FileListView.h \
     src/FileListViewDelegate.h \
     src/FileModel.h \
+    src/DragPaths.h \
     src/FileOpsHelpers.h \
     src/FileOpsMenuBuilder.h \
     src/FileType.h \

@@ -5,6 +5,16 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
+## [Unreleased]
+
+### Fixed
+
+- **Dragging images into Discord (and other Chromium-based apps) was refused.**
+  On Windows a drag from Pixee reached them as a link as well as a file list,
+  and they took it for a link. A Pixee drag now arrives exactly as one from
+  Explorer does: a file list and nothing else.
+- **The crop bar has square corners**, like everything else in the dark theme.
+
 ## [0.6.0] — 2026-10-14
 
 ### Added

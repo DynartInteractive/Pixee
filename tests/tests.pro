@@ -15,4 +15,5 @@ SUBDIRS = \
     FolderExpand \
     Metadata \
     BatchRename \
-    FolderSuggester
+    FolderSuggester \
+    DragPaths

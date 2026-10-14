@@ -9,6 +9,7 @@
 
 #include "AppSettings.h"
 #include "Config.h"
+#include "DragPaths.h"
 #include "Theme.h"
 #include "ThumbnailCache.h"
 #include "TaskManager.h"
@@ -34,6 +35,9 @@ Pixee::Pixee(int argc, char** argv) : _argc(argc) {
 
     // _argc, not the by-value parameter — see the comment in Pixee.h.
     _app = new QApplication(_argc, argv);
+    // Windows: a Pixee drag must reach other apps as a plain file list; see
+    // DragPaths.h. Needs the application's mime registry, hence here.
+    DragPaths::installNativeConverter();
 
     // X11 and Windows read the icon off the window, so set it there too.
     // fromTheme picks up the installed hicolor icon; the qrc copy covers the

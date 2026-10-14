@@ -110,6 +110,9 @@ public:
     //                                  that key off the Windows MIME
     // Caller owns the returned object (typically transferred to QDrag or
     // QClipboard). Returns nullptr on empty input.
+    // Clipboard only. A drag uses DragPaths::makeDragMimeData instead: on
+    // Windows the URLs set here are also exported as a URL format, which
+    // Chromium-based apps (Discord…) take for a link drag and refuse.
     static QMimeData* buildPathsMimeData(const QStringList& paths, bool cut = false);
 
     // Static helper so Ctrl+V handlers can paste without going through

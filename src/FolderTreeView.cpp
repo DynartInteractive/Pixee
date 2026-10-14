@@ -15,16 +15,13 @@
 
 #include "FileFilterModel.h"
 #include "FileItem.h"
+#include "DragPaths.h"
 #include "FileOpsMenuBuilder.h"
 #include "Toast.h"
 
 namespace {
 bool dropHasLocalFile(const QMimeData* mime) {
-    if (!mime || !mime->hasUrls()) return false;
-    for (const QUrl& url : mime->urls()) {
-        if (url.isLocalFile()) return true;
-    }
-    return false;
+    return DragPaths::hasLocalPaths(mime);   // Pixee's path list, or local URLs
 }
 
 // Pixee policy: drop = copy by default; Shift forces move. Modifiers
@@ -183,7 +180,7 @@ void FolderTreeView::startDrag(Qt::DropActions supportedActions) {
     }
     if (paths.isEmpty()) return;
 
-    QMimeData* mime = FileOpsMenuBuilder::buildPathsMimeData(paths);
+    QMimeData* mime = DragPaths::makeDragMimeData(paths);
     if (!mime) return;
 
     auto* drag = new QDrag(this);
