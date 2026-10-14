@@ -6,7 +6,7 @@ files and upload them.
 ```
 website/
 ├── index.html        the whole page
-├── style.css         light/dark via prefers-color-scheme
+├── style.css         the app's dark theme, flat (see the header comment)
 ├── main.js           screenshot gallery + lightbox
 ├── icon.png          copy of docs/pixee-icon-256.png
 ├── favicon.ico       copy of resources/icons/Pixee.ico
@@ -31,6 +31,20 @@ rsync -av --delete website/ <user>@<host>:/var/www/pixee.cc/
 (The docroot path is whatever the `pixee.dynart.net` vhost points at — it was
 `/var/www/pixee.cc/` before the domains were swapped and may not have moved.)
 
+## Feature images
+
+The six rows under "What's in it" each show `screenshots/feature-<name>.jpg`,
+a 3:2 crop of the app at 1600x1067 (the page shows it at half size so it
+is sharp on high-DPI screens). The files there now are grey placeholders;
+overwrite each with the real crop under the same name and nothing else
+needs changing. Names: fast, viewer, edit, metadata, files, formats.
+
+## After editing style.css or main.js
+
+Both are linked from `index.html` with a `?v=<date>` query string so browsers
+fetch the new file instead of a cached one. Bump the date in both links
+whenever either file changes.
+
 ## After a release
 
 The download buttons point at pinned release assets rather than
@@ -43,14 +57,15 @@ GitHub's `latest` redirect skips those. So they need a manual bump:
 2. If the screenshots changed, re-copy them:
 
    ```sh
-   cp ../docs/screenshot-list-v2.jpg  screenshots/list.jpg
-   cp ../docs/screenshot-view-v2.jpg  screenshots/view.jpg
-   cp ../docs/screenshot-crop-v3.jpg  screenshots/edit.jpg
+   cp ../docs/screenshot-list-v3.jpg  screenshots/list.jpg
+   cp ../docs/screenshot-view-v3.jpg  screenshots/view.jpg
+   cp ../docs/screenshot-crop-v4.jpg  screenshots/edit.jpg
    ```
 
-   The `data-w` / `data-h` attributes on the gallery tabs are the images'
-   real pixel sizes — they reserve the right height so the page doesn't jump
-   when you switch shots. Update them if a new screenshot is a different size.
+   The `width` / `height` attributes on the three carousel `<img>`s are the
+   images' real pixel sizes — they reserve the right height before the files
+   load. Update them if a new screenshot is a different size, and the `alt`
+   text if the shot shows something else.
 
 The icon is generated from `resources/icons/net.dynart.Pixee.svg` by
 `scripts/make-icon.bat`; re-copy `icon.png` and `favicon.ico` if it changes.

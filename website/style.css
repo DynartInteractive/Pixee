@@ -1,71 +1,81 @@
 /* Pixee website. No build step, no dependencies -- edit and upload.
-   Colours are taken from the app icon so the page and the product match. */
+
+   The page is styled like the app, not like a web page: the same flat
+   Windows 10 look as themes/dark/style.qss. Plain gray rectangles, 1px
+   borders, no rounded corners, no shadows, no gradients. The colours are
+   the theme's, so the page and the product match:
+
+     #333    window / panel ground   (QMainWindow, QTreeView, QListView)
+     #222    status bar, separators  (QStatusBar, QMainWindow::separator)
+     #2a2a2a sunken fields           (QLineEdit, QTableView, toasts)
+     #444    cells, buttons, headers (file-item, QPushButton, QHeaderView)
+     #555    dock titles, borders    (QDockWidget::title, every border)
+     #2b4580 selection / pressed     (::item:selected, QPushButton:pressed)
+     #5a8dee focus                   (QLineEdit:focus, QPushButton:default)
+     #ccc    body text, #fff headings, #999 secondary, #777 disabled
+
+   The app has one theme and does not follow the OS colour scheme, so
+   neither does the page. */
 
 :root {
-  --blue:        #4F6BED;
-  --blue-deep:   #2B3A8F;
-  --amber:       #FFB020;
-
-  --bg:          #ffffff;
-  --bg-sunken:   #f4f6fb;
-  --card:        #ffffff;
-  --text:        #1b2030;
-  --text-muted:  #5b6478;
-  --border:      #dfe4ef;
-  --shadow:      0 1px 2px rgba(20, 28, 56, .06), 0 8px 24px rgba(20, 28, 56, .08);
-  --radius:      14px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg:         #10131c;
-    --bg-sunken:  #151926;
-    --card:       #181d2b;
-    --text:       #e8ebf4;
-    --text-muted: #9aa3bb;
-    --border:     #273049;
-    --shadow:     0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
-  }
-}
-
-:root[data-theme="dark"] {
-  --bg:         #10131c;
-  --bg-sunken:  #151926;
-  --card:       #181d2b;
-  --text:       #e8ebf4;
-  --text-muted: #9aa3bb;
-  --border:     #273049;
-  --shadow:     0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
+  --ground:      #333;
+  --bar:         #222;
+  --sunken:      #2a2a2a;
+  --cell:        #444;
+  --cell-hover:  #4e4e4e;
+  --title:       #555;
+  --border:      #555;
+  --border-soft: #444;
+  --select:      #2b4580;
+  --select-hi:   #345399;
+  --focus:       #5a8dee;
+  --link:        #7fa3f0;
+  --link-hover:  #a6c0f7;
+  --text:        #ccc;
+  --text-strong: #fff;
+  --text-muted:  #999;
+  --text-dim:    #777;
 }
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* Firefox: the app's thin dark scrollbar. */
+  scrollbar-color: #666 var(--ground);
+  scrollbar-width: thin;
+}
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  * { transition: none !important; }
 }
+
+/* WebKit/Blink: QScrollBar -- narrow, no arrows, a plain #666 handle. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ground); }
+::-webkit-scrollbar-thumb { background: #666; }
+::-webkit-scrollbar-thumb:hover { background: #777; }
+::-webkit-scrollbar-button { width: 0; height: 0; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--ground);
   color: var(--text);
-  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  font: 15px/1.6 "Segoe UI", system-ui, -apple-system, Roboto,
         "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
-a:hover { color: var(--blue-deep); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) a:hover { color: #8ea2ff; }
-}
+a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--link-hover); }
+a:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 
-h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; }
+h1, h2, h3 { line-height: 1.25; color: var(--text-strong); font-weight: 600; }
+strong { color: var(--text-strong); font-weight: 600; }
 
 .skip {
   position: absolute; left: -9999px;
-  background: var(--blue); color: #fff; padding: 10px 16px; border-radius: 8px;
+  background: var(--select); color: #fff; padding: 8px 14px;
+  border: 1px solid var(--focus);
 }
 .skip:focus { left: 16px; top: 16px; z-index: 10; }
 
@@ -73,152 +83,252 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; }
 
 .hero {
   text-align: center;
-  padding: 72px 16px 56px;
-  background:
-    radial-gradient(900px 420px at 50% -120px, rgba(79, 107, 237, .16), transparent 70%),
-    var(--bg-sunken);
-  border-bottom: 1px solid var(--border);
+  padding: 56px 16px 40px;
+  background: var(--ground);
 }
 
 .hero-icon {
-  width: clamp(120px, 22vw, 160px);
+  width: clamp(112px, 20vw, 144px);
   height: auto;
-  filter: drop-shadow(0 14px 30px rgba(43, 58, 143, .34));
 }
 
 .hero h1 {
-  margin: 18px 0 6px;
-  font-size: clamp(2.4rem, 7vw, 3.4rem);
+  margin: 14px 0 4px;
+  font-size: clamp(2.2rem, 6vw, 3rem);
+  letter-spacing: -0.01em;
 }
 
 .tagline {
-  margin: 0 auto 30px;
-  max-width: 34ch;
-  font-size: clamp(1.02rem, 2.6vw, 1.2rem);
-  color: var(--text-muted);
+  margin: 0 auto 28px;
+  max-width: 38ch;
+  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  color: var(--text);
 }
 
 .downloads {
-  display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
-  margin-bottom: 22px;
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+  margin-bottom: 20px;
 }
 
+/* QPushButton: #444 on a 1px #555 border, pressed = selection blue. The
+   primary button simply starts in the pressed colour. */
 .btn {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
   min-width: 232px;
-  padding: 13px 26px;
+  padding: 10px 24px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--text);
+  background: var(--cell);
+  color: var(--text-strong);
   text-decoration: none;
-  box-shadow: var(--shadow);
-  transition: transform .12s ease, box-shadow .12s ease;
 }
-.btn:hover { transform: translateY(-2px); color: var(--text); }
-.btn:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+.btn:hover { background: var(--cell-hover); color: var(--text-strong); }
+.btn:active { background: var(--select); border-color: var(--select); }
+.btn:focus-visible { outline: none; border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--blue), var(--blue-deep));
-  border-color: transparent;
-  color: #fff;
+  background: var(--select);
+  border-color: var(--select);
 }
-.btn-primary:hover { color: #fff; }
+.btn-primary:hover { background: var(--select-hi); border-color: var(--select-hi); }
+.btn-primary:focus-visible { border-color: var(--focus); }
 
-.btn-main { font-weight: 650; font-size: 1.02rem; }
-.btn-sub  { font-size: .82rem; opacity: .75; }
+.btn-main { font-weight: 600; font-size: 1rem; }
+.btn-sub  { font-size: .8rem; color: var(--text); }
+.btn-primary .btn-sub { color: #dbe3f7; }
 
 .fineprint {
-  max-width: 60ch; margin: 0 auto;
-  font-size: .88rem; color: var(--text-muted);
+  max-width: 62ch; margin: 0 auto;
+  font-size: .86rem; color: var(--text-muted);
 }
+.fineprint strong { color: var(--text); }
 
 /* ---------- sections ---------- */
 
-main { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+/* The text column is 980px; the column width lives on the sections rather
+   than on <main> so the gallery can be wider than the text around it. */
+main { margin: 0 auto; }
 
-section { padding: 60px 0; border-bottom: 1px solid var(--border); }
-section:last-child { border-bottom: 0; }
+section { max-width: 980px; margin: 0 auto; padding: 36px 16px 44px; }
 
+/* The gallery runs up to 1920px; its buttons and caption stay on the
+   text column. */
+.gallery { max-width: 1920px; padding-left: 0; padding-right: 0; }
+.gallery-col { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* Section headings: white, bold, with a 1px rule under them in the
+   border grey — the same line that closes QHeaderView::section. */
 section > h2 {
-  margin: 0 0 20px;
-  font-size: clamp(1.45rem, 4vw, 1.9rem);
+  margin: 0 0 18px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-strong);
+  font-size: 1.05rem;
+  font-weight: 700;
 }
 
-.prose p { max-width: 68ch; color: var(--text-muted); }
-.prose p strong { color: var(--text); }
 
 /* ---------- gallery ---------- */
 
-.shot-frame {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-sunken);
-  box-shadow: var(--shadow);
+/* A strip of all the screenshots. The chosen one is centred, its
+   neighbours peek in from the sides and fade into the page ground, so the
+   first shot has nothing on its left and the last nothing on its right.
+   The strip is positioned by main.js (a translateX on .track); the slide
+   width is a share of the strip so the layout holds at any viewport. */
+.carousel {
+  position: relative;
   overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;   /* vertical page scroll stays native; horizontal is ours */
+}
+.carousel.is-dragging { cursor: grabbing; }
+.carousel img { -webkit-user-drag: none; }
+.carousel::before,
+.carousel::after {
+  content: "";
+  position: absolute; top: 0; bottom: 0; width: 16%;
+  pointer-events: none; z-index: 2;
+}
+.carousel::before { left: 0;  background: linear-gradient(90deg,  var(--ground) 15%, transparent); }
+.carousel::after  { right: 0; background: linear-gradient(270deg, var(--ground) 15%, transparent); }
+
+/* No CSS transition here: main.js animates the transform itself (ease-out,
+   distance-scaled), which also lets a drag take over mid-glide. */
+.track {
+  display: flex; align-items: flex-start;
+  gap: 16px;
 }
 
-.shot-open {
-  display: block; width: 100%; padding: 0;
-  border: 0; background: none; cursor: zoom-in;
+/* Never wider than the screenshot itself (1117px), so a wide strip shows
+   it 1:1 with more of the neighbours instead of upscaling it. */
+.slide {
+  flex: 0 0 min(72%, 1117px);
+  margin: 0; padding: 0; border: 0;
+  background: var(--cell);
+  cursor: pointer;
+  opacity: .5;
+  transition: opacity .4s ease;
 }
-.shot-open:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; }
+.slide.is-active { opacity: 1; cursor: zoom-in; }
+.carousel.is-dragging .slide { cursor: grabbing; }
+.slide:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.slide img { display: block; width: 100%; height: auto; }
 
-.shot-frame img {
-  display: block; width: 100%; height: auto;
+/* Prev / next: QPushButton squares sitting on the faded edges. */
+.carousel-arrow {
+  position: absolute; top: 50%; z-index: 3;
+  transform: translateY(-50%);
+  width: 44px; height: 88px;
+  padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--cell);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+/* The chevron is drawn, not typed: a glyph sits on the text baseline and
+   lands off-centre, two borders rotated 45 degrees land exactly in the
+   middle whatever the font. */
+.carousel-arrow::before {
+  content: "";
+  width: 9px; height: 9px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+.carousel-prev::before { transform: translateX(2px) rotate(45deg); }
+.carousel-next::before { transform: translateX(-2px) rotate(-135deg); }
+.carousel-arrow:hover { background: var(--cell-hover); }
+.carousel-arrow:active { background: var(--select); border-color: var(--select); }
+.carousel-arrow:disabled {
+  color: var(--text-dim); background: var(--sunken); border-color: var(--border-soft);
+  cursor: default;
+}
+.carousel-arrow:focus-visible { outline: none; border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
+.carousel-prev { left: 8px; }
+.carousel-next { right: 8px; }
+
+@media (max-width: 640px) {
+  .slide { flex-basis: 84%; }
+  .carousel::before, .carousel::after { width: 10%; }
 }
 
 .shot-caption {
-  margin: 14px 2px 20px;
-  font-size: .92rem; color: var(--text-muted);
+  margin: 10px 2px 0;
+  font-size: .9rem; color: var(--text-muted);
 }
 
-.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+/* QPushButton again; the active tab is the checked/selected state. The
+   strip sits above the screenshot, like a tool bar over its view. */
+.tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 10px; }
 
 .tab {
-  padding: 9px 20px;
+  min-width: 96px;
+  padding: 5px 18px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--text-muted);
-  font: inherit; font-size: .94rem;
+  background: var(--cell);
+  color: var(--text);
+  font: inherit; font-size: .92rem;
   cursor: pointer;
-  transition: border-color .12s ease, color .12s ease;
 }
-.tab:hover { color: var(--text); border-color: var(--blue); }
-.tab:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.tab:hover { background: var(--cell-hover); color: var(--text-strong); }
+.tab:focus-visible { outline: none; border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
 .tab.is-active {
-  background: var(--blue);
-  border-color: var(--blue);
+  background: var(--select);
+  border-color: var(--select);
   color: #fff;
 }
 
 /* ---------- features ---------- */
 
-.grid {
-  display: grid; gap: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+/* One row per feature: a 3:2 crop of the app and a few sentences, sides
+   alternating. Single column on a phone, image first. */
+.features-list {
+  display: grid; gap: 56px;
   margin: 0; padding: 0; list-style: none;
 }
-
-.grid li {
-  padding: 20px 22px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
+.feature {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 36px;
+  align-items: center;
+}
+.feature:nth-child(even) .feature-shot { order: 2; }
+.feature-shot {
+  background: var(--cell);
+  aspect-ratio: 3 / 2;
+}
+.feature-shot img { display: block; width: 100%; height: auto; }
+.feature h3 { margin: 0 0 8px; font-size: 1.25rem; }
+.feature p  { margin: 0; color: var(--text); }
+@media (max-width: 720px) {
+  .feature { grid-template-columns: 1fr; gap: 16px; }
+  .feature:nth-child(even) .feature-shot { order: 0; }
+  .features-list { gap: 40px; }
 }
 
-.grid h3 { margin: 0 0 6px; font-size: 1.02rem; }
-.grid p  { margin: 0; font-size: .93rem; color: var(--text-muted); }
+/* Scroll reveal: a row fades in and rises 16px as it enters the viewport,
+   once (main.js adds .is-in and stops watching). The image goes first, the
+   text 100ms later. Only in effect when scripts run (html.js), so without
+   JavaScript nothing is hidden. Deliberately not switched off under
+   prefers-reduced-motion: Windows reports that whenever "Show animations"
+   is off, which is common, and a 16px fade is mild enough to keep. */
+html.js .reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity .5s ease-out, transform .5s ease-out;
+}
+html.js .feature-text.reveal { transition-delay: .1s; }
+html.js .reveal.is-in { opacity: 1; transform: none; }
+html.js .reveal.no-anim { transition: none; }
 
 /* ---------- footer ---------- */
 
+/* QStatusBar: #222, light text. */
 footer {
-  padding: 36px 16px 48px;
+  padding: 20px 16px 28px;
   text-align: center;
-  font-size: .9rem;
-  border-top: 1px solid var(--border);
-  background: var(--bg-sunken);
+  font-size: .88rem;
+  background: var(--bar);
+  color: var(--text);
 }
 footer p { margin: 4px 0; }
 .muted { color: var(--text-muted); }
@@ -229,24 +339,23 @@ footer p { margin: 4px 0; }
   position: fixed; inset: 0; z-index: 50;
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
-  background: rgba(8, 10, 18, .92);
+  background: rgba(0, 0, 0, .9);
   cursor: zoom-out;
 }
 .lightbox[hidden] { display: none; }
 
 .lightbox img {
   max-width: 100%; max-height: 100%;
-  border-radius: 8px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
 }
 
+/* The dock's float/close buttons: a square, framed only on hover. */
 .lightbox-close {
-  position: absolute; top: 12px; right: 18px;
-  width: 44px; height: 44px;
-  border: 0; border-radius: 50%;
-  background: rgba(255, 255, 255, .12);
-  color: #fff; font-size: 26px; line-height: 1;
+  position: absolute; top: 10px; right: 10px;
+  width: 36px; height: 36px;
+  border: 1px solid transparent;
+  background: var(--sunken);
+  color: #fff; font-size: 24px; line-height: 1;
   cursor: pointer;
 }
-.lightbox-close:hover { background: rgba(255, 255, 255, .22); }
-.lightbox-close:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.lightbox-close:hover { background: var(--cell); border-color: var(--border); }
+.lightbox-close:focus-visible { outline: none; border-color: var(--focus); }

@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot-list-v2.jpg" alt="Pixee browsing a folder of images as a thumbnail grid"><br>
+  <img src="docs/screenshot-list-v3.jpg" alt="Pixee browsing a folder of images as a thumbnail grid"><br>
   <em>List view</em>
 </p>
 
@@ -42,14 +42,14 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Image viewer** in the main window — async chunked loading with a cached-thumbnail placeholder, fit / 1:1 / discrete zoom (`0.1×` – `8×`), pan with `Space + LMB` or `Middle-drag`, `F11` fullscreen, and a 5-image preload cache for instant prev/next.
 
   <p align="center">
-    <img src="docs/screenshot-view-v2.jpg" alt="Pixee showing a single image in the viewer, with the Metadata, Adjust and Histogram docks stacked down the right-hand side"><br>
+    <img src="docs/screenshot-view-v3.jpg" alt="Pixee showing a single image in the viewer, with the Metadata, Adjust and Histogram docks stacked down the right-hand side"><br>
     <em>Image view with Metadata, Adjust and Histogram docks</em>
   </p>
 
-- **In-viewer editing** — rotate (`R` / `Shift + R`), flip (`H` / `V`) and **crop** (`C`), from the keys or the viewer's `Edit ▸` menu. The crop marquee has a marching-ants border, eight drag handles, a draggable interior that slides the whole selection, a live pixel-size readout and an optional **fixed aspect ratio** — tick *Fixed ratio* and set the two numbers, e.g. `2 : 3`. `Enter` applies, `Esc` cancels. Edits stay in memory until `File → Save` (`Ctrl + S`) writes them back over the original or `File → Save As…` exports a copy; navigating away with an unsaved edit prompts Save / Discard / Cancel. (Rotate re-encodes the pixels for now — lossless orientation-only rotation comes with metadata write support.)
+- **In-viewer editing** — rotate (`R` / `Shift + R`), flip (`H` / `V`) and **crop** (`C`), from the keys or the viewer's `Edit ▸` menu. The crop marquee has a marching-ants border, eight drag handles, a draggable interior that slides the whole selection, a live pixel-size readout and an optional **fixed aspect ratio** — tick *Fixed ratio* and set the two numbers, e.g. `2 : 3`; drag the bar by its dotted grip if it sits over a handle you need. `Enter` applies, `Esc` cancels. Edits stay in memory until `File → Save` (`Ctrl + S`) writes them back over the original or `File → Save As…` exports a copy; navigating away with an unsaved edit prompts Save / Discard / Cancel. (Rotate re-encodes the pixels for now — lossless orientation-only rotation comes with metadata write support.)
 
   <p align="center">
-    <img src="docs/screenshot-crop-v3.jpg" alt="Pixee's crop marquee over a photo, with the fixed-ratio bar set to 2 : 3, a 452 x 678 px readout, and the viewer context menu open on the Edit submenu"><br>
+    <img src="docs/screenshot-crop-v4.jpg" alt="Pixee's crop marquee over a photo of a cyclist on a rainy street, with the fixed-ratio bar set to 2 : 3, a 486 x 729 px readout, and the viewer context menu open on the Edit submenu"><br>
     <em>Cropping at a fixed 2 : 3 ratio, with the viewer's <code>Edit ▸</code> menu open</em>
   </p>
 

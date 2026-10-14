@@ -3,8 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<!-- Marks that scripts run, so the scroll-reveal styles only ever hide
+     content a script is going to show again. -->
+<script>document.documentElement.classList.add("js");</script>
+<meta name="theme-color" content="#333333">
 <title>Pixee — a fast, minimalist image browser</title>
-<meta name="description" content="Pixee is a responsive, minimalist image manager for Windows and Linux. Built on Qt 6 for folders full of photos — including the ones on a network share.">
+<meta name="description" content="Pixee is a responsive, minimalist image manager for Windows, Linux and macOS. Built on Qt 6 for folders full of photos — including the ones on a network share.">
 
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" href="icon.png" type="image/png">
@@ -14,11 +19,13 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://pixee.dynart.net/">
 <meta property="og:title" content="Pixee — a fast, minimalist image browser">
-<meta property="og:description" content="A responsive, minimalist image manager for Windows and Linux. Built for folders full of photos — including the ones on a network share.">
+<meta property="og:description" content="A responsive, minimalist image manager for Windows, Linux and macOS. Built for folders full of photos — including the ones on a network share.">
 <meta property="og:image" content="https://pixee.dynart.net/icon.png">
 <meta name="twitter:card" content="summary">
 
-<link rel="stylesheet" href="style.css">
+<!-- ?v= is a cache-buster: bump it (the date) whenever style.css or main.js
+     changes, or a returning visitor keeps the old copy. -->
+<link rel="stylesheet" href="style.css?v=20261014i">
 </head>
 <body>
 
@@ -27,7 +34,7 @@
 <header class="hero">
   <img class="hero-icon" src="icon.png" width="160" height="160" alt="">
   <h1>Pixee</h1>
-  <p class="tagline">A fast, minimalist image browser for Windows and Linux.</p>
+  <p class="tagline">A fast, minimalist image browser for Windows, Linux and macOS.</p>
 
   <!-- DOWNLOAD LINKS: bump the version in the three hrefs and the two
        .btn-sub lines when a new release is published. -->
@@ -49,8 +56,9 @@
     on first run — choose <em>More info → Run anyway</em>.
     <br>
     On Linux, <a href="https://github.com/DynartInteractive/Pixee#linux-flatpak">build a Flatpak</a>
-    or <a href="https://github.com/DynartInteractive/Pixee#-building">build from source</a> —
-    there are no prebuilt binaries yet.
+    or <a href="https://github.com/DynartInteractive/Pixee#-building">build from source</a>;
+    on macOS, build from source — there are no prebuilt binaries for either yet,
+    but Pixee is tested on both.
     <br>
     <a href="https://github.com/DynartInteractive/Pixee/releases">All releases</a> &middot;
     <a href="https://github.com/DynartInteractive/Pixee">Source on GitHub</a>
@@ -59,78 +67,113 @@
 
 <main>
 
-<section class="gallery" aria-labelledby="shots">
-  <h2 id="shots">A look around</h2>
-
-  <div class="shot-frame">
-    <button class="shot-open" type="button" aria-label="Open the screenshot full size">
-      <img id="shot" src="screenshots/list.jpg" width="1172" height="764"
-           alt="Pixee browsing a folder of photos as a thumbnail grid, with the folder tree on the left">
-    </button>
-  </div>
-  <p class="shot-caption" id="caption" aria-live="polite">Browse — a thumbnail grid with a folder tree, index overlays and instant sorting.</p>
-
+<section class="gallery" aria-label="Screenshots">
+  <div class="gallery-col">
   <div class="tabs" role="group" aria-label="Choose a screenshot">
     <button type="button" class="tab is-active" aria-pressed="true"
-            data-src="screenshots/list.jpg"
-            data-w="1172" data-h="764"
-            data-alt="Pixee browsing a folder of photos as a thumbnail grid, with the folder tree on the left"
             data-caption="Browse — a thumbnail grid with a folder tree, index overlays and instant sorting.">Browse</button>
     <button type="button" class="tab" aria-pressed="false"
-            data-src="screenshots/view.jpg"
-            data-w="1172" data-h="764"
-            data-alt="Pixee showing a single image in the viewer, with the Metadata, Adjust and Histogram docks stacked down the right-hand side"
             data-caption="View — zoom, pan and fullscreen, with metadata, colour and histogram docks alongside.">View</button>
     <button type="button" class="tab" aria-pressed="false"
-            data-src="screenshots/edit.jpg"
-            data-w="1172" data-h="845"
-            data-alt="Pixee's crop marquee over a photo, with a fixed 2:3 ratio bar and a live pixel-size readout"
             data-caption="Edit — crop with a fixed ratio and a live pixel readout, plus rotate, flip and colour adjustment.">Edit</button>
+  </div>
+  </div>
+
+  <!-- All three shots in one strip, wider than the text column (up to
+       1920px); the chosen one is centred, the others peek in from the
+       sides. Drag the strip, or click a side shot, to slide; clicking the
+       centred one opens it full size. -->
+  <div class="carousel" id="carousel">
+    <button class="carousel-arrow carousel-prev" type="button" aria-label="Previous screenshot" disabled></button>
+    <div class="track" id="track">
+      <button type="button" class="slide is-active" data-index="0" aria-current="true">
+        <img src="screenshots/list.jpg" width="1117" height="750"
+             alt="Pixee browsing a folder of photos as a thumbnail grid, with the folder tree on the left">
+      </button>
+      <button type="button" class="slide" data-index="1" aria-current="false">
+        <img src="screenshots/view.jpg" width="1117" height="750"
+             alt="Pixee showing a single image in the viewer, with the Metadata, Adjust and Histogram docks stacked down the right-hand side">
+      </button>
+      <button type="button" class="slide" data-index="2" aria-current="false">
+        <img src="screenshots/edit.jpg" width="1117" height="748"
+             alt="Pixee's crop marquee over a photo of a cyclist on a rainy street, with a fixed 2:3 ratio bar, a live pixel-size readout and the viewer context menu open on the Edit submenu">
+      </button>
+    </div>
+    <button class="carousel-arrow carousel-next" type="button" aria-label="Next screenshot"></button>
+  </div>
+  <div class="gallery-col">
+  <p class="shot-caption" id="caption" aria-live="polite">Browse — a thumbnail grid with a folder tree, index overlays and instant sorting.</p>
   </div>
 </section>
 
-<section class="prose">
-  <h2>Built for folders full of photos</h2>
-  <p>
-    Pixee opens a directory of images and gets out of the way. Thumbnails are decoded on four
-    background threads into a local SQLite cache and prioritised by what's actually on screen,
-    so the grid fills from the top-left down instead of making you wait for the whole folder.
-  </p>
-  <p>
-    It exists because the alternatives crawl on a <strong>network share</strong>. Every directory
-    read, image decode and file operation happens off the UI thread, and Pixee deliberately
-    avoids Qt's stock file models and dialogs — the ones that stall for seconds on an SMB mount.
-    The window stays responsive whether the photos are on an SSD or a NAS across the hall.
-  </p>
-</section>
 
 
 <section class="features">
   <h2>What's in it</h2>
-  <ul class="grid">
-    <li>
-      <h3>Thumbnails that keep up</h3>
-      <p>A four-worker decode pool feeding a SQLite cache, ordered by distance from the viewport, with the rest of the folder filling in behind you.</p>
+  <!-- One row per feature, image and text alternating sides. The images
+       are 3:2 crops of the app at 1600x1067 (shown at half size, so they
+       stay sharp on high-DPI screens); the files in screenshots/feature-*.jpg
+       are grey placeholders until the real crops replace them. -->
+  <ul class="features-list">
+    <li class="feature">
+      <div class="feature-shot reveal">
+        <img src="screenshots/feature-fast.jpg" width="1600" height="1067" loading="lazy"
+             alt="The thumbnail grid half filled, with a network share selected in the folder tree">
+      </div>
+      <div class="feature-text reveal">
+        <h3>Fast where other viewers crawl</h3>
+        <p>Open a folder of ten thousand photos on a network share and start browsing straight away. Pixee shows the thumbnails you are looking at first and quietly fills in the rest behind you.</p>
+      </div>
     </li>
-    <li>
-      <h3>A real viewer</h3>
-      <p>Fit, 1:1 and stepped zoom from 0.1× to 8×, space-drag panning, fullscreen, and a five-image preload so prev/next is instant.</p>
+    <li class="feature">
+      <div class="feature-shot reveal">
+        <img src="screenshots/feature-viewer.jpg" width="1600" height="1067" loading="lazy"
+             alt="The viewer showing a photo, with its dimensions in the status bar">
+      </div>
+      <div class="feature-text reveal">
+        <h3>A viewer that keeps up with your arrow keys</h3>
+        <p>Double-click to view, then step through the folder as fast as you can press Next. Zoom to the pixel, pan with a drag, and go fullscreen with one key.</p>
+      </div>
     </li>
-    <li>
-      <h3>Edit without leaving</h3>
-      <p>Rotate, flip and crop with a marching-ants marquee and optional fixed ratio. Brightness, contrast, saturation, hue and gamma preview live, then apply at full resolution on save.</p>
+    <li class="feature">
+      <div class="feature-shot reveal">
+        <img src="screenshots/feature-edit.jpg" width="1600" height="1067" loading="lazy"
+             alt="The crop marquee over a photo, with the Adjust dock open beside it">
+      </div>
+      <div class="feature-text reveal">
+        <h3>Fix a photo without opening an editor</h3>
+        <p>Crop to a fixed ratio, straighten with a rotate, flip, and adjust brightness, contrast, colour and gamma with live sliders. Hold B to compare with the original, then save over the file or as a copy.</p>
+      </div>
     </li>
-    <li>
-      <h3>File operations that explain themselves</h3>
-      <p>Copy, move, rename, delete and batch rename through a proper task queue. Clashes show both files side by side — thumbnail, size, date — so you choose by eye.</p>
+    <li class="feature">
+      <div class="feature-shot reveal">
+        <img src="screenshots/feature-metadata.jpg" width="1600" height="1067" loading="lazy"
+             alt="The Metadata dock listing camera fields and an embedded ComfyUI prompt">
+      </div>
+      <div class="feature-text reveal">
+        <h3>See what your camera, and your AI tool, recorded</h3>
+        <p>Exposure, lens, date and location from the EXIF, plus the prompt and workflow that ComfyUI or Automatic1111 wrote into the file.</p>
+      </div>
     </li>
-    <li>
-      <h3>Every format your Qt build can read</h3>
-      <p>JPEG, PNG, WebP, GIF, BMP, TIFF and ICO out of the box; HEIC, AVIF, PSD and XCF come bundled in the Windows builds.</p>
+    <li class="feature">
+      <div class="feature-shot reveal">
+        <img src="screenshots/feature-files.jpg" width="1600" height="1067" loading="lazy"
+             alt="The conflict dialog showing an existing and an incoming file side by side">
+      </div>
+      <div class="feature-text reveal">
+        <h3>Move files without the guesswork</h3>
+        <p>Copy, move and rename in the background while you keep browsing. When a name clashes you see both files side by side with their size and date, so you pick by eye. Batch rename shows every new name before it touches anything.</p>
+      </div>
     </li>
-    <li>
-      <h3>Yours to change</h3>
-      <p>MIT licensed, themeable with plain Qt stylesheets, and translated into English and Hungarian with more scaffolded.</p>
+    <li class="feature">
+      <div class="feature-shot reveal">
+        <img src="screenshots/feature-formats.jpg" width="1600" height="1067" loading="lazy"
+             alt="The Settings window with the General page open">
+      </div>
+      <div class="feature-text reveal">
+        <h3>Opens the odd ones too, and it is yours</h3>
+        <p>HEIC from an iPhone, AVIF, Photoshop and GIMP files open like any JPEG. Pick a theme, write a plugin in JavaScript, or read the source. MIT licensed.</p>
+      </div>
     </li>
   </ul>
 </section>
@@ -143,7 +186,7 @@
     <a href="https://github.com/DynartInteractive/Pixee/issues">Report an issue</a> &middot;
     <a href="https://github.com/DynartInteractive/Pixee/blob/main/LICENSE">MIT licence</a>
   </p>
-  <p class="muted">Made by DynartInteractive.</p>
+  <p class="muted">Made by <a href="https://dynart.net">Dynart</a>.</p>
 </footer>
 
 <div class="lightbox" id="lightbox" hidden>
@@ -151,6 +194,6 @@
   <img id="lightbox-img" src="" alt="">
 </div>
 
-<script src="main.js"></script>
+<script src="main.js?v=20261014i"></script>
 </body>
 </html>
