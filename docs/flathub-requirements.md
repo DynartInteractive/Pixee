@@ -8,7 +8,7 @@ This file is the other half — the steps **only you** can do. Roughly in order.
 
 **Where it stands:** steps 1–5 are done — **the submission PR is open**:
 <https://github.com/flathub/flathub/pull/10328> (2026-09-21, pinned to v0.5.0;
-the pin in step 4 has since moved to v0.5.1, and the PR's manifest follows once
+the pin in step 4 has since moved to v0.6.0, and the PR's manifest follows once
 that is re-verified).
 What remains is step 6, working the review, which is mostly waiting. Its CI is
 **red on purpose**; see step 6 before reading that as a problem. Everything
@@ -101,7 +101,7 @@ For future releases the procedure is:
    pins it to the matching tag. Mark it a pre-release, as every release so far
    is — the website's download buttons depend on that (`website/README.md`).
 
-## 4. Pin the manifest to that tarball — **pinned to v0.5.1, needs a re-verify**
+## 4. Pin the manifest to that tarball — **pinned to v0.6.0, needs a re-verify**
 
 The submission manifest is `packaging/net.dynart.Pixee.yml` with its `sources:`
 block replaced by the pinned release tarball. Keep the repo copy as a `dir`
@@ -111,20 +111,23 @@ copy you put in the Flathub PR:
 ```yaml
     sources:
       - type: archive
-        url: https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.5.1.tar.gz
-        sha256: f5367cb0defe5b6a83bf181863f59248f5cd6157e4ae9198c683676c4a11679e
+        url: https://github.com/DynartInteractive/Pixee/archive/refs/tags/v0.6.0.tar.gz
+        sha256: c4b09550c5f05ef652094549a712c49933f60e05c87ab53b6ee69db47c642720
 ```
 
 That hash was taken from the published tarball (9.4 MB) and is what the
 buildbot will check against.
 
-**The 0.5.1 pin has not been built yet.** What was verified (2026-09-21, on
+**The 0.6.0 pin has not been built yet.** What was verified (2026-09-21, on
 `mini`, against the pinned manifest so the tarball URL and hash were exercised
 too) is the *0.5.0* manifest: it built clean, the app ran in the sandbox, and
 `flatpak-builder-lint manifest` reported exactly one error,
-`finish-args-host-filesystem-access`. 0.5.1 is a fixes-only release with no
-build-system change, but repeat the pre-flight at the bottom of this file on a
-Linux box with the 0.5.1 pin in place before moving the PR to it.
+`finish-args-host-filesystem-access`. **0.6.0 is not build-system neutral:**
+the plugin system adds `QT += qml` to `Pixee.pro`, so the build needs the Qt
+QML module, which the KDE runtime provides but which the manifest has not been
+exercised against, and the bundled `plugins/` folder is installed under the
+prefix. Repeat the pre-flight at the bottom of this file on a Linux box with
+the 0.6.0 pin in place before moving the PR to it.
 
 **The open PR (#10328) still carries the v0.5.0 manifest** — this file moving
 does not touch it. Once re-verified, push the updated `net.dynart.Pixee.yml` to
