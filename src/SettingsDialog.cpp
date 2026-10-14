@@ -7,6 +7,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFont>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
@@ -316,14 +317,21 @@ void SettingsDialog::build() {
         header->setFont(hf);
         pageLay->addWidget(header);
 
-        for (const SettingDef& s : grp.settings) {
-            auto* rowW = new QWidget(page);
-            auto* rowLay = new QHBoxLayout(rowW);
-            rowLay->setContentsMargins(0, 0, 0, 0);
-            rowLay->setSpacing(8);
+        // Column 0 labels, column 1 controls, column 2 takes the slack. One
+        // grid per page, so the controls line up down the page whatever the
+        // label lengths. A check box carries its own text and spans all
+        // three columns, so its text starts where the labels do.
+        auto* grid = new QGridLayout();
+        grid->setContentsMargins(0, 0, 0, 0);
+        grid->setHorizontalSpacing(12);
+        grid->setVerticalSpacing(8);
+        grid->setColumnMinimumWidth(1, 180);
+        grid->setColumnStretch(2, 1);
+        pageLay->addLayout(grid);
+        int gridRow = 0;
 
+        for (const SettingDef& s : grp.settings) {
             Row row;
-            row.container = rowW;
             row.label = s.label;
             row.labelText = s.label.toLower();
             row.groupIndex = g;
@@ -335,35 +343,42 @@ void SettingsDialog::build() {
             row.enabledByValue = s.enabledByValue;
 
             if (s.type == Bool) {
-                auto* cb = new QCheckBox(s.label, rowW);
+                auto* cb = new QCheckBox(s.label, page);
                 row.check = cb;
                 row.labelWidget = cb;
-                rowLay->addWidget(cb);
-                rowLay->addStretch(1);
+                row.widgets = { cb };
+                grid->addWidget(cb, gridRow, 0, 1, 3);
             } else if (s.type == Choice) {
-                auto* lab = new QLabel(s.label, rowW);
-                auto* combo = new QComboBox(rowW);
+                auto* lab = new QLabel(s.label, page);
+                auto* combo = new QComboBox(page);
                 for (const auto& c : s.choices) combo->addItem(c.second, c.first);
                 row.combo = combo;
                 row.labelWidget = lab;
-                rowLay->addWidget(lab);
-                rowLay->addWidget(combo, 0);
-                rowLay->addStretch(1);
+                row.widgets = { lab, combo };
+                grid->addWidget(lab, gridRow, 0);
+                grid->addWidget(combo, gridRow, 1);
             } else if (s.type == Int) {
-                auto* lab = new QLabel(s.label, rowW);
-                auto* spin = new QSpinBox(rowW);
+                auto* lab = new QLabel(s.label, page);
+                auto* spin = new QSpinBox(page);
                 spin->setRange(s.min, s.max);
                 if (!s.suffix.isEmpty()) spin->setSuffix(s.suffix);
                 row.spin = spin;
                 row.labelWidget = lab;
-                rowLay->addWidget(lab);
-                rowLay->addWidget(spin, 0);
-                rowLay->addStretch(1);
+                row.widgets = { lab, spin };
+                grid->addWidget(lab, gridRow, 0);
+                grid->addWidget(spin, gridRow, 1);
             } else {  // Path
-                auto* lab = new QLabel(s.label, rowW);
-                auto* edit = new QLineEdit(rowW);
+                auto* lab = new QLabel(s.label, page);
+                // Edit + Browse travel as one cell spanning the control and
+                // slack columns, so the edit gets the width and the button
+                // keeps its own.
+                auto* pathW = new QWidget(page);
+                auto* pathLay = new QHBoxLayout(pathW);
+                pathLay->setContentsMargins(0, 0, 0, 0);
+                pathLay->setSpacing(8);
+                auto* edit = new QLineEdit(pathW);
                 edit->setClearButtonEnabled(true);
-                auto* browse = new QPushButton(tr("Browse..."), rowW);
+                auto* browse = new QPushButton(tr("Browse..."), pathW);
                 // Native folder picker — the same one Copy to / Move to and
                 // Save As use. (The no-QFileDialog rule is about the central
                 // browser, where the model's behaviour on shares matters.)
@@ -375,15 +390,17 @@ void SettingsDialog::build() {
                     if (!dir.isEmpty()) edit->setText(QDir::toNativeSeparators(dir));
                 });
                 // The Browse button shares the row's enabled state through
-                // the container; the edit is what holds the value.
+                // pathW; the edit is what holds the value.
                 row.edit = edit;
                 row.labelWidget = lab;
-                rowLay->addWidget(lab);
-                rowLay->addWidget(edit, 1);
-                rowLay->addWidget(browse, 0);
+                row.widgets = { lab, pathW };
+                pathLay->addWidget(edit, 1);
+                pathLay->addWidget(browse, 0);
+                grid->addWidget(lab, gridRow, 0);
+                grid->addWidget(pathW, gridRow, 1, 1, 2);
             }
 
-            pageLay->addWidget(rowW);
+            ++gridRow;
             _rows.append(row);
         }
 
@@ -440,7 +457,7 @@ void SettingsDialog::updateDependentRows() {
             enabled = currentValue(ctl).toString() == dep.enabledByValue;
             break;
         }
-        dep.container->setEnabled(enabled);
+        for (QWidget* w : dep.widgets) w->setEnabled(enabled);
     }
 }
 
@@ -481,7 +498,8 @@ void SettingsDialog::applySearch(const QString& query) {
     for (const Row& r : _rows) {
         const bool titleHit = !q.isEmpty() && _groupTitlesLower.at(r.groupIndex).contains(q);
         const bool labelHit = !q.isEmpty() && r.labelText.contains(q);
-        r.container->setVisible(q.isEmpty() || titleHit || labelHit);
+        const bool show = q.isEmpty() || titleHit || labelHit;
+        for (QWidget* w : r.widgets) w->setVisible(show);
         if (r.labelWidget) {
             QFont f = r.labelWidget->font();
             f.setBold(labelHit);

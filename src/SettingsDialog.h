@@ -55,7 +55,11 @@ private:
     enum ControlType { Bool, Choice, Int, Path };
 
     struct Row {
-        QWidget*   container = nullptr;    // row widget — shown/hidden by search
+        // The row's widgets in the page grid (label + control, or the one
+        // check box): shown/hidden together by the search, enabled/disabled
+        // together by a controlling Choice. No container widget — the rows
+        // share one QGridLayout so every control sits on the same column.
+        QList<QWidget*> widgets;
         QWidget*   labelWidget = nullptr;  // checkbox (Bool) or QLabel (others)
         QString    label;                  // display text, for the restart notice
         QString    labelText;              // lowercased, for matching

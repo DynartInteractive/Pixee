@@ -1,7 +1,12 @@
+/* The path bar sits level with the Folders dock title and must stay the
+   same height as it, so the two read as one strip. The title is the font
+   height + 5px padding top and bottom (QDockWidget::title below); a
+   QLineEdit adds 1px of its own above and below the text, so 4px here lands
+   on the same total. Measured at Segoe UI 9pt: both 26px. */
 #pathLineEdit {
 	color: #ccc;
 	background-color: #555;
-	padding: 3px 5px 4px 5px;
+	padding: 4px 5px 4px 5px;
 	border: none;
 }
 QMainWindow {
