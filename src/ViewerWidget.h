@@ -135,6 +135,16 @@ public:
     bool lockZoom() const { return _lockZoom; }
     void setLockZoom(bool on) { _lockZoom = on; }
 
+    // Settings-driven behaviour (MainWindow::applySettings pushes these).
+    // The fit mode a freshly opened image starts in, unless Lock zoom is on
+    // (then the current view state carries over). NoFit means 1:1.
+    FitMode defaultFitMode() const { return _defaultFitMode; }
+    void setDefaultFitMode(FitMode mode) { _defaultFitMode = mode; }
+    // When true the plain wheel zooms and Ctrl + wheel steps to the previous
+    // / next image; when false (the default) it is the other way round.
+    bool wheelZooms() const { return _wheelZooms; }
+    void setWheelZooms(bool on) { _wheelZooms = on; }
+
 signals:
     void dismissed();
     void prevRequested();
@@ -300,6 +310,8 @@ private:
     QSpinBox* _ratioW = nullptr;
     QSpinBox* _ratioH = nullptr;
     FitMode _fitMode = FitMode::FitLargeOnly;
+    FitMode _defaultFitMode = FitMode::FitLargeOnly;  // what setImage resets to
+    bool _wheelZooms = false;    // plain wheel zooms instead of navigating
     bool _lockZoom = false;      // when true, fit / zoom / pan survive setImage
     int _zoomIndex = 0;          // index into kZoomLevels (used when _fitMode == NoFit)
     QPoint _translate;           // pan offset relative to widget center

@@ -10,6 +10,7 @@
 class Config;
 class Theme;
 class FileFilterModel;
+class FileListViewDelegate;
 class TaskManager;
 class ThumbnailCache;
 class QDragEnterEvent;
@@ -29,6 +30,11 @@ public:
     // MainWindow: where to enqueue tasks, and what widget to parent
     // dialogs / toasts to. Call once after construction.
     void setDropContext(TaskManager* taskManager, QWidget* dialogParent);
+
+    // The grid's cell edge in pixels (Settings → Thumbnails → Thumbnail cell
+    // size). Re-lays the grid out and re-runs the thumbnail subscription
+    // window, since a denser grid shows more rows. 0 means the default.
+    void setCellSize(int px);
 
     // The current multi-selection's operable paths, with the synthetic
     // ".." item filtered out. imageOpsAllowed is false when the
@@ -65,6 +71,8 @@ private:
     // drop targets that folder (drop INTO sub-folder); when invalid the
     // drop targets the currently-viewed folder (full-view highlight).
     QPersistentModelIndex _dropHoverIndex;
+
+    FileListViewDelegate* _delegate = nullptr;
 
 private slots:
     void scheduleSubscriptionUpdate();

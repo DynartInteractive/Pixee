@@ -5,6 +5,7 @@
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
+#include "Config.h"
 #include "Theme.h"
 #include "FileFilterModel.h"
 #include "FileItem.h"
@@ -16,6 +17,7 @@ FileListViewDelegate::FileListViewDelegate(Config* config, Theme* theme, FileFil
     _config = config;
     _theme = theme;
     _fileFilterModel = fileFilterModel;
+    _cellSize = config->thumbnailSize();
 
     _backgroundBrush = theme->color("file-item.background-color", QColor(242, 242, 242));
     _textPen = theme->color("file-item.text-color", QColor(24, 24, 24));
@@ -48,8 +50,37 @@ FileListViewDelegate::FileListViewDelegate(Config* config, Theme* theme, FileFil
 FileListViewDelegate::~FileListViewDelegate() {
 }
 
+void FileListViewDelegate::setCellSize(int px) {
+    const int size = px > 0 ? px : _config->thumbnailSize();
+    if (size == _cellSize) return;
+    _cellSize = size;
+    _scaledIcons.clear();
+}
+
+int FileListViewDelegate::scaled(int v) const {
+    const int base = _config->thumbnailSize();
+    if (_cellSize == base || base <= 0) return v;
+    return qRound(double(v) * _cellSize / base);
+}
+
+const QPixmap& FileListViewDelegate::iconFor(QPixmap* pixmap) const {
+    // Theme icons are already _config->thumbnailSize() - 8 on their long
+    // edge; only a smaller cell needs a scaled copy.
+    const int fit = _cellSize - 8;
+    if (pixmap->isNull() || (pixmap->width() <= fit && pixmap->height() <= fit)) {
+        return *pixmap;
+    }
+    const qint64 key = pixmap->cacheKey();
+    auto it = _scaledIcons.constFind(key);
+    if (it == _scaledIcons.constEnd()) {
+        it = _scaledIcons.insert(key,
+            pixmap->scaled(fit, fit, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    return it.value();
+}
+
 QSize FileListViewDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const {
-    return QSize(_config->thumbnailSize() + 4, _config->thumbnailSize() + 37);
+    return QSize(_cellSize + 4, _cellSize + 37);
 }
 
 void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, const QModelIndex &index) const {
@@ -61,7 +92,7 @@ void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option
         return;
     }
     FileItem* fileItem = static_cast<FileItem*>(fileIndex.internalPointer());
-    
+
     auto bgRect = option.rect;
     bgRect.adjust(0, 0, -4, -37);
     auto textRect = QRect(bgRect.x() + 6, bgRect.bottom(), bgRect.width() - 12, 28);
@@ -77,12 +108,26 @@ void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option
 
         const QImage thumbImage = index.data(FileModel::ThumbnailRole).value<QImage>();
         if (!thumbImage.isNull()) {
+            // Thumbnails are cached at thumbnailSize(); in a smaller cell
+            // they are drawn scaled down (smooth), never up — a thumbnail
+            // smaller than the cell was already upscaled, pixel-art style,
+            // when it was generated.
             const QPixmap thumbPixmap = QPixmap::fromImage(thumbImage);
+            QSize drawSize = thumbPixmap.size();
+            if (drawSize.width() > bgRect.width() || drawSize.height() > bgRect.height()) {
+                drawSize = drawSize.scaled(bgRect.size(), Qt::KeepAspectRatio);
+            }
             const QRect imgRect = QStyle::alignedRect(
-                Qt::LeftToRight, Qt::AlignCenter, thumbPixmap.size(), bgRect);
+                Qt::LeftToRight, Qt::AlignCenter, drawSize, bgRect);
             p->setBrush(_checkerBrush);
             p->drawRect(imgRect);
-            p->drawPixmap(imgRect.x(), imgRect.y(), thumbPixmap);
+            if (drawSize == thumbPixmap.size()) {
+                p->drawPixmap(imgRect.x(), imgRect.y(), thumbPixmap);
+            } else {
+                p->setRenderHint(QPainter::SmoothPixmapTransform, true);
+                p->drawPixmap(imgRect, thumbPixmap, thumbPixmap.rect());
+                p->setRenderHint(QPainter::SmoothPixmapTransform, false);
+            }
         } else {
             // Placeholders sit directly on the solid background — no checker.
             const int state = index.data(FileModel::ThumbnailStateRole).toInt();
@@ -129,7 +174,8 @@ void FileListViewDelegate::paint(QPainter *p, const QStyleOptionViewItem &option
 }
 
 void FileListViewDelegate::_drawPixmap(QPainter *p, QPixmap* pixmap, QRect &bgRect, bool border) const {
-    auto rect = QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, pixmap->size(), bgRect);
+    const QPixmap& icon = iconFor(pixmap);
+    auto rect = QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, icon.size(), bgRect);
     /*
     if (border) {
         auto borderRect = rect;
@@ -138,15 +184,17 @@ void FileListViewDelegate::_drawPixmap(QPainter *p, QPixmap* pixmap, QRect &bgRe
         p->drawRect(borderRect);
     }
     */
-    p->drawPixmap(rect.x(), rect.y(), *pixmap);
+    p->drawPixmap(rect.x(), rect.y(), icon);
 }
 
 void FileListViewDelegate::_drawIndexThumbnail(QPainter* p, const QImage& image, const QRect& bgRect) const {
     if (image.isNull()) return;
 
-    const int m = _indexMargin;
-    const int b = _indexBorderSize;
-    const int dy = _indexOffsetY;  // shift the overlay vertically; tunes against the folder graphic
+    // The theme tunes these against the 256 px folder graphic; a smaller
+    // cell draws that graphic scaled, so the overlay geometry scales too.
+    const int m = scaled(_indexMargin);
+    const int b = _indexBorderSize > 0 ? qMax(1, scaled(_indexBorderSize)) : 0;
+    const int dy = scaled(_indexOffsetY);  // shift the overlay vertically; tunes against the folder graphic
     QRect outer = bgRect.adjusted(m, m + dy, -m, -m + dy);
     if (outer.isEmpty()) return;
     // The image fits inside `outer` minus the border on each side.
@@ -174,5 +222,7 @@ void FileListViewDelegate::_drawIndexThumbnail(QPainter* p, const QImage& image,
     p->drawRect(imageRect);
 
     // The image itself — smooth-scaled into its rect.
+    p->setRenderHint(QPainter::SmoothPixmapTransform, true);
     p->drawPixmap(imageRect, pixmap, pixmap.rect());
+    p->setRenderHint(QPainter::SmoothPixmapTransform, false);
 }

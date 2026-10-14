@@ -9,6 +9,20 @@ fixes bump the patch).
 
 ### Added
 
+- **Eight new settings** in `Edit → Settings…`, now on four pages. *General*:
+  theme (any folder under `themes/`, or Qt's own look) and where Pixee starts
+  — the last folder, your home folder, the drive list, or a folder you pick.
+  *Thumbnails*: how many thumbnails decode in parallel (the shipped two suits
+  a network share; a local disk can take more) and the cell size — 128, 192
+  or 256 px, drawn from the same cached thumbnails so a denser grid costs no
+  re-decode. *Viewer*: whether the plain mouse wheel flips images or zooms
+  (`Ctrl` + wheel does the other), and whether an image opens fitted only
+  when larger than the window, always fitted, or at 1:1. *File operations*:
+  ask before deleting to the recycle bin (permanent delete always asks), and
+  the JPEG / WebP quality `File → Save` writes with. Language, theme and the
+  decoder count are read at startup; Save says so in one notice when one of
+  them changed. The rest apply as soon as you press Save.
+
 - **JavaScript plugins** — a plugin is a folder with a `plugin.json` and a
   script, dropped at `<data dir>/plugins/<name>/`. Whatever it registers shows
   up under a new **Plugins** menu, which stays hidden when you have none. This

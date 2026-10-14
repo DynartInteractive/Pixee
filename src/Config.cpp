@@ -7,13 +7,30 @@
 #include <QThreadPool>
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QSettings>
 #include <QStandardPaths>
+
+#include "AppSettings.h"
 
 QString Config::_USER_FOLDER = ".pixee";
 
 Config::Config() {
     _thumbnailSize = 256;
-    _theme = "dark";
+
+    // Both of these are read once, here, and never again: Theme loads its
+    // assets from theme() before any widget exists, and the thumbnail pool
+    // is sized from maxThreadCount() when ThumbnailCache is built. Changing
+    // either in Settings therefore takes effect on the next start (the
+    // dialog says so). An empty or absent theme name means the bundled one.
+    const QSettings settings;
+    _theme = settings.value(AppSettings::kTheme,
+                            QString::fromLatin1(AppSettings::kThemeDefault)).toString().trimmed();
+    if (_theme.isEmpty()) _theme = QString::fromLatin1(AppSettings::kThemeDefault);
+    _decoderThreads = qBound(AppSettings::kDecoderThreadsMin,
+                             settings.value(AppSettings::kDecoderThreads,
+                                            AppSettings::kDecoderThreadsDefault).toInt(),
+                             AppSettings::kDecoderThreadsMax);
+
     _setUpImageExtensions();
     _setUpUserFolder();
 }
@@ -132,10 +149,12 @@ const QString Config::theme() {
 }
 
 int Config::maxThreadCount() {
-    // Two parallel decoders keep the SMB pipe usefully busy without
-    // saturating it — four hammered the share hard enough that the
-    // viewer's full-res load would queue behind them.
-    return 2;
+    // The default of two parallel decoders keeps the SMB pipe usefully busy
+    // without saturating it — four hammered the share hard enough that the
+    // viewer's full-res load would queue behind them. A local library can
+    // afford more; the number is Settings → Thumbnails → Parallel thumbnail
+    // decoders (AppSettings::kDecoderThreads), read once in the constructor.
+    return _decoderThreads;
 }
 
 int Config::taskWorkerCount() {

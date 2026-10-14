@@ -3,6 +3,9 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFont>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -12,11 +15,15 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
+#include <QSpinBox>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 #include <QVector>
 
+#include <algorithm>
+
 #include "AppSettings.h"
+#include "Config.h"
 
 namespace {
 
@@ -31,6 +38,12 @@ struct SettingDef {
     int type;                                  // SettingsDialog::ControlType
     QVariant def;
     QList<QPair<QString, QString>> choices;     // (stored value, display) — Choice only
+    int min = 0;                               // Int only
+    int max = 0;
+    QString suffix;
+    bool restart = false;                      // read once at startup
+    QString enabledByKey;                      // enabled only while that Choice …
+    QString enabledByValue;                    // … holds this stored value
 };
 struct GroupDef {
     QString title;
@@ -38,25 +51,99 @@ struct GroupDef {
     QList<SettingDef> settings;
 };
 
-QList<GroupDef> makeRegistry() {
-    QList<GroupDef> groups;
+// The numeric values mirror SettingsDialog::ControlType; the enum is private
+// to the class and the registry lives outside it.
+constexpr int kBool = 0;
+constexpr int kChoice = 1;
+constexpr int kInt = 2;
+constexpr int kPath = 3;
 
-    GroupDef fileOps;
-    fileOps.title = QObject::tr("File operations");
-    fileOps.icon  = QStringLiteral(":/icons/settings/file-operations.svg");
-    fileOps.settings.append({
-        QString::fromLatin1(AppSettings::kSelectAddedFiles),
-        QObject::tr("Select added files"),
-        0 /*Bool*/, true, {} });
-    groups.append(fileOps);
+SettingDef boolSetting(const char* key, const QString& label, bool def) {
+    SettingDef s;
+    s.key = QString::fromLatin1(key);
+    s.label = label;
+    s.type = kBool;
+    s.def = def;
+    return s;
+}
+
+SettingDef choiceSetting(const char* key, const QString& label, const QString& def,
+                         const QList<QPair<QString, QString>>& choices,
+                         bool restart = false) {
+    SettingDef s;
+    s.key = QString::fromLatin1(key);
+    s.label = label;
+    s.type = kChoice;
+    s.def = def;
+    s.choices = choices;
+    s.restart = restart;
+    return s;
+}
+
+SettingDef intSetting(const char* key, const QString& label, int def, int min, int max,
+                      const QString& suffix = QString(), bool restart = false) {
+    SettingDef s;
+    s.key = QString::fromLatin1(key);
+    s.label = label;
+    s.type = kInt;
+    s.def = def;
+    s.min = min;
+    s.max = max;
+    s.suffix = suffix;
+    s.restart = restart;
+    return s;
+}
+
+SettingDef pathSetting(const char* key, const QString& label) {
+    SettingDef s;
+    s.key = QString::fromLatin1(key);
+    s.label = label;
+    s.type = kPath;
+    s.def = QString();
+    return s;
+}
+
+// Every theme folder Theme could load, in the order it would find them, plus
+// "default" (Qt's own look). The bundled dark theme is always offered even
+// when no themes/ tree is next to the binary, because its assets fall through
+// to the :/ resources.
+QList<QPair<QString, QString>> themeChoices(Config* config) {
+    QStringList names;
+    names << QString::fromLatin1(AppSettings::kThemeDefault);
+    if (config) {
+        for (const QString& root : config->themeSearchPaths()) {
+            const QDir dir(root + QStringLiteral("/themes"));
+            const QStringList subdirs =
+                dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+            for (const QString& name : subdirs) {
+                if (QFileInfo::exists(dir.filePath(name) + QStringLiteral("/style.qss")))
+                    names << name;
+            }
+        }
+    }
+    names.removeDuplicates();
+    names.removeAll(QStringLiteral("default"));
+    std::sort(names.begin(), names.end(),
+              [](const QString& a, const QString& b) { return a.compare(b, Qt::CaseInsensitive) < 0; });
+
+    QList<QPair<QString, QString>> choices;
+    for (const QString& name : names) {
+        QString display = name;
+        if (!display.isEmpty()) display[0] = display.at(0).toUpper();
+        choices.append({ name, display });
+    }
+    choices.append({ QStringLiteral("default"), QObject::tr("System default (no theme)") });
+    return choices;
+}
+
+QList<GroupDef> makeRegistry(Config* config) {
+    QList<GroupDef> groups;
 
     GroupDef general;
     general.title = QObject::tr("General");
     general.icon  = QStringLiteral(":/icons/settings/general.svg");
-    general.settings.append({
-        QString::fromLatin1(AppSettings::kLanguage),
-        QObject::tr("Language"),
-        1 /*Choice*/, QString(),
+    general.settings.append(choiceSetting(
+        AppSettings::kLanguage, QObject::tr("Language"), QString(),
         {
             { QString(),                QObject::tr("System default") },
             { QStringLiteral("en"),     QStringLiteral("English") },
@@ -64,22 +151,97 @@ QList<GroupDef> makeRegistry() {
             { QStringLiteral("de"),     QStringLiteral("Deutsch") },
             { QStringLiteral("fr"),     QStringLiteral("Français") },
             { QStringLiteral("es"),     QStringLiteral("Español") },
-        } });
+        },
+        /*restart=*/true));
+    general.settings.append(choiceSetting(
+        AppSettings::kTheme, QObject::tr("Theme"),
+        QString::fromLatin1(AppSettings::kThemeDefault), themeChoices(config),
+        /*restart=*/true));
+    general.settings.append(choiceSetting(
+        AppSettings::kStartupMode, QObject::tr("Start in"),
+        QString::fromLatin1(AppSettings::kStartupModeDefault),
+        {
+            { QStringLiteral("last"),  QObject::tr("Last visited folder") },
+            { QStringLiteral("home"),  QObject::tr("Home folder") },
+#if defined(__linux__) || defined(__APPLE__)
+            { QStringLiteral("root"),  QObject::tr("Root folder (/)") },
+#else
+            { QStringLiteral("root"),  QObject::tr("Drive list") },
+#endif
+            { QStringLiteral("fixed"), QObject::tr("This folder:") },
+        }));
+    {
+        SettingDef path = pathSetting(AppSettings::kStartupPath, QObject::tr("Startup folder"));
+        path.enabledByKey = QString::fromLatin1(AppSettings::kStartupMode);
+        path.enabledByValue = QStringLiteral("fixed");
+        general.settings.append(path);
+    }
     groups.append(general);
+
+    GroupDef thumbs;
+    thumbs.title = QObject::tr("Thumbnails");
+    thumbs.icon  = QStringLiteral(":/icons/settings/thumbnails.svg");
+    thumbs.settings.append(intSetting(
+        AppSettings::kDecoderThreads, QObject::tr("Parallel thumbnail decoders"),
+        AppSettings::kDecoderThreadsDefault,
+        AppSettings::kDecoderThreadsMin, AppSettings::kDecoderThreadsMax,
+        QString(), /*restart=*/true));
+    thumbs.settings.append(choiceSetting(
+        AppSettings::kCellSize, QObject::tr("Thumbnail cell size"),
+        QString::number(AppSettings::kCellSizeDefault),
+        {
+            { QStringLiteral("128"), QStringLiteral("128 px") },
+            { QStringLiteral("192"), QStringLiteral("192 px") },
+            { QStringLiteral("256"), QStringLiteral("256 px") },
+        }));
+    groups.append(thumbs);
+
+    GroupDef viewer;
+    viewer.title = QObject::tr("Viewer");
+    viewer.icon  = QStringLiteral(":/icons/settings/viewer.svg");
+    viewer.settings.append(choiceSetting(
+        AppSettings::kViewerWheel, QObject::tr("Mouse wheel"),
+        QString::fromLatin1(AppSettings::kViewerWheelDefault),
+        {
+            { QStringLiteral("navigate"), QObject::tr("Previous / next image (Ctrl + wheel zooms)") },
+            { QStringLiteral("zoom"),     QObject::tr("Zoom (Ctrl + wheel changes image)") },
+        }));
+    viewer.settings.append(choiceSetting(
+        AppSettings::kViewerOpenZoom, QObject::tr("Open images at"),
+        QString::fromLatin1(AppSettings::kViewerOpenZoomDefault),
+        {
+            { QStringLiteral("fitLarge"), QObject::tr("Fit to window if larger") },
+            { QStringLiteral("fit"),      QObject::tr("Fit to window") },
+            { QStringLiteral("actual"),   QObject::tr("Actual size (1:1)") },
+        }));
+    groups.append(viewer);
+
+    GroupDef fileOps;
+    fileOps.title = QObject::tr("File operations");
+    fileOps.icon  = QStringLiteral(":/icons/settings/file-operations.svg");
+    fileOps.settings.append(boolSetting(
+        AppSettings::kSelectAddedFiles, QObject::tr("Select added files"), true));
+    fileOps.settings.append(boolSetting(
+        AppSettings::kConfirmTrash, QObject::tr("Ask before deleting to the recycle bin"), true));
+    fileOps.settings.append(intSetting(
+        AppSettings::kSaveQuality, QObject::tr("Save quality (JPEG, WebP)"),
+        AppSettings::kSaveQualityDefault, 1, 100));
+    groups.append(fileOps);
 
     return groups;
 }
 
 }  // namespace
 
-SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
+SettingsDialog::SettingsDialog(Config* config, QWidget* parent)
+    : QDialog(parent), _config(config) {
     setObjectName("settingsDialog");
     setWindowTitle(tr("Settings"));
     setModal(false);
     // "Always in front but not blocking": modeless + stays above the main
     // window. The caller shows it with show() and can keep using Pixee.
     setWindowFlag(Qt::WindowStaysOnTopHint, true);
-    resize(580, 400);
+    resize(640, 420);
 
     // ---- top: search ----
     _search = new QLineEdit(this);
@@ -118,6 +280,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
 
     build();
     load();
+    updateDependentRows();
 
     connect(_groupList, &QListWidget::currentRowChanged,
             _stack, &QStackedWidget::setCurrentIndex);
@@ -132,7 +295,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
 }
 
 void SettingsDialog::build() {
-    const QList<GroupDef> groups = makeRegistry();
+    const QList<GroupDef> groups = makeRegistry(_config);
 
     for (int g = 0; g < groups.size(); ++g) {
         const GroupDef& grp = groups.at(g);
@@ -161,11 +324,15 @@ void SettingsDialog::build() {
 
             Row row;
             row.container = rowW;
+            row.label = s.label;
             row.labelText = s.label.toLower();
             row.groupIndex = g;
             row.key = s.key;
             row.type = s.type;
             row.def = s.def;
+            row.restart = s.restart;
+            row.enabledByKey = s.enabledByKey;
+            row.enabledByValue = s.enabledByValue;
 
             if (s.type == Bool) {
                 auto* cb = new QCheckBox(s.label, rowW);
@@ -173,7 +340,7 @@ void SettingsDialog::build() {
                 row.labelWidget = cb;
                 rowLay->addWidget(cb);
                 rowLay->addStretch(1);
-            } else {  // Choice
+            } else if (s.type == Choice) {
                 auto* lab = new QLabel(s.label, rowW);
                 auto* combo = new QComboBox(rowW);
                 for (const auto& c : s.choices) combo->addItem(c.second, c.first);
@@ -182,6 +349,38 @@ void SettingsDialog::build() {
                 rowLay->addWidget(lab);
                 rowLay->addWidget(combo, 0);
                 rowLay->addStretch(1);
+            } else if (s.type == Int) {
+                auto* lab = new QLabel(s.label, rowW);
+                auto* spin = new QSpinBox(rowW);
+                spin->setRange(s.min, s.max);
+                if (!s.suffix.isEmpty()) spin->setSuffix(s.suffix);
+                row.spin = spin;
+                row.labelWidget = lab;
+                rowLay->addWidget(lab);
+                rowLay->addWidget(spin, 0);
+                rowLay->addStretch(1);
+            } else {  // Path
+                auto* lab = new QLabel(s.label, rowW);
+                auto* edit = new QLineEdit(rowW);
+                edit->setClearButtonEnabled(true);
+                auto* browse = new QPushButton(tr("Browse..."), rowW);
+                // Native folder picker — the same one Copy to / Move to and
+                // Save As use. (The no-QFileDialog rule is about the central
+                // browser, where the model's behaviour on shares matters.)
+                connect(browse, &QPushButton::clicked, this, [this, edit]() {
+                    const QString start = edit->text().isEmpty()
+                        ? QDir::homePath() : edit->text();
+                    const QString dir = QFileDialog::getExistingDirectory(
+                        this, tr("Choose the startup folder"), start);
+                    if (!dir.isEmpty()) edit->setText(QDir::toNativeSeparators(dir));
+                });
+                // The Browse button shares the row's enabled state through
+                // the container; the edit is what holds the value.
+                row.edit = edit;
+                row.labelWidget = lab;
+                rowLay->addWidget(lab);
+                rowLay->addWidget(edit, 1);
+                rowLay->addWidget(browse, 0);
             }
 
             pageLay->addWidget(rowW);
@@ -191,38 +390,74 @@ void SettingsDialog::build() {
         pageLay->addStretch(1);
         _stack->addWidget(page);
     }
+
+    // Dependent rows follow their controlling Choice live, so the startup
+    // path greys out the moment "This folder:" is deselected.
+    for (const Row& r : _rows) {
+        if (r.enabledByKey.isEmpty() || !r.combo) continue;
+        for (const Row& dep : _rows) {
+            if (dep.enabledByKey != r.key) continue;
+            connect(r.combo, &QComboBox::currentIndexChanged, this,
+                    &SettingsDialog::updateDependentRows);
+            break;
+        }
+    }
 }
 
 void SettingsDialog::load() {
     QSettings s;
-    for (const Row& r : _rows) {
+    for (Row& r : _rows) {
         if (r.type == Bool && r.check) {
             r.check->setChecked(s.value(r.key, r.def).toBool());
         } else if (r.type == Choice && r.combo) {
             const QString cur = s.value(r.key, r.def).toString();
             const int idx = r.combo->findData(cur);
             r.combo->setCurrentIndex(idx < 0 ? 0 : idx);
+        } else if (r.type == Int && r.spin) {
+            // The spin box clamps an out-of-range stored value for us.
+            r.spin->setValue(s.value(r.key, r.def).toInt());
+        } else if (r.type == Path && r.edit) {
+            r.edit->setText(s.value(r.key, r.def).toString());
         }
+        r.initial = currentValue(r);
     }
-    _initialLanguage = s.value(QString::fromLatin1(AppSettings::kLanguage)).toString();
+}
+
+QVariant SettingsDialog::currentValue(const Row& r) const {
+    if (r.type == Bool && r.check) return r.check->isChecked();
+    if (r.type == Choice && r.combo) return r.combo->currentData().toString();
+    if (r.type == Int && r.spin) return r.spin->value();
+    if (r.type == Path && r.edit) return r.edit->text().trimmed();
+    return r.def;
+}
+
+void SettingsDialog::updateDependentRows() {
+    for (const Row& dep : _rows) {
+        if (dep.enabledByKey.isEmpty()) continue;
+        bool enabled = true;
+        for (const Row& ctl : _rows) {
+            if (ctl.key != dep.enabledByKey) continue;
+            enabled = currentValue(ctl).toString() == dep.enabledByValue;
+            break;
+        }
+        dep.container->setEnabled(enabled);
+    }
 }
 
 void SettingsDialog::save() {
     QSettings s;
+    QStringList needRestart;
     for (const Row& r : _rows) {
-        if (r.type == Bool && r.check) {
-            s.setValue(r.key, r.check->isChecked());
-        } else if (r.type == Choice && r.combo) {
-            s.setValue(r.key, r.combo->currentData().toString());
-        }
+        const QVariant v = currentValue(r);
+        s.setValue(r.key, v);
+        if (r.restart && v != r.initial) needRestart << r.label;
     }
     s.sync();
+    emit saved();
 
-    const QString newLanguage =
-        s.value(QString::fromLatin1(AppSettings::kLanguage)).toString();
-    if (newLanguage != _initialLanguage) {
-        QMessageBox::information(this, tr("Language changed"),
-            tr("Restart Pixee to apply the new language."));
+    if (!needRestart.isEmpty()) {
+        QMessageBox::information(this, tr("Restart needed"),
+            tr("Restart Pixee to apply: %1.").arg(needRestart.join(QStringLiteral(", "))));
     }
     close();
 }

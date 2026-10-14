@@ -66,6 +66,10 @@ private slots:
     // they can be selected once the folder refresh inserts their rows.
     void onGroupFinished(QStringList producedPaths);
     void openSettings();
+    // Pushes the settings that apply without a restart (viewer wheel role,
+    // open zoom, thumbnail cell size) into the widgets. Called at the end of
+    // create() and on every SettingsDialog::saved.
+    void applySettings();
     void openBatchRename();
     // File → Save As…: convert/export the focused image to a chosen folder /
     // name / format via a ConvertFormatTask. File → Save: overwrite the

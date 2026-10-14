@@ -40,8 +40,8 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
     : _cache(cache), _fileFilterModel(fileFilterModel) {
     setModel(fileFilterModel);
 
-    auto delegate = new FileListViewDelegate(config, theme, fileFilterModel, this);
-    setItemDelegate(delegate);
+    _delegate = new FileListViewDelegate(config, theme, fileFilterModel, this);
+    setItemDelegate(_delegate);
 
     setObjectName("fileListView");
     setViewMode(QListView::IconMode);
@@ -425,6 +425,18 @@ void FileListView::onCacheJobDone(const QString& path) {
 void FileListView::setDropContext(TaskManager* taskManager, QWidget* dialogParent) {
     _taskManager = taskManager;
     _dialogParent = dialogParent;
+}
+
+void FileListView::setCellSize(int px) {
+    const int before = _delegate->cellSize();
+    _delegate->setCellSize(px);
+    if (_delegate->cellSize() == before) return;
+    // Uniform item sizes are cached by the view; a layout pass re-asks the
+    // delegate's sizeHint. The subscription window follows on the same
+    // debounce a resize uses, because the number of visible rows changed.
+    scheduleDelayedItemsLayout();
+    viewport()->update();
+    scheduleSubscriptionUpdate();
 }
 
 FileListView::Selection FileListView::selectionPaths() const {

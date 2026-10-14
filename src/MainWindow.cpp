@@ -836,18 +836,60 @@ void MainWindow::create() {
     // to either the startup image's parent (CLI arg wins) or the saved
     // lastPath. Manual navigation cancels the restore (see navigateTo).
     navigateTo(nullptr);
-    QString restorePath = _startupImagePath.isEmpty()
-            ? settings.value("lastPath").toString()
-            : QFileInfo(_startupImagePath).absolutePath();
+    // Where to start (Settings → General → Start in): the previous session's
+    // folder, the home folder, the root (the drive list here, "/" where
+    // there is none), or a fixed folder. A command-line image always wins.
+    // lastPath is saved on exit whatever the mode, so switching back to
+    // "last" later picks up where the previous session actually was.
+    const QString startupMode = settings.value(
+        AppSettings::kStartupMode,
+        QString::fromLatin1(AppSettings::kStartupModeDefault)).toString();
+    QString restorePath;
+    if (!_startupImagePath.isEmpty()) {
+        restorePath = QFileInfo(_startupImagePath).absolutePath();
+    } else if (startupMode == QLatin1String("home")) {
+        restorePath = QDir::homePath();
+    } else if (startupMode == QLatin1String("fixed")) {
+        restorePath = settings.value(AppSettings::kStartupPath).toString().trimmed();
+    } else if (startupMode != QLatin1String("root")) {  // "last" and anything unknown
+        restorePath = settings.value("lastPath").toString();
+    }
     // Nothing to restore on a drive-list-less platform means we'd sit on
     // "/" — open the home folder instead, which is where the user's images
-    // actually live. Windows keeps its drive list as the neutral start.
-    if (restorePath.isEmpty() && !_pixee->config()->hasDriveList()) {
+    // actually live. Windows keeps its drive list as the neutral start, and
+    // "root" asks for exactly that, so it skips the fallback.
+    if (restorePath.isEmpty() && startupMode != QLatin1String("root")
+            && !_pixee->config()->hasDriveList()) {
         restorePath = QDir::homePath();
     }
     if (!restorePath.isEmpty()) {
         beginPathRestore(restorePath);
     }
+
+    applySettings();
+}
+
+void MainWindow::applySettings() {
+    // The settings that take effect without a restart. Called once the
+    // widgets exist and again every time the Settings window saves, so the
+    // reading code lives here only; nothing else polls QSettings for these.
+    const QSettings settings;
+
+    const QString wheel = settings.value(
+        AppSettings::kViewerWheel,
+        QString::fromLatin1(AppSettings::kViewerWheelDefault)).toString();
+    _viewerWidget->setWheelZooms(wheel == QLatin1String("zoom"));
+
+    const QString openZoom = settings.value(
+        AppSettings::kViewerOpenZoom,
+        QString::fromLatin1(AppSettings::kViewerOpenZoomDefault)).toString();
+    ViewerWidget::FitMode fit = ViewerWidget::FitMode::FitLargeOnly;
+    if (openZoom == QLatin1String("fit")) fit = ViewerWidget::FitMode::Fit;
+    else if (openZoom == QLatin1String("actual")) fit = ViewerWidget::FitMode::NoFit;
+    _viewerWidget->setDefaultFitMode(fit);
+
+    _fileListView->setCellSize(
+        settings.value(AppSettings::kCellSize, AppSettings::kCellSizeDefault).toInt());
 }
 
 void MainWindow::goToFolderByFileIndex(const QModelIndex& fileIndex) {
@@ -1056,8 +1098,10 @@ void MainWindow::openSettings() {
         _settingsDialog->activateWindow();
         return;
     }
-    _settingsDialog = new SettingsDialog(this);
+    _settingsDialog = new SettingsDialog(_pixee->config(), this);
     _settingsDialog->setAttribute(Qt::WA_DeleteOnClose);  // QPointer auto-nulls
+    // Live settings (viewer wheel, open zoom, cell size) re-read on Save.
+    connect(_settingsDialog, &SettingsDialog::saved, this, &MainWindow::applySettings);
     _settingsDialog->show();
 }
 
@@ -1163,7 +1207,12 @@ bool MainWindow::saveEditedOverOriginal() {
     // navigating away while it writes is safe, and it writes via a temp file
     // so a failure leaves the original intact.
     auto* group = new TaskGroup(tr("Save %1").arg(QFileInfo(path).fileName()));
-    auto* task = new SaveImageTask(edited, path, fmt, /*quality=*/92, group,
+    // Encoder quality for the lossy formats (Settings → File operations);
+    // SaveImageTask ignores it for the rest.
+    const int quality = qBound(1,
+        QSettings().value(AppSettings::kSaveQuality, AppSettings::kSaveQualityDefault).toInt(),
+        100);
+    auto* task = new SaveImageTask(edited, path, fmt, quality, group,
                                    nullptr, /*overwriteExisting=*/true);
     group->addTask(task);
     _pendingSaves.insert(task->id(), { path, edited, /*overOriginal=*/true });

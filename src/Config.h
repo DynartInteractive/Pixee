@@ -50,6 +50,7 @@ private:
     QString _thumbnailsPath;
     QString _cacheFolder;
     QString _theme;
+    int _decoderThreads;
 
 };
 

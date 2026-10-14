@@ -14,6 +14,7 @@
 #include <QString>
 #include <QUrl>
 
+#include "AppSettings.h"
 #include "Config.h"
 #include "CopyFileTask.h"
 #include "DeleteFileTask.h"
@@ -556,7 +557,12 @@ void FileOpsMenuBuilder::doDelete(bool toTrash) {
     const QString question = paths.size() == 1
         ? tr("%1 \"%2\"?").arg(verb, QFileInfo(paths.first()).fileName())
         : tr("%1 %2 selected items?").arg(verb).arg(paths.size());
-    if (QMessageBox::question(_dialogParent, title, question,
+    // The recycle-bin prompt is optional (Settings → File operations); a
+    // permanent delete always asks, because there is nothing to get it back
+    // from.
+    const bool ask = !toTrash
+        || QSettings().value(AppSettings::kConfirmTrash, true).toBool();
+    if (ask && QMessageBox::question(_dialogParent, title, question,
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
         return;
     }

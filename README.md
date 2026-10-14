@@ -87,7 +87,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 
 - **Open with** — right-click an image and hand it to an external editor. The list is yours to build: *Open with → Configure…* has **Add**, **Edit** and **Remove**, and Add/Edit share one dialog — a display label, the path to the executable with a **Browse…** picker, and Save / Cancel. Save stays greyed out until both fields are usable, with the reason shown inline; a bare command name is accepted on purpose (`gimp` gets resolved against `PATH`). The whole selection is passed as arguments, so one launch opens them all. Inside the Flatpak this collapses to a single *Open with…* that routes through the desktop portal — the sandbox can't run host binaries.
 - **Save / Save As** (`File → Save`, `Ctrl + S` / `File → Save As…`, `Ctrl + Shift + S`) — write the focused image (the viewer's, or a single selected thumbnail) to any folder, name and format. The format list offers only what your Qt build can actually **write**, with a quality slider for the lossy ones (JPEG / WebP). With an unsaved edit, Save overwrites the original after a confirm and Save As exports the edited pixels; with no edit, Save As converts straight from the file on disk. Both run through the task pipeline, so the side-by-side conflict prompt covers them.
-- **Settings window** (`Edit → Settings…`) — a non-modal, always-on-top panel: type to filter any label, groups in an icon sidebar, Save / Cancel. Currently *Select added files* and *Language*.
+- **Settings window** (`Edit → Settings…`) — a non-modal, always-on-top panel: type to filter any label, groups in an icon sidebar, Save / Cancel. Four pages: **General** (language, theme, where to start — last folder / home / drive list / a folder of your choice), **Thumbnails** (how many decoders run in parallel — fewer on a slow share, more on a local disk; and the cell size, 128 / 192 / 256 px, applied live without re-decoding anything), **Viewer** (whether the plain wheel flips images or zooms — `Ctrl` + wheel does the other — and whether an image opens fitted-if-larger, fitted, or at 1:1) and **File operations** (select added files, ask before deleting to the recycle bin, and the JPEG / WebP quality `File → Save` writes with). The few that are read at startup — language, theme, decoder count — say so with one notice on Save; everything else applies immediately.
 
   <p align="center">
     <img src="docs/screenshot-settings-dialog-v2.jpg" alt="The Settings window: a search box, a File operations / General icon sidebar, and the General page with the Language dropdown open"><br>
@@ -214,8 +214,8 @@ The manifest builds from the working tree, so no tag or commit is needed to try 
 | Shortcut | Action |
 |---|---|
 | `←` / `→` | Previous / next image |
-| Mouse wheel | Previous / next image |
-| `Ctrl` + Mouse wheel | Zoom in / out |
+| Mouse wheel | Previous / next image (or zoom — Settings → Viewer swaps the two) |
+| `Ctrl` + Mouse wheel | Zoom in / out (or previous / next, when swapped) |
 | `+` / `-` | Zoom in / out |
 | `0` / `*` | Toggle fit to window |
 | `1` | Actual size (1:1) |

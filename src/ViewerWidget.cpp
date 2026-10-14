@@ -83,11 +83,12 @@ void ViewerWidget::setImage(const QImage& image) {
     setModified(false);
     cancelCrop();
     if (!_lockZoom) {
-        // Fresh-image defaults: FitLargeOnly + 100% baseline + centered.
-        // (When locked, keep the user's current fit mode, zoom, and pan;
-        // clampTranslate will re-fit the pan to the new image's bounds
-        // on the first paint.)
-        _fitMode = FitMode::FitLargeOnly;
+        // Fresh-image defaults: the configured open mode (FitLargeOnly
+        // unless Settings → Viewer says otherwise) + 100% baseline +
+        // centered. (When locked, keep the user's current fit mode, zoom,
+        // and pan; clampTranslate will re-fit the pan to the new image's
+        // bounds on the first paint.)
+        _fitMode = _defaultFitMode;
         _zoomIndex = kZoomIndex100;
         _translate = QPoint();
     }
@@ -1154,7 +1155,10 @@ void ViewerWidget::wheelEvent(QWheelEvent* event) {
     // direction reverses so a turn-back responds immediately.
     if ((_wheelAccum > 0 && dy < 0) || (_wheelAccum < 0 && dy > 0)) _wheelAccum = 0;
     _wheelAccum += dy;
-    const bool zoom = event->modifiers() & Qt::ControlModifier;
+    // Ctrl flips whichever role the plain wheel has (Settings → Viewer →
+    // Mouse wheel), so both actions are always one modifier apart.
+    const bool ctrl = event->modifiers() & Qt::ControlModifier;
+    const bool zoom = ctrl != _wheelZooms;
     while (qAbs(_wheelAccum) >= 120) {
         const bool up = _wheelAccum > 0;
         _wheelAccum += up ? -120 : 120;
