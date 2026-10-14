@@ -355,9 +355,14 @@ FileModel::FolderRefreshDiff FileModel::computeDiff(
     // Removed (row, path) pairs, sorted DESCENDING by row so the per-row
     // beginRemoveRows calls in applyRefreshDiff don't invalidate later
     // indices: removing the highest row first leaves all lower rows at
-    // their original indices.
+    // their original indices. A leftover that is still on disk is not a
+    // removal: the listing skips hidden entries, so a row adopted on request
+    // (adoptPath) never comes back in `entries` — dropping it here would
+    // yank the folder the user is standing in out of the tree on the very
+    // next refresh. One stat per leftover, and leftovers are rare.
     diff.removed.reserve(live.size());
     for (auto it = live.constBegin(); it != live.constEnd(); ++it) {
+        if (QFileInfo::exists(it.key())) continue;
         diff.removed.append({ it.value().row, it.key() });
     }
     std::sort(diff.removed.begin(), diff.removed.end(),
@@ -932,6 +937,47 @@ FileItem* FileModel::createFolder(FileItem* parent, const QString& name) {
     return item;
 }
 
+FileItem* FileModel::adoptPath(FileItem* parent, const QString& path) {
+    if (!parent || parent == _rootItem || path.isEmpty()) return nullptr;
+    if (FileItem* existing = itemForPath(path)) return existing;
+
+    const QFileInfo info(path);
+    if (!info.exists()) return nullptr;
+    // Directly inside `parent`, by filesystem identity rather than string
+    // comparison: the caller's spelling may differ from the model's in case
+    // or separators.
+    const QDir parentDir(parent->fileInfo().filePath());
+    if (QFileInfo(parentDir.absolutePath()) != QFileInfo(info.absolutePath())) {
+        return nullptr;
+    }
+
+    // Parent never enumerated (only its Loading placeholder): populate it
+    // synchronously, which also brings the ".." row; then only adopt if the
+    // listing really left the path out.
+    if (parent->childCount() == 1
+            && parent->child(0)->fileType() == FileType::Loading) {
+        appendFileItems(parentDir.absolutePath(), parent);
+        if (FileItem* listed = itemForPath(path)) return listed;
+    }
+
+    // Keep the model's own spelling: the parent's path plus the entry name,
+    // the way the enumerator would have produced it.
+    const QFileInfo modelInfo(parentDir.filePath(info.fileName()));
+    if (FileItem* listed = itemForPath(modelInfo.filePath())) return listed;
+    const int row = parent->childCount();
+    const QModelIndex parentIdx = createIndex(parent->row(), 0, parent);
+    beginInsertRows(parentIdx, row, row);
+    FileItem* item = createItemForFileInfo(modelInfo, parent);
+    parent->appendChild(item);
+    const FileType ft = item->fileType();
+    if (ft == FileType::Folder || ft == FileType::Image) {
+        _itemsByPath.insert(modelInfo.filePath(), item);
+    }
+    endInsertRows();
+    if (ft == FileType::Image) repickFolderIndex(parent);
+    return item;
+}
+
 QModelIndex FileModel::indexFor(FileItem* item) const {
     if (!item || item == _rootItem) return QModelIndex();
     return createIndex(item->row(), 0, item);
@@ -977,6 +1023,10 @@ QModelIndex FileModel::expandPath(const QString& path) {
                 break;
             }
         }
+        // Not in the listing — a hidden folder, typically. It exists (the
+        // whole chain was built from a path that does), so take it in
+        // rather than refusing a path the user typed.
+        if (!match) match = adoptPath(parent, seg);
         if (!match) return QModelIndex();
         parent = match;
         parentIndex = createIndex(match->row(), 0, match);

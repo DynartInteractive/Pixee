@@ -805,16 +805,22 @@ void MainWindow::create() {
             // Look the image up by name among the folder's children, so the
             // model's own spelling of the path is used.
             const QString wantedName = QFileInfo(_startupImagePath).fileName();
+            const QString wantedPath = _startupImagePath;
             _startupImagePath.clear();
+            FileItem* found = nullptr;
             for (int i = 0; i < folder->childCount(); ++i) {
                 FileItem* item = folder->child(i);
                 if (item && item->fileType() == FileType::Image
                         && item->fileInfo().fileName().compare(
                                wantedName, FileOpsHelpers::pathCaseSensitivity()) == 0) {
-                    activateImage(item);
+                    found = item;
                     break;
                 }
             }
+            // A hidden image file is left out of the listing the same way a
+            // hidden folder is; it was named on the command line, so show it.
+            if (!found) found = _fileModel->adoptPath(folder, wantedPath);
+            if (found && found->fileType() == FileType::Image) activateImage(found);
         });
 
     // On a platform with no drive list (Linux) the synthetic root holds a
@@ -1786,8 +1792,16 @@ void MainWindow::advancePathRestore() {
             _fileModel->requestEnumerate(_restoreParent);
             return;
         }
-        // Already populated and the segment isn't there — saved path is
-        // stale (folder was renamed / share offline). Stop the restore.
+        // Populated and the segment isn't listed. Hidden folders are left
+        // out of every listing, so before calling the path stale, ask the
+        // model to take the folder in if it is really there (an image
+        // opened from %APPDATA%, say). Only then is the saved path stale —
+        // renamed folder, share offline — and the restore stops.
+        if (FileItem* adopted = _fileModel->adoptPath(_restoreParent, seg)) {
+            _restoreParent = adopted;
+            _restoreChain.removeFirst();
+            continue;
+        }
         cancelPathRestore();
         return;
     }

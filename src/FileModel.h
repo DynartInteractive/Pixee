@@ -127,6 +127,21 @@ public:
     // select it), nullptr on failure (mkdir error, name collision).
     FileItem* createFolder(FileItem* parent, const QString& name);
 
+    // Insert a row for `path` under `parent` although the directory listing
+    // left it out. The listings deliberately skip hidden and system entries
+    // (no QDir::Hidden), so a folder such as %APPDATA% is never a child of
+    // the user folder — and a path the user asked for by name (an image
+    // passed on the command line from a hidden folder, a hidden path typed
+    // into the path bar) stopped at the nearest visible ancestor. Explorer
+    // keeps hidden folders out of its listings too, and still opens one
+    // when you type its path; this is that. Returns the item already
+    // mapped for `path` if there is one; nullptr when `path` doesn't exist,
+    // isn't directly inside `parent`, or `parent` is the synthetic root.
+    // Folders come with the usual Loading placeholder, so the normal
+    // enumeration follows. A row adopted this way survives refreshes: the
+    // diff keeps a leftover that is still on disk (see computeDiff).
+    FileItem* adoptPath(FileItem* parent, const QString& path);
+
 signals:
     void folderPopulated(QString dirPath);
     // Emitted after a successful renameItem. Cross-cache listeners
