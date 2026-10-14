@@ -306,6 +306,12 @@ private:
     // travels with the image into F11 fullscreen and costs the browser layout
     // nothing. Built lazily on first beginCrop(), shown only in crop mode.
     QWidget* _cropBar = nullptr;
+    // The bar can be dragged by its grip, because wherever it sits it can
+    // cover a marquee handle. Set once the user has moved it in this crop
+    // session: resizes then keep the bar where it was (clamped) instead of
+    // re-centring it. Cleared on every beginCrop — the position is never
+    // saved, each crop starts with the bar at the top centre.
+    bool _cropBarDragged = false;
     QCheckBox* _ratioCheck = nullptr;
     QSpinBox* _ratioW = nullptr;
     QSpinBox* _ratioH = nullptr;

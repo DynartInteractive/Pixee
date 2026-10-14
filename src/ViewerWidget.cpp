@@ -17,6 +17,7 @@
 #include <QTransform>
 #include <QWheelEvent>
 
+#include <functional>
 #include <numeric>
 
 namespace {
@@ -301,6 +302,7 @@ void ViewerWidget::beginCrop() {
     _spaceDown = _midDown = _panning = false;
 
     buildCropBar();
+    _cropBarDragged = false;   // back to the top centre; nothing is remembered
     positionCropBar();
     _cropBar->show();
     _cropBar->raise();
@@ -575,6 +577,68 @@ void ViewerWidget::setCropCursor(CropHandle h) {
     }
 }
 
+namespace {
+
+// The crop bar's move handle: the dotted grip a Windows tool bar carries at
+// its left end, two columns of three dots. Dragging it slides the whole bar
+// inside the viewer so it can be pulled off a marquee handle it happens to
+// cover. Plain QWidget, no Q_OBJECT: the one thing it reports is "the user
+// moved me", via a callback.
+class CropBarGrip : public QWidget {
+public:
+    CropBarGrip(QWidget* bar, std::function<void()> onMoved)
+        : QWidget(bar), _bar(bar), _onMoved(std::move(onMoved)) {
+        setFixedSize(10, 22);
+        setCursor(Qt::SizeAllCursor);
+        setToolTip(ViewerWidget::tr("Drag to move the bar"));
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        QColor dot = palette().color(QPalette::WindowText);
+        dot.setAlpha(150);
+        p.setPen(Qt::NoPen);
+        p.setBrush(dot);
+        // 2 x 3 dots of 2 px, 4 px apart, centred in the widget.
+        const int x0 = (width() - 6) / 2;
+        const int y0 = (height() - 10) / 2;
+        for (int col = 0; col < 2; ++col)
+            for (int row = 0; row < 3; ++row)
+                p.drawEllipse(QRect(x0 + col * 4, y0 + row * 4, 2, 2));
+    }
+    void mousePressEvent(QMouseEvent* e) override {
+        if (e->button() != Qt::LeftButton) { QWidget::mousePressEvent(e); return; }
+        // Where inside the bar the grab happened, so the bar follows the
+        // pointer without jumping.
+        _grab = mapTo(_bar, e->pos());
+        _dragging = true;
+    }
+    void mouseMoveEvent(QMouseEvent* e) override {
+        if (!_dragging) return;
+        QWidget* host = _bar->parentWidget();
+        if (!host) return;
+        QPoint pos = mapTo(host, e->pos()) - _grab;
+        // Wholly inside the viewer, so the grip can always be reached again.
+        pos.setX(qBound(0, pos.x(), qMax(0, host->width()  - _bar->width())));
+        pos.setY(qBound(0, pos.y(), qMax(0, host->height() - _bar->height())));
+        _bar->move(pos);
+        if (_onMoved) _onMoved();
+    }
+    void mouseReleaseEvent(QMouseEvent* e) override {
+        if (e->button() == Qt::LeftButton) _dragging = false;
+    }
+
+private:
+    QWidget* _bar;
+    std::function<void()> _onMoved;
+    QPoint _grab;
+    bool _dragging = false;
+};
+
+}  // namespace
+
 void ViewerWidget::buildCropBar() {
     if (_cropBar) return;
     _cropBar = new QWidget(this);
@@ -603,9 +667,13 @@ void ViewerWidget::buildCropBar() {
     _ratioW->setValue(2);
     _ratioH->setValue(3);
 
+    auto* grip = new CropBarGrip(_cropBar, [this] { _cropBarDragged = true; });
+    grip->setPalette(pal);   // same reason as the labels below
+
     auto* layout = new QHBoxLayout(_cropBar);
-    layout->setContentsMargins(10, 6, 10, 6);
+    layout->setContentsMargins(4, 6, 10, 6);
     layout->setSpacing(6);
+    layout->addWidget(grip);
     layout->addWidget(_ratioCheck);
     layout->addWidget(_ratioW);
     auto* colon = new QLabel(QStringLiteral(":"), _cropBar);
@@ -634,6 +702,13 @@ void ViewerWidget::buildCropBar() {
 void ViewerWidget::positionCropBar() {
     if (!_cropBar) return;
     _cropBar->adjustSize();
+    if (_cropBarDragged) {
+        // The user put it somewhere; keep that, just not off the edge.
+        const QPoint p = _cropBar->pos();
+        _cropBar->move(qBound(0, p.x(), qMax(0, width()  - _cropBar->width())),
+                       qBound(0, p.y(), qMax(0, height() - _cropBar->height())));
+        return;
+    }
     _cropBar->move(qMax(0, (width() - _cropBar->width()) / 2), 12);
 }
 
