@@ -19,9 +19,10 @@ fixes bump the patch).
 ### Fixed
 
 - **Dragging images into Discord (and other Chromium-based apps) was refused.**
-  On Windows a drag from Pixee reached them as a link as well as a file list,
-  and they took it for a link. A Pixee drag now arrives exactly as one from
-  Explorer does: a file list and nothing else.
+  On Windows a drag from Pixee reached them as a link and as text as well as
+  a file list; Discord took it for a link, and web apps that accept text
+  pasted the file path next to the image. A Pixee drag now arrives exactly as
+  one from Explorer does: a file list and nothing else.
 - **The crop bar has square corners**, like everything else in the dark theme.
 
 ## [0.6.0] — 2026-10-14
