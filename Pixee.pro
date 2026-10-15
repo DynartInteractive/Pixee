@@ -85,6 +85,7 @@ SOURCES += \
     src/PreviewReader.cpp \
     src/MetadataReader.cpp \
     src/MoveFileTask.cpp \
+    src/NameFilter.cpp \
     src/RenameTask.cpp \
     src/NewFolderDialog.cpp \
     src/OpenWithDialog.cpp \
@@ -152,6 +153,7 @@ HEADERS += \
     src/PreviewReader.h \
     src/MetadataReader.h \
     src/MoveFileTask.h \
+    src/NameFilter.h \
     src/RenameTask.h \
     src/NewFolderDialog.h \
     src/OpenWithDialog.h \

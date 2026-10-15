@@ -9,6 +9,11 @@ fixes bump the patch).
 
 ### Added
 
+- **Filter the folder by name with `Ctrl + F`.** A strip opens under the
+  path bar; type and the grid keeps only the names that contain the text,
+  folders included. `*` and `?` make it a whole-name pattern (`*.png`). The
+  status bar shows how many of the folder's images are on screen, the viewer
+  walks only the matches, `Esc` clears, and entering another folder drops it.
 - **The Metadata, Adjust and Histogram panels remember separately whether
   they are open while browsing and while viewing**, the way the folder tree
   already hides in the viewer and comes back afterwards. Open the Histogram in

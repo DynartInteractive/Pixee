@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QItemSelection>
 #include <QItemSelectionModel>
 #include <QKeySequence>
@@ -21,6 +22,7 @@
 #include <QStorageInfo>
 #include <QStyle>
 #include <QSysInfo>
+#include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -405,12 +407,58 @@ void MainWindow::create() {
     // sibling page in the same stack, so swapping pages naturally hides the
     // path edit. The folder-tree dock is separate (it's docked to the main
     // window) and is hidden / restored explicitly in activateImage / dismiss.
+    // Ctrl + F filter strip: a line edit and a close button under the path
+    // bar. Part of the browser page, so the viewer never shows it; hidden
+    // until showNameFilter(), cleared and hidden again by navigateTo.
+    _filterBar = new QWidget();
+    _filterBar->setObjectName("filterBar");
+    auto fh = new QHBoxLayout(_filterBar);
+    fh->setContentsMargins(0, 0, 0, 0);
+    fh->setSpacing(4);
+    _filterLineEdit = new QLineEdit();
+    _filterLineEdit->setObjectName("filterLineEdit");
+    _filterLineEdit->setPlaceholderText(
+        tr("Filter by name (* and ? are wildcards, Esc clears)"));
+    auto* filterClose = new QToolButton();
+    filterClose->setObjectName("filterCloseButton");
+    filterClose->setText(QString::fromUtf8("\xe2\x9c\x95"));  // U+2715 multiplication x
+    filterClose->setToolTip(tr("Clear the filter and close it (Esc)"));
+    filterClose->setAutoRaise(true);
+    filterClose->setFocusPolicy(Qt::NoFocus);
+    fh->addWidget(_filterLineEdit, 1);
+    fh->addWidget(filterClose);
+    _filterBar->hide();
+    connect(_filterLineEdit, &QLineEdit::textChanged,
+            this, &MainWindow::applyNameFilter);
+    // Enter hands the keyboard to the grid, so the arrows and Enter act on
+    // what is left without reaching for the mouse. The cursor lands on the
+    // first match rather than on "..", which is where a fresh list keeps it:
+    // a second Enter should open what was filtered for, not go up a folder.
+    connect(_filterLineEdit, &QLineEdit::returnPressed, this, [this] {
+        if (!_fileListView->selectionModel()->hasSelection()) {
+            const QModelIndex root = _fileListView->rootIndex();
+            const int rows = _fileFilterModel->rowCount(root);
+            for (int i = 0; i < rows; ++i) {
+                const QModelIndex idx = _fileFilterModel->index(i, 0, root);
+                if (_fileFilterModel->data(idx, Qt::DisplayRole).toString() == "..") continue;
+                _fileListView->setCurrentIndex(idx);
+                break;
+            }
+        }
+        _fileListView->setFocus();
+    });
+    connect(filterClose, &QToolButton::clicked, this, &MainWindow::hideNameFilter);
+    auto* filterEsc = new QShortcut(QKeySequence(Qt::Key_Escape), _filterLineEdit);
+    filterEsc->setContext(Qt::WidgetShortcut);
+    connect(filterEsc, &QShortcut::activated, this, &MainWindow::hideNameFilter);
+
     auto browserPage = new QWidget();
     browserPage->setObjectName("browserPage");
     auto bv = new QVBoxLayout(browserPage);
     bv->setContentsMargins(0, 0, 0, 0);
     bv->setSpacing(4);
     bv->addWidget(_pathLineEdit);
+    bv->addWidget(_filterBar);
     bv->addWidget(_fileListView);
 
     _centerStack = new QStackedWidget();
@@ -928,6 +976,10 @@ void MainWindow::navigateTo(FileItem* item) {
         }
         dismissViewer();
     }
+    // A filter is a look at one folder, not a saved view: entering another
+    // folder (or the drive list) drops it. F5 is not a navigation, so a
+    // refresh keeps it.
+    hideNameFilter();
     _fileListView->selectionModel()->clear();
     // With no drive list there is nothing above "/" worth showing, so every
     // route that would land on the synthetic root (startup, navigateUp from
@@ -1415,7 +1467,58 @@ void MainWindow::updateStatusBar(FileItem* folder) {
             ++folders;
         }
     }
+    if (_fileFilterModel && _fileFilterModel->hasNameFilter()) {
+        // Count what survived the filter: the proxy rows under the list's
+        // root, by type, so the message says how much of the folder is on
+        // screen rather than repeating the totals above.
+        int shownImages = 0;
+        int shownFolders = 0;
+        const QModelIndex root = _fileListView->rootIndex();
+        const int rows = _fileFilterModel->rowCount(root);
+        for (int i = 0; i < rows; ++i) {
+            const QModelIndex src =
+                _fileFilterModel->mapToSource(_fileFilterModel->index(i, 0, root));
+            FileItem* c = src.isValid() ? static_cast<FileItem*>(src.internalPointer()) : nullptr;
+            if (!c) continue;
+            if (c->fileType() == FileType::Image) {
+                ++shownImages;
+            } else if (c->fileType() == FileType::Folder
+                       && c->fileInfo().fileName() != "..") {
+                ++shownFolders;
+            }
+        }
+        statusBar()->showMessage(tr("Images: %1 of %2  |  Folders: %3 of %4")
+            .arg(shownImages).arg(images).arg(shownFolders).arg(folders));
+        return;
+    }
     statusBar()->showMessage(tr("Images: %1  |  Folders: %2").arg(images).arg(folders));
+}
+
+void MainWindow::showNameFilter() {
+    // Browsing only: the strip is on the browser page, and the viewer's
+    // keys are its own.
+    if (!_filterBar || inViewer()) return;
+    _filterBar->show();
+    _filterLineEdit->setFocus();
+    _filterLineEdit->selectAll();
+}
+
+void MainWindow::hideNameFilter() {
+    if (!_filterBar || !_filterBar->isVisible()) return;
+    _filterBar->hide();
+    // Clearing the text applies the empty filter through textChanged (a
+    // no-op when it was already empty).
+    _filterLineEdit->clear();
+    if (!inViewer()) _fileListView->setFocus();
+}
+
+void MainWindow::applyNameFilter() {
+    if (!_fileFilterModel || !_fileListView) return;
+    // Scoped to the folder being shown, so the proxy never hides that
+    // folder's own row - the one the list's rootIndex points at.
+    const QModelIndex sourceRoot = _fileFilterModel->mapToSource(_fileListView->rootIndex());
+    _fileFilterModel->setNameFilter(_filterLineEdit->text(), sourceRoot);
+    updateStatusBar(currentFolder());
 }
 
 void MainWindow::createMenus() {
@@ -1454,6 +1557,10 @@ void MainWindow::createMenus() {
     QAction* refreshAction = viewMenu->addAction(tr("&Refresh"));
     refreshAction->setShortcut(QKeySequence::Refresh);  // F5 on most platforms
     connect(refreshAction, &QAction::triggered, this, &MainWindow::refreshCurrentFolder);
+
+    QAction* filterAction = viewMenu->addAction(tr("&Filter by name..."));
+    filterAction->setShortcut(QKeySequence::Find);  // Ctrl+F, Cmd+F on macOS
+    connect(filterAction, &QAction::triggered, this, &MainWindow::showNameFilter);
 
     viewMenu->addSeparator();
 

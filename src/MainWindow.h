@@ -36,6 +36,7 @@ class PathCompleter;
 class PreviewReader;
 class QAction;
 class QMenu;
+class QToolButton;
 class SettingsDialog;
 class TaskConflictPrompter;
 class TaskDockWidget;
@@ -59,6 +60,13 @@ public:
 private slots:
     void goToPathFromLineEdit();
     void refreshCurrentFolder();
+    // The Ctrl + F name filter over the central list. show opens the strip
+    // under the path bar and focuses it; hide clears and closes it; apply
+    // pushes the typed text into FileFilterModel, scoped to the folder the
+    // list is showing. Browsing only - the strip lives on the browser page.
+    void showNameFilter();
+    void hideNameFilter();
+    void applyNameFilter();
     void onTaskPathTouched(QString dir);
     void onTouchedDirsRefreshDue();
     // When a task group finishes, remember the files it added to the folder
@@ -244,6 +252,10 @@ private:
     FolderTreeView* _folderTreeView;
     QLineEdit* _pathLineEdit;
     PathCompleter* _pathCompleter;
+    // The Ctrl + F filter strip under the path bar: hidden until asked for,
+    // cleared and hidden again on every folder change (navigateTo).
+    QWidget* _filterBar = nullptr;
+    QLineEdit* _filterLineEdit = nullptr;
     QStackedWidget* _centerStack;
     ViewerWidget* _viewerWidget;
     // Persistent user intent for the tasks dock — what the View → Tasks

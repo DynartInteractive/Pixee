@@ -16,4 +16,5 @@ SUBDIRS = \
     Metadata \
     BatchRename \
     FolderSuggester \
-    DragPaths
+    DragPaths \
+    NameFilter

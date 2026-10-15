@@ -1,8 +1,10 @@
 #ifndef FILEFILTERMODEL_H
 #define FILEFILTERMODEL_H
 
+#include <QPersistentModelIndex>
 #include <QSortFilterProxyModel>
 #include "FileType.h"
+#include "NameFilter.h"
 
 class FileItem;
 
@@ -27,11 +29,22 @@ public:
     // are never inverted.
     void setSortAscending(bool ascending);
     bool sortAscending() const { return _sortAscending; }
+
+    // The Ctrl + F name filter. It applies to the children of `sourceParent`
+    // only - the folder the list is showing - and never to that folder's own
+    // row in *its* parent, which the view's rootIndex points at: hiding that
+    // row would invalidate the root and empty the list. ".." always passes.
+    // An empty pattern clears the filter.
+    void setNameFilter(const QString& pattern, const QModelIndex& sourceParent);
+    const NameFilter& nameFilter() const { return _nameFilter; }
+    bool hasNameFilter() const { return !_nameFilter.isEmpty(); }
 private:
     QList<FileType> _acceptedFileTypes;
     bool _showDotDot = false;
     SortKey _sortKey = SortKey::Name;
     bool _sortAscending = true;
+    NameFilter _nameFilter;
+    QPersistentModelIndex _nameFilterParent;
 };
 
 #endif // FILEFILTERMODEL_H

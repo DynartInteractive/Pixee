@@ -39,6 +39,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Thumbnail pipeline** — local SQLite cache, four-worker decode pool, viewport-driven priority queue (top-left → bottom-right), per-session negative caching, and background fill of the rest of the folder once the visible cells are done. **Refresh thumbnail** in the context menu rebuilds one from the file's current bytes — the escape hatch for a thumbnail cached from a file that was still being written (a long export). Works on folders too, rebuilding their index overlay.
 - **Folder index thumbnails** — the alphabetically-first image inside a folder is overlaid on its folder icon, with a configurable margin / border / vertical offset. The pick uses the file list's own locale-aware, case-insensitive ordering, so the overlay always matches the folder's first cell — and stays alphabetical however the list itself is sorted.
 - **Sorting** — `View → Sort by` orders the list by name, creation date or modification date, ascending or descending (two independent, sticky choices). `..` stays first and folders stay grouped ahead of files in A→Z order; the key and direction apply to files only. The folder tree and the index overlay are always name-sorted.
+- **Name filter** — `Ctrl + F` opens a filter strip under the path bar. Type, and the grid keeps only the names that contain the text, folders included (`..` stays). A `*` or `?` turns it into a whole-name pattern: `*.png`, `IMG_2?.*`. The status bar says how many of the folder's images are showing, and the viewer's prev / next walk only the matches, so a filter plus the viewer is a quick "show me these". `Enter` moves the focus to the grid, `Esc` clears, and the filter is dropped when you enter another folder (`F5` keeps it).
 - **Image viewer** in the main window — async chunked loading with a cached-thumbnail placeholder, fit / 1:1 / discrete zoom (`0.1×` – `8×`), pan with `Space + LMB` or `Middle-drag`, `F11` fullscreen, and a 5-image preload cache for instant prev/next.
 
   <p align="center">
@@ -200,6 +201,7 @@ The manifest builds from the working tree, so no tag or commit is needed to try 
 | Shortcut | Action |
 |---|---|
 | `F5` | Refresh current folder |
+| `Ctrl + F` | Filter the list by name (`Esc` clears, `Enter` moves to the grid) |
 | `F11` | Toggle fullscreen |
 | `Enter` / Double-click | Open folder or image |
 | `Ctrl + C` | Copy selection to the clipboard |

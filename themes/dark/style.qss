@@ -9,6 +9,17 @@
 	padding: 4px 5px 4px 5px;
 	border: none;
 }
+/* The Ctrl + F filter strip sits under the path bar. Its line edit is the
+   plain QLineEdit below (same 26px as the bar); the close button is a bare
+   glyph that lights up on hover like the dock buttons. */
+#filterCloseButton {
+	color: #ccc;
+	border: none;
+	padding: 2px 6px;
+}
+#filterCloseButton:hover {
+	background-color: #555;
+}
 QMainWindow {
 	background-color: #333;
 }

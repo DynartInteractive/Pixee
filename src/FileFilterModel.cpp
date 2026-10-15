@@ -38,7 +38,30 @@ bool FileFilterModel::filterAcceptsRow(int row, const QModelIndex &index) const 
     if (item->fileInfo().fileName() == "..") {
         return _showDotDot && item->parent()->parent() != fileModel->rootItem();
     }
-    return _acceptedFileTypes.contains(item->fileType());
+    if (!_acceptedFileTypes.contains(item->fileType())) {
+        return false;
+    }
+    if (!_nameFilter.isEmpty() && index == _nameFilterParent) {
+        return _nameFilter.matches(item->fileInfo().fileName());
+    }
+    return true;
+}
+
+void FileFilterModel::setNameFilter(const QString& pattern, const QModelIndex& sourceParent) {
+    const NameFilter next(pattern);
+    if (next.isEmpty() && _nameFilter.isEmpty()) return;  // clear on clear: nothing to redo
+    // Qt 6.10 replaced invalidateRowsFilter() with a begin/end pair around
+    // the state change; the older call is kept for the Qt 6.6 floor.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    beginFilterChange();
+#endif
+    _nameFilter = next;
+    _nameFilterParent = sourceParent;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
+    invalidateRowsFilter();
+#endif
 }
 
 void FileFilterModel::setAcceptedFileTypes(const QList<FileType>& acceptedFileTypes) {
