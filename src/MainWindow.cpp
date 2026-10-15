@@ -434,8 +434,9 @@ void MainWindow::create() {
                                | QDockWidget::DockWidgetFloatable
                                | QDockWidget::DockWidgetMovable);
     addDockWidget(Qt::RightDockWidgetArea, _metadataDock);
-    // Hidden by default — opt-in via View → Metadata; sticky across runs.
-    _metadataDock->setVisible(QSettings().value("metadataDockEnabled", false).toBool());
+    // Hidden by default — opt-in via View → Metadata; sticky across runs,
+    // separately for browsing and for the viewer (applySideDocks).
+    _metadataDock->setVisible(false);
     // Reading is gated on the dock being visible, so refresh the current
     // context whenever the user reveals it.
     connect(_metadataDock, &QDockWidget::visibilityChanged, this,
@@ -451,7 +452,7 @@ void MainWindow::create() {
                              | QDockWidget::DockWidgetFloatable
                              | QDockWidget::DockWidgetMovable);
     addDockWidget(Qt::RightDockWidgetArea, _adjustDock);
-    _adjustDock->setVisible(QSettings().value("adjustDockEnabled", false).toBool());
+    _adjustDock->setVisible(false);
 
     // Panel -> viewer, and back again. The viewer clamps and de-duplicates, and
     // its own setAdjustments does not echo a value the panel already holds, so
@@ -473,8 +474,7 @@ void MainWindow::create() {
                                 | QDockWidget::DockWidgetFloatable
                                 | QDockWidget::DockWidgetMovable);
     addDockWidget(Qt::RightDockWidgetArea, _histogramDock);
-    _histogramDock->setVisible(
-        QSettings().value("histogramDockEnabled", false).toBool());
+    _histogramDock->setVisible(false);
 
     // The viewer only keeps a preview-resolution copy of its pixels around
     // when something wants one. An adjustment in progress is one reason; this
@@ -624,9 +624,9 @@ void MainWindow::create() {
     QSettings settings;
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
     restoreState(settings.value("mainWindowState").toByteArray());
-    // restoreState re-applies the dock visibility from the saved blob, which
-    // would override the metadataDockEnabled intent applied at construction.
-    _metadataDock->setVisible(settings.value("metadataDockEnabled", false).toBool());
+    // restoreState re-applies the dock visibility from the saved blob; the
+    // side docks' intent is ours (per mode), so it is applied after it.
+    applySideDocks();
 
     // restoreState rebuilds the whole dock layout from saved data, so a dock
     // added since that data was written is unknown to it and gets dropped out
@@ -658,10 +658,7 @@ void MainWindow::create() {
         settings.setValue("rightDockLayout", kRightDockLayout);
         splitDockWidget(_metadataDock, _adjustDock, Qt::Vertical);
         splitDockWidget(_adjustDock, _histogramDock, Qt::Vertical);
-        _adjustDock->setVisible(
-            settings.value("adjustDockEnabled", false).toBool());
-        _histogramDock->setVisible(
-            settings.value("histogramDockEnabled", false).toBool());
+        applySideDocks();
     }
 
     // If a previous session's saved state left the folders dock detached
@@ -1532,7 +1529,7 @@ void MainWindow::createMenus() {
     _metadataToggleAction->setCheckable(true);
     _metadataToggleAction->setChecked(_metadataDock->isVisible());
     connect(_metadataToggleAction, &QAction::toggled, this, [this](bool on) {
-        QSettings().setValue("metadataDockEnabled", on);
+        recordSideDock("metadataDockEnabled", on);
         _metadataDock->setVisible(on);
         if (on) _metadataDock->raise();
     });
@@ -1546,7 +1543,7 @@ void MainWindow::createMenus() {
                 // another dock also report "not visible" but leave the dock
                 // itself un-hidden — those aren't the user's intent.
                 if (visible || _metadataDock->isHidden())
-                    QSettings().setValue("metadataDockEnabled", visible);
+                    recordSideDock("metadataDockEnabled", visible);
             });
     viewMenu->addAction(_metadataToggleAction);
 
@@ -1555,7 +1552,7 @@ void MainWindow::createMenus() {
     _adjustToggleAction->setCheckable(true);
     _adjustToggleAction->setChecked(_adjustDock->isVisible());
     connect(_adjustToggleAction, &QAction::toggled, this, [this](bool on) {
-        QSettings().setValue("adjustDockEnabled", on);
+        recordSideDock("adjustDockEnabled", on);
         _adjustDock->setVisible(on);
         if (on) _adjustDock->raise();
     });
@@ -1563,6 +1560,8 @@ void MainWindow::createMenus() {
             [this](bool visible) {
                 const QSignalBlocker block(_adjustToggleAction);
                 _adjustToggleAction->setChecked(visible);
+                if (visible || _adjustDock->isHidden())
+                    recordSideDock("adjustDockEnabled", visible);
             });
     viewMenu->addAction(_adjustToggleAction);
 
@@ -1571,7 +1570,7 @@ void MainWindow::createMenus() {
     _histogramToggleAction->setCheckable(true);
     _histogramToggleAction->setChecked(_histogramDock->isVisible());
     connect(_histogramToggleAction, &QAction::toggled, this, [this](bool on) {
-        QSettings().setValue("histogramDockEnabled", on);
+        recordSideDock("histogramDockEnabled", on);
         _histogramDock->setVisible(on);
         if (on) _histogramDock->raise();
     });
@@ -1579,6 +1578,8 @@ void MainWindow::createMenus() {
             [this](bool visible) {
                 const QSignalBlocker block(_histogramToggleAction);
                 _histogramToggleAction->setChecked(visible);
+                if (visible || _histogramDock->isHidden())
+                    recordSideDock("histogramDockEnabled", visible);
             });
     viewMenu->addAction(_histogramToggleAction);
 
@@ -1869,6 +1870,8 @@ void MainWindow::activateImage(FileItem* item) {
     _dockWasVisible = _dockWidget->isVisible();
     if (_dockWasVisible) _dockWidget->hide();
     _centerStack->setCurrentWidget(_viewerWidget);
+    // Now in viewer mode: the side docks switch to their viewer intent.
+    applySideDocks();
     _viewerWidget->setFocus();
 
     // Free SMB bandwidth for the full-res load. Thumbnails resume when
@@ -2326,6 +2329,37 @@ void MainWindow::viewerNext() {
     showViewerImageAt(_viewerIndex + 1);
 }
 
+bool MainWindow::inViewer() const {
+    return _centerStack && _viewerWidget && _centerStack->currentWidget() == _viewerWidget;
+}
+
+QString MainWindow::sideDockKey(const char* base) const {
+    return inViewer() ? QString::fromLatin1(base) + QLatin1String("Viewer")
+                      : QString::fromLatin1(base);
+}
+
+void MainWindow::recordSideDock(const char* base, bool visible) {
+    QSettings().setValue(sideDockKey(base), visible);
+}
+
+void MainWindow::applySideDocks() {
+    const QSettings s;
+    const auto want = [&](const char* base) {
+        // The viewer's intent starts out as a copy of the browsing one, so an
+        // existing install sees no change until it closes or opens a dock in
+        // one mode and not the other.
+        const QString browse = QString::fromLatin1(base);
+        return inViewer()
+            ? s.value(browse + QLatin1String("Viewer"), s.value(browse, false)).toBool()
+            : s.value(browse, false).toBool();
+    };
+    // setVisible fires visibilityChanged, whose handlers record the value
+    // back under the same key — a no-op write, by design.
+    if (_metadataDock)  _metadataDock->setVisible(want("metadataDockEnabled"));
+    if (_adjustDock)    _adjustDock->setVisible(want("adjustDockEnabled"));
+    if (_histogramDock) _histogramDock->setVisible(want("histogramDockEnabled"));
+}
+
 void MainWindow::dismissViewer() {
     if (!_centerStack) return;
     // Esc / Enter dismissing the viewer also exits fullscreen if we got
@@ -2352,6 +2386,7 @@ void MainWindow::dismissViewer() {
     _viewerImageCache.clear();
     _viewerCacheOrder.clear();
     if (_dockWasVisible) _dockWidget->show();
+    applySideDocks();   // back to the browsing intent
     // clear() above emitted a null preview, which blanked the histogram; hand
     // it back to whatever the file list has selected.
     scheduleHistogramForSelection();
@@ -2439,6 +2474,7 @@ void MainWindow::exit() {
     if (_centerStack && _centerStack->currentIndex() != 0) {
         _centerStack->setCurrentIndex(0);
         if (_dockWasVisible) _dockWidget->show();
+        applySideDocks();
     }
 
     // Write settings

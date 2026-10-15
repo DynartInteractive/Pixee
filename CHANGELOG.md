@@ -7,6 +7,15 @@ fixes bump the patch).
 
 ## [Unreleased]
 
+### Added
+
+- **The Metadata, Adjust and Histogram panels remember separately whether
+  they are open while browsing and while viewing**, the way the folder tree
+  already hides in the viewer and comes back afterwards. Open the Histogram in
+  the viewer and it stays there for every image, but the grid gets its full
+  width back when you leave; close Metadata while browsing and it is still
+  there the next time you open an image.
+
 ### Fixed
 
 - **Dragging images into Discord (and other Chromium-based apps) was refused.**

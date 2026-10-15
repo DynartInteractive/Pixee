@@ -261,6 +261,21 @@ private:
     // activated, so dismissing the viewer doesn't unhide a dock the user
     // had explicitly closed.
     bool _dockWasVisible = true;
+
+    // The three side docks (Metadata / Adjust / Histogram) keep one
+    // visibility for browsing and another for the viewer, the way the
+    // Folders dock is hidden in the viewer and back afterwards. The
+    // browsing intent lives under "<dock>DockEnabled", the viewer's under
+    // "<dock>DockEnabledViewer"; sideDockKey picks by the current page, so
+    // the View-menu toggles and the docks' X buttons always record the
+    // intent for the mode the user is looking at.
+    bool inViewer() const;
+    QString sideDockKey(const char* base) const;
+    // Read the current mode's intent for all three and show/hide to match.
+    // Called at startup, on entering the viewer and on leaving it.
+    void applySideDocks();
+    // One-way: record `visible` as the current mode's intent for `base`.
+    void recordSideDock(const char* base, bool visible);
     // Ordered list of image paths in the folder the viewer was opened
     // from (in the file-list view's display order), and the index of the
     // currently-shown image inside that list.
