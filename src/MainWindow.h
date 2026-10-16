@@ -108,6 +108,8 @@ private slots:
     void copyViewedImageToClipboard();
     void cutFileListSelectionToClipboard();
     void cutViewedImageToClipboard();
+    void copyFileListSelectionPathsAsText();
+    void copyViewedImagePathAsText();
     void pasteIntoCurrentFolder();
     void pasteIntoViewerImageFolder();
     void pasteIntoSelectedTreeFolder();

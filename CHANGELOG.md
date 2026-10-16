@@ -9,6 +9,11 @@ fixes bump the patch).
 
 ### Added
 
+- **Copy path.** The right-click menu of the file list and the viewer gains
+  **Copy path** (`Ctrl + Shift + C`), which puts the full path on the
+  clipboard as plain text, with no file attached: paste it into a chat, a
+  terminal or a file dialog and you get the path, not a copy of the file. A
+  multi-selection copies one path per line. A toast shows what was copied.
 - **Filter the folder by name with `Ctrl + F`.** A strip opens under the
   path bar; type and the grid keeps only the names that contain the text,
   folders included. `*` and `?` make it a whole-name pattern (`*.png`). The

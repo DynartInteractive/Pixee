@@ -92,6 +92,14 @@ public:
     // menu item and the window-wide Ctrl+X handlers.
     static void cutPathsToClipboard(const QStringList& paths);
 
+    // Puts the path(s) on the clipboard as plain text only — native
+    // separators, one per line — with no file payload, so pasting into a
+    // chat, a terminal or a "file name" box gives the path and pasting in
+    // Explorer does nothing. Shows a toast naming what was copied. Used by
+    // the "Copy path" menu item and the window-wide Ctrl+Shift+C handlers.
+    static void copyPathsAsTextToClipboard(const QStringList& paths,
+                                           QWidget* toastParent);
+
     // Post-drop helper for external drag-out with MoveAction. Enqueues a
     // delete-only TaskGroup for the source paths (same expansion as the
     // Delete menu — folders → per-file DeleteFileTask + FolderCleanupTask)
@@ -154,6 +162,7 @@ public:
 private:
     void doCopyToClipboard();
     void doCutToClipboard();
+    void doCopyPathAsText();
     void doPaste();
     void doCopy(const QString& destFolder);
     void doMove(const QString& destFolder);

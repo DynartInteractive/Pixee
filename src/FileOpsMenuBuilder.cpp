@@ -169,6 +169,13 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     clipCut->setShortcut(QKeySequence::Cut);  // visual hint only, see Copy above
     connect(clipCut, &QAction::triggered, this, [this]() { doCutToClipboard(); });
 
+    // Copy path — the path as text and nothing else, for places that want
+    // to be told where a file is rather than handed the file.
+    QAction* copyPath = menu->addAction(_paths.size() == 1 ? tr("Copy path")
+                                                           : tr("Copy paths"));
+    copyPath->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C));  // hint, see Copy
+    connect(copyPath, &QAction::triggered, this, [this]() { doCopyPathAsText(); });
+
     if (!_pasteDestination.isEmpty()) addPaste(menu);
 
     menu->addSeparator();
@@ -245,6 +252,10 @@ void FileOpsMenuBuilder::doCopyToClipboard() {
 
 void FileOpsMenuBuilder::doCutToClipboard() {
     cutPathsToClipboard(_paths);
+}
+
+void FileOpsMenuBuilder::doCopyPathAsText() {
+    copyPathsAsTextToClipboard(_paths, _dialogParent);
 }
 
 void FileOpsMenuBuilder::doPaste() {
@@ -427,6 +438,24 @@ void FileOpsMenuBuilder::copyPathsToClipboard(const QStringList& paths) {
 void FileOpsMenuBuilder::cutPathsToClipboard(const QStringList& paths) {
     if (QMimeData* mime = buildPathsMimeData(paths, /*cut=*/true)) {
         QApplication::clipboard()->setMimeData(mime);
+    }
+}
+
+void FileOpsMenuBuilder::copyPathsAsTextToClipboard(const QStringList& paths,
+                                                    QWidget* toastParent) {
+    if (paths.isEmpty()) return;
+    QStringList textPaths;
+    textPaths.reserve(paths.size());
+    for (const QString& p : paths) textPaths.append(QDir::toNativeSeparators(p));
+    // Deliberately setText rather than buildPathsMimeData: no URLs, so the
+    // clipboard holds nothing Explorer would paste as a file.
+    QApplication::clipboard()->setText(textPaths.join('\n'));
+    if (toastParent) {
+        Toast::show(toastParent,
+                    paths.size() == 1
+                        ? tr("Copied %1").arg(textPaths.first())
+                        : tr("Copied %n path(s)", nullptr, paths.size()),
+                    Toast::Info, 2000);
     }
 }
 

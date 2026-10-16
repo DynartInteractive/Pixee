@@ -229,6 +229,20 @@ void MainWindow::create() {
     QObject::connect(viewerCutShortcut, &QShortcut::activated,
                      this, &MainWindow::cutViewedImageToClipboard);
 
+    // Ctrl+Shift+C — the path(s) as plain text, no file payload. Same
+    // two-context wiring as Ctrl+C.
+    auto* listCopyPathShortcut =
+        new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C), _fileListView);
+    listCopyPathShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(listCopyPathShortcut, &QShortcut::activated,
+                     this, &MainWindow::copyFileListSelectionPathsAsText);
+
+    auto* viewerCopyPathShortcut =
+        new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C), _viewerWidget);
+    viewerCopyPathShortcut->setContext(Qt::WidgetShortcut);
+    QObject::connect(viewerCopyPathShortcut, &QShortcut::activated,
+                     this, &MainWindow::copyViewedImagePathAsText);
+
     // Ctrl+V — paste clipboard contents into the relevant folder.
     auto* listPasteShortcut = new QShortcut(QKeySequence::Paste, _fileListView);
     listPasteShortcut->setContext(Qt::WidgetShortcut);
@@ -2642,6 +2656,15 @@ void MainWindow::copyFileListSelectionToClipboard() {
 void MainWindow::copyViewedImageToClipboard() {
     if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
     FileOpsMenuBuilder::copyPathsToClipboard({_viewerImagePaths.at(_viewerIndex)});
+}
+
+void MainWindow::copyFileListSelectionPathsAsText() {
+    FileOpsMenuBuilder::copyPathsAsTextToClipboard(_fileListView->selectionPaths().paths, this);
+}
+
+void MainWindow::copyViewedImagePathAsText() {
+    if (_viewerIndex < 0 || _viewerIndex >= _viewerImagePaths.size()) return;
+    FileOpsMenuBuilder::copyPathsAsTextToClipboard({_viewerImagePaths.at(_viewerIndex)}, this);
 }
 
 void MainWindow::cutFileListSelectionToClipboard() {

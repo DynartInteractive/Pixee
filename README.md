@@ -78,7 +78,7 @@ See [all releases](https://github.com/DynartInteractive/Pixee/releases) for othe
 - **Format support** for everything Qt's image plugins can decode — JPEG, PNG, WebP, GIF, BMP, ICO, plus whatever extra plugins (HEIC, AVIF, PSD via [`kimageformats`](https://invent.kde.org/frameworks/kimageformats), …) are installed against your Qt build. ICO files pick the highest-area, highest-bit-depth sub-image. Windows MSVC recipe: [`docs/windows-extra-image-formats.md`](docs/windows-extra-image-formats.md).
 - **Pixel-art aware** — nearest-neighbor upscaling for images smaller than the cell, smooth scaling down. Transparent images render over a configurable checker pattern.
 - **SMB-friendly** — chunked reads with cooperative abort, off-GUI enumeration, no `QFileSystemModel` / `QFileDialog`. Built for image folders sitting on a network share.
-- **File operations** — Copy / Cut / Paste / Move / Rename / Delete / New folder through a task pipeline. The conflict prompt shows the two clashing files **side by side** — Existing vs Incoming, each with a thumbnail and dimensions / size / date — so you pick Skip / Rename / Overwrite by eye rather than by path. Moves and renames **keep the cached thumbnail** (the row is repointed, not regenerated), and a finished batch selects the files it added and scrolls them into view (toggle in Settings). **Overwrite never loses the existing file on failure**: the replacement is written in full first, or the old file is set aside and put back if the move fails. A move into the folder an item already lives in is refused, not treated as a conflict. **Delete** moves items to the Recycle Bin / Trash. On a drive without one (typical for network shares) it fails with a message instead of deleting permanently; `Shift + Del` deletes permanently. Quitting while file operations are running asks first.
+- **File operations** — Copy / Cut / Paste / Move / Rename / Delete / New folder through a task pipeline. **Copy path** (`Ctrl + Shift + C`) puts the full path on the clipboard as text alone, for a chat, a terminal or a file dialog. The conflict prompt shows the two clashing files **side by side** — Existing vs Incoming, each with a thumbnail and dimensions / size / date — so you pick Skip / Rename / Overwrite by eye rather than by path. Moves and renames **keep the cached thumbnail** (the row is repointed, not regenerated), and a finished batch selects the files it added and scrolls them into view (toggle in Settings). **Overwrite never loses the existing file on failure**: the replacement is written in full first, or the old file is set aside and put back if the move fails. A move into the folder an item already lives in is refused, not treated as a conflict. **Delete** moves items to the Recycle Bin / Trash. On a drive without one (typical for network shares) it fails with a message instead of deleting permanently; `Shift + Del` deletes permanently. Quitting while file operations are running asks first.
 - **Batch rename** (`Tools → Batch rename…`) — renames the whole selection at once: find & replace (optionally case-sensitive), a `{name}` / `{n}` pattern with a configurable Start / Step (`{n:3}` zero-pads to three digits; prefix and suffix fall out of typing around `{name}`), and keep-extension. A live before→after table previews every name and flags clashes — two files heading for the same name is blocked, a name that already exists on disk prompts per file. Same task pipeline, so the same progress dock and conflict handling.
 
   <p align="center">
@@ -206,6 +206,7 @@ The manifest builds from the working tree, so no tag or commit is needed to try 
 | `Enter` / Double-click | Open folder or image |
 | `Ctrl + C` | Copy selection to the clipboard |
 | `Ctrl + X` | Cut selection to the clipboard (next paste moves) |
+| `Ctrl + Shift + C` | Copy the full path(s) of the selection as text |
 | `Ctrl + V` | Paste into the current folder (or, with the folder tree focused, into the folder selected there) |
 | `Del` / `Shift + Del` | Delete the selection to the recycle bin / permanently (with the folder tree focused, deletes the folder selected there and steps up to its parent) |
 | `Ctrl + Shift + S` | Save As… (export the selected image) |
@@ -230,6 +231,7 @@ The manifest builds from the working tree, so no tag or commit is needed to try 
 | `F11` | Toggle fullscreen |
 | `Esc` / `Enter` / Double-click | Return to the file list (prompts if there's an unsaved edit) |
 | `Ctrl + C` / `Ctrl + X` / `Ctrl + V` | Copy / Cut / Paste the current image |
+| `Ctrl + Shift + C` | Copy the full path of the current image as text |
 | `Ctrl + S` | Save (overwrite the original with the edited image) |
 | `Ctrl + Shift + S` | Save As… (export the current image) |
 | Right-click | Context menu — `Edit ▸` (rotate / flip / crop / adjust colours), `Zoom ▸`, **Copy to…** |
