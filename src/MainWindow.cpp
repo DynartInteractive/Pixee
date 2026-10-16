@@ -581,6 +581,20 @@ void MainWindow::create() {
     connect(_pixee->taskManager(), &TaskManager::groupFinished,
             this, &MainWindow::onGroupFinished);
 
+    // The counts are first written by navigateTo, before the folder's
+    // listing has arrived, so a folder entered for the first time (startup
+    // included) showed "Images: 0 | Folders: 0" until something else
+    // recounted. Recount when the listing lands, if it is still the folder
+    // on screen; folder-tree pre-fetches populate other folders too.
+    connect(_fileModel, &FileModel::folderPopulated, this,
+            [this](const QString& dirPath) {
+                FileItem* folder = currentFolder();
+                if (!folder || folder == _fileModel->rootItem()) return;
+                if (QDir::cleanPath(folder->fileInfo().filePath())
+                        != QDir::cleanPath(dirPath)) return;
+                updateStatusBar(folder);
+            });
+
     // Status bar reflects the post-refresh contents. Fires for every
     // resolved refresh (changed or not — we skip the FileItem walk when
     // we know the count didn't shift, but the 'changed=false' case

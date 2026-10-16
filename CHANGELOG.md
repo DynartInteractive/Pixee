@@ -28,6 +28,10 @@ fixes bump the patch).
 
 ### Fixed
 
+- **The status bar said "Images: 0 | Folders: 0" for a folder entered for
+  the first time**, startup included, until something made it recount. The
+  counts were written before the folder's listing had arrived; they now
+  update when it lands.
 - **Dragging images into Discord (and other Chromium-based apps) was refused.**
   On Windows a drag from Pixee reached them as a link and as text as well as
   a file list; Discord took it for a link, and web apps that accept text
