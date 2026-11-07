@@ -9,6 +9,11 @@ fixes bump the patch).
 
 ### Added
 
+- **Single-key panel toggles.** `F`, `M`, `A`, `H` and `T` show or hide the
+  Folders, Metadata, Adjust, Histogram and Tasks panels, while browsing and in
+  the viewer alike; the letters are shown in the `View` menu. To make room,
+  the viewer's **flip horizontal moved from `H` to `Shift + H`** (flip
+  vertical stays on `V`).
 - **Image position in the viewer.** The right end of the status bar shows
   where you are in the folder (`3 / 10`) while an image is open. It counts
   the images the viewer walks, so a name filter narrows it, and a delete or

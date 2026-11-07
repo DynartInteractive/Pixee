@@ -955,7 +955,11 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
         event->accept();
         return;
     case Qt::Key_H:
+        // Shift+H, not H: the plain letter is the Histogram dock's
+        // window-wide toggle (MainWindow's View menu), which the shortcut
+        // system takes before this handler would see it.
         if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) break;
+        if (!(event->modifiers() & Qt::ShiftModifier)) break;
         flipHorizontal();
         event->accept();
         return;

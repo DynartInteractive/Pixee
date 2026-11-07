@@ -1664,8 +1664,17 @@ void MainWindow::createMenus() {
     // time Qt thinks the dock isn't properly parented to the main window
     // (which can happen after a saveState/restoreState round-trip from a
     // weird previous run).
+    // The five dock toggles sit on plain letters (F / M / A / H / T), the
+    // way the viewer's edit keys do. A letter shortcut is window-wide, so it
+    // wins over a widget's keyPressEvent unless that widget claims the key
+    // through ShortcutOverride — line edits and spin boxes do, so typing in
+    // the path bar, the filter strip or an Adjust spin box is unaffected;
+    // the file list's type-to-search does not, so those five letters no
+    // longer jump to a name. The viewer's flip horizontal moved to Shift+H
+    // to make room (see ViewerWidget::keyPressEvent).
     QAction* foldersToggle = new QAction(tr("&Folders"), this);
     foldersToggle->setCheckable(true);
+    foldersToggle->setShortcut(QKeySequence(Qt::Key_F));
     foldersToggle->setChecked(_dockWidget->isVisible());
     connect(foldersToggle, &QAction::toggled, this, [this](bool on) {
         _dockWidget->setVisible(on);
@@ -1688,6 +1697,7 @@ void MainWindow::createMenus() {
     // panel stays shown/hidden across runs.
     _metadataToggleAction = new QAction(tr("&Metadata"), this);
     _metadataToggleAction->setCheckable(true);
+    _metadataToggleAction->setShortcut(QKeySequence(Qt::Key_M));
     _metadataToggleAction->setChecked(_metadataDock->isVisible());
     connect(_metadataToggleAction, &QAction::toggled, this, [this](bool on) {
         recordSideDock("metadataDockEnabled", on);
@@ -1711,6 +1721,7 @@ void MainWindow::createMenus() {
     // Adjust dock toggle - same two-way binding and stickiness as Metadata.
     _adjustToggleAction = new QAction(tr("&Adjust"), this);
     _adjustToggleAction->setCheckable(true);
+    _adjustToggleAction->setShortcut(QKeySequence(Qt::Key_A));
     _adjustToggleAction->setChecked(_adjustDock->isVisible());
     connect(_adjustToggleAction, &QAction::toggled, this, [this](bool on) {
         recordSideDock("adjustDockEnabled", on);
@@ -1729,6 +1740,7 @@ void MainWindow::createMenus() {
     // Histogram dock toggle - same two-way binding and stickiness again.
     _histogramToggleAction = new QAction(tr("&Histogram"), this);
     _histogramToggleAction->setCheckable(true);
+    _histogramToggleAction->setShortcut(QKeySequence(Qt::Key_H));
     _histogramToggleAction->setChecked(_histogramDock->isVisible());
     connect(_histogramToggleAction, &QAction::toggled, this, [this](bool on) {
         recordSideDock("histogramDockEnabled", on);
@@ -1746,6 +1758,7 @@ void MainWindow::createMenus() {
 
     _tasksToggleAction = new QAction(tr("&Tasks"), this);
     _tasksToggleAction->setCheckable(true);
+    _tasksToggleAction->setShortcut(QKeySequence(Qt::Key_T));
     _tasksToggleAction->setChecked(_userTasksDockEnabled);
     connect(_tasksToggleAction, &QAction::toggled, this, [this](bool on) {
         _userTasksDockEnabled = on;
@@ -2382,7 +2395,7 @@ void MainWindow::populateViewerEditMenu(QMenu* editMenu) {
     addEdit(tr("Rotate right"),    QStringLiteral("R"),       &ViewerWidget::rotateRight);
     addEdit(tr("Rotate left"),     QStringLiteral("Shift+R"), &ViewerWidget::rotateLeft);
     editMenu->addSeparator();
-    addEdit(tr("Flip horizontal"), QStringLiteral("H"),       &ViewerWidget::flipHorizontal);
+    addEdit(tr("Flip horizontal"), QStringLiteral("Shift+H"), &ViewerWidget::flipHorizontal);
     addEdit(tr("Flip vertical"),   QStringLiteral("V"),       &ViewerWidget::flipVertical);
     editMenu->addSeparator();
     addEdit(tr("Crop..."),         QStringLiteral("C"),       &ViewerWidget::beginCrop);

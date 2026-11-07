@@ -203,6 +203,7 @@ The manifest builds from the working tree, so no tag or commit is needed to try 
 | `F5` | Refresh current folder |
 | `Ctrl + F` | Filter the list by name (`Esc` clears, `Enter` moves to the grid) |
 | `F11` | Toggle fullscreen |
+| `F` / `M` / `A` / `H` / `T` | Show / hide the Folders / Metadata / Adjust / Histogram / Tasks panel |
 | `Enter` / Double-click | Open folder or image |
 | `Ctrl + C` | Copy selection to the clipboard |
 | `Ctrl + X` | Cut selection to the clipboard (next paste moves) |
@@ -225,10 +226,11 @@ The manifest builds from the working tree, so no tag or commit is needed to try 
 | `Space` + Left-drag | Pan |
 | Middle-drag | Pan |
 | `R` / `Shift + R` | Rotate right / left |
-| `H` / `V` | Flip horizontal / vertical |
+| `Shift + H` / `V` | Flip horizontal / vertical |
 | `C` | Crop — drag a rectangle, drag the handles to resize or the inside to move it, then `Enter` to apply / `Esc` to cancel |
 | `B` (hold) | Compare with the original — temporarily hides any pending colour adjustment |
 | `F11` | Toggle fullscreen |
+| `F` / `M` / `A` / `H` / `T` | Show / hide the Folders / Metadata / Adjust / Histogram / Tasks panel |
 | `Esc` / `Enter` / Double-click | Return to the file list (prompts if there's an unsaved edit) |
 | `Ctrl + C` / `Ctrl + X` / `Ctrl + V` | Copy / Cut / Paste the current image |
 | `Ctrl + Shift + C` | Copy the full path of the current image as text |
