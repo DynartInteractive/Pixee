@@ -9,6 +9,12 @@ fixes bump the patch).
 
 ### Added
 
+- **See and change the remembered Copy to / Move to folders.** The context
+  menu's `Copy to "…"` / `Move to "…"` items only had room for the folder's
+  name; the full path was in the registry and nowhere else. Hovering the item
+  now shows the full path in a tooltip, and `Settings → File operations` lists
+  both folders in full, where they can be pointed elsewhere or cleared (a
+  cleared one hides its menu item).
 - **Copy path.** The right-click menu of the file list and the viewer gains
   **Copy path** (`Ctrl + Shift + C`), which puts the full path on the
   clipboard as plain text, with no file attached: paste it into a chat, a

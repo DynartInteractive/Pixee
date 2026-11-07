@@ -81,6 +81,15 @@ constexpr const char* kConfirmTrash = "fileOps/confirmTrash";
 constexpr const char* kSaveQuality = "fileOps/saveQuality";
 constexpr int kSaveQualityDefault = 92;
 
+// string — the folder behind the context menu's `Copy to "<name>"` /
+// `Move to "<name>"` items; set by the native folder picker behind Copy to… /
+// Move to…, and editable on the Settings → File operations page, where an
+// empty value hides the item. Top-level keys (no group): they predate the
+// grouped layout and are kept as they are so an existing install keeps its
+// destinations. Stored with forward slashes; the dialog shows native ones.
+constexpr const char* kLastCopyToPath = "lastCopyToPath";
+constexpr const char* kLastMoveToPath = "lastMoveToPath";
+
 // ---- View menu (not in the Settings window) ---------------------------------
 
 // string — list-view sort key: "name" (default), "created", or "modified".

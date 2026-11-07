@@ -45,6 +45,7 @@ struct SettingDef {
     bool restart = false;                      // read once at startup
     QString enabledByKey;                      // enabled only while that Choice …
     QString enabledByValue;                    // … holds this stored value
+    QString dialogTitle;                       // Path only: the Browse… picker's title
 };
 struct GroupDef {
     QString title;
@@ -95,12 +96,13 @@ SettingDef intSetting(const char* key, const QString& label, int def, int min, i
     return s;
 }
 
-SettingDef pathSetting(const char* key, const QString& label) {
+SettingDef pathSetting(const char* key, const QString& label, const QString& dialogTitle) {
     SettingDef s;
     s.key = QString::fromLatin1(key);
     s.label = label;
     s.type = kPath;
     s.def = QString();
+    s.dialogTitle = dialogTitle;
     return s;
 }
 
@@ -172,7 +174,8 @@ QList<GroupDef> makeRegistry(Config* config) {
             { QStringLiteral("fixed"), QObject::tr("This folder:") },
         }));
     {
-        SettingDef path = pathSetting(AppSettings::kStartupPath, QObject::tr("Startup folder"));
+        SettingDef path = pathSetting(AppSettings::kStartupPath, QObject::tr("Startup folder"),
+                                      QObject::tr("Choose the startup folder"));
         path.enabledByKey = QString::fromLatin1(AppSettings::kStartupMode);
         path.enabledByValue = QStringLiteral("fixed");
         general.settings.append(path);
@@ -227,6 +230,15 @@ QList<GroupDef> makeRegistry(Config* config) {
     fileOps.settings.append(intSetting(
         AppSettings::kSaveQuality, QObject::tr("Save quality (JPEG, WebP)"),
         AppSettings::kSaveQualityDefault, 1, 100));
+    // The folders behind the context menu's Copy to "…" / Move to "…" items.
+    // They are set by the menu's folder picker; here they can be read in
+    // full, pointed elsewhere, or cleared (which hides the item).
+    fileOps.settings.append(pathSetting(
+        AppSettings::kLastCopyToPath, QObject::tr("Copy to folder"),
+        QObject::tr("Choose the Copy to folder")));
+    fileOps.settings.append(pathSetting(
+        AppSettings::kLastMoveToPath, QObject::tr("Move to folder"),
+        QObject::tr("Choose the Move to folder")));
     groups.append(fileOps);
 
     return groups;
@@ -382,11 +394,13 @@ void SettingsDialog::build() {
                 // Native folder picker — the same one Copy to / Move to and
                 // Save As use. (The no-QFileDialog rule is about the central
                 // browser, where the model's behaviour on shares matters.)
-                connect(browse, &QPushButton::clicked, this, [this, edit]() {
+                const QString title = s.dialogTitle.isEmpty() ? tr("Choose a folder")
+                                                              : s.dialogTitle;
+                connect(browse, &QPushButton::clicked, this, [this, edit, title]() {
                     const QString start = edit->text().isEmpty()
                         ? QDir::homePath() : edit->text();
                     const QString dir = QFileDialog::getExistingDirectory(
-                        this, tr("Choose the startup folder"), start);
+                        this, title, start);
                     if (!dir.isEmpty()) edit->setText(QDir::toNativeSeparators(dir));
                 });
                 // The Browse button shares the row's enabled state through
@@ -434,7 +448,9 @@ void SettingsDialog::load() {
             // The spin box clamps an out-of-range stored value for us.
             r.spin->setValue(s.value(r.key, r.def).toInt());
         } else if (r.type == Path && r.edit) {
-            r.edit->setText(s.value(r.key, r.def).toString());
+            // Shown native (the picker stores forward slashes); the readers
+            // accept either, see AppSettings::kLastCopyToPath.
+            r.edit->setText(QDir::toNativeSeparators(s.value(r.key, r.def).toString()));
         }
         r.initial = currentValue(r);
     }

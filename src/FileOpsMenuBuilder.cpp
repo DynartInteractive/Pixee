@@ -35,8 +35,8 @@ using FileOpsHelpers::isDriveRoot;
 using FileOpsHelpers::Pair;
 
 namespace {
-constexpr const char* kLastCopyKey = "lastCopyToPath";
-constexpr const char* kLastMoveKey = "lastMoveToPath";
+constexpr const char* kLastCopyKey = AppSettings::kLastCopyToPath;
+constexpr const char* kLastMoveKey = AppSettings::kLastMoveToPath;
 }
 
 FileOpsMenuBuilder::FileOpsMenuBuilder(QStringList sourcePaths,
@@ -59,7 +59,7 @@ QString FileOpsMenuBuilder::summary(const QString& templateOne,
 
 QString FileOpsMenuBuilder::pickFolder(const QString& settingsKey, const QString& title) {
     QSettings settings;
-    const QString last = settings.value(settingsKey).toString();
+    const QString last = QDir::fromNativeSeparators(settings.value(settingsKey).toString());
     const QString picked = QFileDialog::getExistingDirectory(
         _dialogParent, title, last,
         QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
@@ -189,10 +189,22 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
         return name.replace(QLatin1Char('&'), QStringLiteral("&&"));
     };
 
+    // The label only has room for the folder's name, so the full path goes
+    // in the item's tooltip — QMenu doesn't show those unless asked. Not
+    // checked for existence here: a stat on an unreachable share can stall
+    // for seconds, and this runs while the menu is opening. (The task's
+    // mkpath recreates a missing folder.) The Settings page accepts native
+    // separators, the picker stores forward slashes; read both the same way.
+    menu->setToolTipsVisible(true);
+    auto readDest = [&settings](const char* key) {
+        return QDir::fromNativeSeparators(settings.value(QLatin1String(key)).toString().trimmed());
+    };
+
     // ---- Copy ----
-    const QString lastCopy = settings.value(kLastCopyKey).toString();
+    const QString lastCopy = readDest(kLastCopyKey);
     if (!lastCopy.isEmpty()) {
         QAction* a = menu->addAction(tr("Copy to \"%1\"").arg(destLabel(lastCopy)));
+        a->setToolTip(QDir::toNativeSeparators(lastCopy));
         connect(a, &QAction::triggered, this, [this, lastCopy]() { doCopy(lastCopy); });
     }
     QAction* copyPick = menu->addAction(tr("Copy to..."));
@@ -202,9 +214,10 @@ void FileOpsMenuBuilder::populate(QMenu* menu) {
     });
 
     // ---- Move ----
-    const QString lastMove = settings.value(kLastMoveKey).toString();
+    const QString lastMove = readDest(kLastMoveKey);
     if (!lastMove.isEmpty()) {
         QAction* a = menu->addAction(tr("Move to \"%1\"").arg(destLabel(lastMove)));
+        a->setToolTip(QDir::toNativeSeparators(lastMove));
         connect(a, &QAction::triggered, this, [this, lastMove]() { doMove(lastMove); });
     }
     QAction* movePick = menu->addAction(tr("Move to..."));
