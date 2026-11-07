@@ -9,6 +9,10 @@ fixes bump the patch).
 
 ### Added
 
+- **Image position in the viewer.** The right end of the status bar shows
+  where you are in the folder (`3 / 10`) while an image is open. It counts
+  the images the viewer walks, so a name filter narrows it, and a delete or
+  move shortens it.
 - **See and change the remembered Copy to / Move to folders.** The context
   menu's `Copy to "…"` / `Move to "…"` items only had room for the folder's
   name; the full path was in the registry and nowhere else. Hovering the item

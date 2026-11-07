@@ -34,6 +34,7 @@ class MetadataReader;
 class PluginManager;
 class PathCompleter;
 class PreviewReader;
+class QLabel;
 class QAction;
 class QMenu;
 class QToolButton;
@@ -187,6 +188,7 @@ private:
     // active. Pass an invalid QSize() to clear (e.g. while the full-res
     // image is still loading and we have nothing accurate to report).
     void updateViewerStatusBar(const QSize& size);
+    void updateViewerPosition();   // the "3 / 10" at the status bar's right
     void activateImage(FileItem* item);
     void buildViewerImageList(const QString& currentPath,
                               const QSet<QString>& restrictTo = {});
@@ -244,6 +246,7 @@ private:
     QDockWidget* _dockWidget;
     TaskDockWidget* _taskDockWidget;
     TaskStatusWidget* _taskStatusWidget = nullptr;
+    QLabel* _viewerPositionLabel = nullptr;   // "3 / 10" while the viewer is up
     // Surfaces task conflict questions as blocking modal dialogs (one at a
     // time, queued). Parented to this window, so no manual delete.
     TaskConflictPrompter* _conflictPrompter = nullptr;

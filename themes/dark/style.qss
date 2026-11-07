@@ -173,6 +173,11 @@ QProgressBar#taskItemProgress::chunk, QProgressBar#taskGroupAggregate::chunk {
 	color: #fff;
 	padding-right: 8px;
 }
+/* The viewer's "3 / 10" position counter, right end of the status bar. */
+#viewerPositionLabel {
+	color: #fff;
+	padding-right: 8px;
+}
 QProgressBar#taskStatusBar {
 	background-color: #2a2a2a;
 	border: 1px solid #1f1f1f;

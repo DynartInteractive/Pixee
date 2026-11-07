@@ -685,6 +685,16 @@ void MainWindow::create() {
 
     // Status-bar progress widget — right-aligned permanent. Click toggles
     // the dock without touching the menu (transient peek).
+    // Position in the folder ("3 / 10") while the viewer is up. Permanent,
+    // so it sits at the right like the task progress (added first, so the
+    // progress stays outermost when both show); hidden while browsing. Named
+    // so the dark theme can colour its text — an unnamed QLabel on the
+    // status bar comes out near-black on #222, see the QLabel gotcha.
+    _viewerPositionLabel = new QLabel(this);
+    _viewerPositionLabel->setObjectName("viewerPositionLabel");
+    _viewerPositionLabel->hide();
+    statusBar()->addPermanentWidget(_viewerPositionLabel);
+
     _taskStatusWidget = new TaskStatusWidget(_pixee->taskManager(), this);
     statusBar()->addPermanentWidget(_taskStatusWidget);
     connect(_taskStatusWidget, &TaskStatusWidget::toggleDockRequested,
@@ -1478,6 +1488,22 @@ void MainWindow::updateViewerStatusBar(const QSize& size) {
         .arg(size.width()).arg(size.height()));
 }
 
+void MainWindow::updateViewerPosition() {
+    if (!_viewerPositionLabel) return;
+    const bool viewerUp =
+        _centerStack && _centerStack->currentWidget() == _viewerWidget;
+    const bool valid = viewerUp
+                    && _viewerIndex >= 0 && _viewerIndex < _viewerImagePaths.size();
+    if (!valid) {
+        _viewerPositionLabel->hide();
+        return;
+    }
+    // 1-based: the first image is "1 / N", as a person would count.
+    _viewerPositionLabel->setText(tr("%1 / %2")
+        .arg(_viewerIndex + 1).arg(_viewerImagePaths.size()));
+    _viewerPositionLabel->show();
+}
+
 void MainWindow::updateStatusBar(FileItem* folder) {
     if (!folder || folder == _fileModel->rootItem()) {
         statusBar()->clearMessage();
@@ -2062,6 +2088,7 @@ void MainWindow::syncFileListSelectionTo(const QString& path, bool scroll) {
 void MainWindow::showViewerImageAt(int index) {
     if (index < 0 || index >= _viewerImagePaths.size()) return;
     _viewerIndex = index;
+    updateViewerPosition();
     const QString path = _viewerImagePaths.at(index);
 
     // Cancel any in-flight load (current + preloads from the previous image)
@@ -2517,6 +2544,7 @@ void MainWindow::dismissViewer() {
     _viewerImagePaths.clear();
     _viewerIndex = -1;
     _viewerMultiSelect = false;
+    updateViewerPosition();   // hides it
     // Free the preload cache — those images can be tens of MB each.
     _viewerImageCache.clear();
     _viewerCacheOrder.clear();
