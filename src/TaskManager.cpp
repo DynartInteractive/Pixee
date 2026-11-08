@@ -184,6 +184,8 @@ void TaskManager::onTaskFinished(QUuid taskId) {
 }
 
 void TaskManager::onTaskFailed(QUuid taskId, QString /*message*/) {
+    // The message is read back off the task when its group is removed
+    // (maybeRemoveGroup -> groupFailed), so it needs no handling here.
     onTaskTerminal(taskId);
 }
 
@@ -216,12 +218,22 @@ void TaskManager::maybeRemoveGroup(TaskGroup* group) {
     // group (and its tasks) are deleted. Skipped/failed/aborted tasks
     // produced nothing, so filter on Completed.
     QStringList produced;
+    QStringList failedNames;
+    QStringList failureMessages;
     for (Task* t : group->tasks()) {
         if (t->state() == Task::Completed) produced += t->producedPaths();
+        if (t->state() == Task::Failed) {
+            failedNames += t->displayName();
+            failureMessages += t->failureMessage();
+        }
     }
 
     _groups.removeAll(group);
     for (Task* t : group->tasks()) _taskProgress.remove(t->id());
+    if (!failedNames.isEmpty()) {
+        emit groupFailed(group->displayName(), group->tasks().size(),
+                         failedNames, failureMessages);
+    }
     emit groupRemoved(id);
     emit groupFinished(produced);
     group->deleteLater();

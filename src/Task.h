@@ -60,6 +60,10 @@ public:
     QUuid groupId() const;
     TaskGroup* group() const { return _group; }
     State state() const { return static_cast<State>(_state.loadAcquire()); }
+    // The setFailed() text, once the task is Failed. Written on the worker
+    // before the failed/stateChanged emit, so a GUI-thread reader that got
+    // there via those queued signals sees the final value.
+    QString failureMessage() const { return _failureMessage; }
     virtual QString displayName() const = 0;
 
     // Directories whose contents may have changed because this task ran.

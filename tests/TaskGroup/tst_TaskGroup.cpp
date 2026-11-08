@@ -26,6 +26,7 @@ private slots:
     void sequential_dispatch_within_a_group();
     void parallel_dispatch_across_groups();
     void path_touched_emits_for_completed_task();
+    void group_failed_carries_the_failed_tasks_messages();
     void shutdown_is_idempotent();
     void shutdown_mid_run_returns_promptly();
 };
@@ -179,6 +180,12 @@ void TstTaskGroup::parallel_dispatch_across_groups() {
     auto* tA = addCopy(groupA, f.path("a.bin"), f.path("a-out.bin"));
     auto* groupB = new TaskGroup(QStringLiteral("B"));
     auto* tB = addCopy(groupB, f.path("b.bin"), f.path("b-out.bin"));
+    // Taken now: the manager deleteLater()s a finished group with its tasks,
+    // and the QTRY_ loop below spins the event loop, so tA / tB may be gone
+    // by the time the last two asserts run (a dangling id read as -1 here,
+    // intermittently).
+    const QUuid idA = tA->id();
+    const QUuid idB = tB->id();
 
     f.mgr.enqueueGroup(groupA);
     f.mgr.enqueueGroup(groupB);
@@ -186,16 +193,16 @@ void TstTaskGroup::parallel_dispatch_across_groups() {
     // Pause both. Both reaching Paused proves both got dispatched —
     // i.e., different groups occupied separate workers concurrently.
     // (Polling for Running races on small files; pause is durable.)
-    f.mgr.pauseTask(tA->id());
-    f.mgr.pauseTask(tB->id());
+    f.mgr.pauseTask(idA);
+    f.mgr.pauseTask(idB);
     QTRY_VERIFY_WITH_TIMEOUT(
         tA->state() == Task::Paused && tB->state() == Task::Paused, 5000);
 
-    f.mgr.resumeTask(tA->id());
-    f.mgr.resumeTask(tB->id());
+    f.mgr.resumeTask(idA);
+    f.mgr.resumeTask(idB);
     QTRY_COMPARE_WITH_TIMEOUT(f.groupRemovedSpy.count(), 2, 15000);
-    QCOMPARE(f.lastStateOf(tA->id()), int(Task::Completed));
-    QCOMPARE(f.lastStateOf(tB->id()), int(Task::Completed));
+    QCOMPARE(f.lastStateOf(idA), int(Task::Completed));
+    QCOMPARE(f.lastStateOf(idB), int(Task::Completed));
 }
 
 void TstTaskGroup::path_touched_emits_for_completed_task() {
@@ -219,6 +226,42 @@ void TstTaskGroup::path_touched_emits_for_completed_task() {
         }
     }
     QVERIFY2(sawDest, "expected pathTouched to fire for the dest folder");
+}
+
+void TstTaskGroup::group_failed_carries_the_failed_tasks_messages() {
+    TaskTestFixture f;
+    QDir().mkpath(f.path("dest"));
+    TestHelpers::writeBytes(f.path("ok.bin"), 1024);
+    QSignalSpy failedSpy(&f.mgr, &TaskManager::groupFailed);
+
+    // One task that copies fine, one whose source does not exist -> Failed
+    // with CopyFileTask's "Cannot open source" message. The manager reports
+    // the failure once, when it removes the group, naming only the failed
+    // task and quoting its message verbatim.
+    auto* group = new TaskGroup(QStringLiteral("Mixed"));
+    addCopy(group, f.path("ok.bin"), f.path("dest/ok.bin"));
+    CopyFileTask* bad = addCopy(group, f.path("missing.bin"), f.path("dest/missing.bin"));
+    const QString badName = bad->displayName();
+    f.mgr.enqueueGroup(group);
+    QVERIFY(f.waitForGroupRemoved());
+
+    QCOMPARE(failedSpy.count(), 1);
+    const QList<QVariant> args = failedSpy.takeFirst();
+    QCOMPARE(args.value(0).toString(), QStringLiteral("Mixed"));
+    QCOMPARE(args.value(1).toInt(), 2);
+    QCOMPARE(args.value(2).toStringList(), QStringList{ badName });
+    const QStringList messages = args.value(3).toStringList();
+    QCOMPARE(messages.size(), 1);
+    QVERIFY2(messages.first().startsWith(QStringLiteral("Cannot open source")),
+             qPrintable(messages.first()));
+
+    // A group whose tasks all complete says nothing.
+    TestHelpers::writeBytes(f.path("ok2.bin"), 1024);
+    auto* clean = new TaskGroup(QStringLiteral("Clean"));
+    addCopy(clean, f.path("ok2.bin"), f.path("dest/ok2.bin"));
+    f.mgr.enqueueGroup(clean);
+    QVERIFY(f.waitForGroupRemoved());
+    QCOMPARE(failedSpy.count(), 0);
 }
 
 void TstTaskGroup::shutdown_is_idempotent() {

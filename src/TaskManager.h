@@ -80,6 +80,14 @@ signals:
     // paths its completed tasks created on disk. The UI uses this to select
     // freshly-added files. Fires right after groupRemoved for the same group.
     void groupFinished(QStringList producedPaths);
+    // Emitted right before groupRemoved when at least one task in the group
+    // failed: the group's display name, how many tasks it had, and the
+    // failed tasks' display names with their setFailed() messages, in task
+    // order (the two lists are parallel). This is the only route a failure
+    // message takes to the user — the dock row that would have shown the
+    // Failed state is taken down by the same removal.
+    void groupFailed(QString groupName, int taskCount,
+                     QStringList failedTaskNames, QStringList messages);
     void taskStateChanged(QUuid taskId, int state);
     void taskProgress(QUuid taskId, int pct);
     void taskQuestionPosed(QUuid taskId, int kind, QVariantMap context);

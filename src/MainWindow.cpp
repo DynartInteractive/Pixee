@@ -580,6 +580,11 @@ void MainWindow::create() {
     // hook below selects them.
     connect(_pixee->taskManager(), &TaskManager::groupFinished,
             this, &MainWindow::onGroupFinished);
+    // A failed task's message reached nothing until this: the dock row is
+    // removed with the group the instant every task is terminal, so a
+    // one-file Delete that failed simply vanished. Show the reason.
+    connect(_pixee->taskManager(), &TaskManager::groupFailed,
+            this, &MainWindow::onGroupFailed);
 
     // The counts are first written by navigateTo, before the folder's
     // listing has arrived, so a folder entered for the first time (startup
@@ -1376,12 +1381,22 @@ void MainWindow::onSaveTaskStateChanged(QUuid taskId, int state) {
             _viewerCacheOrder.removeAll(save.viewerPath);
         }
     }
-    if (state == Task::Failed) {
-        Toast::show(this,
-            tr("Saving %1 failed — see the Tasks panel for details.")
-                .arg(QFileInfo(save.viewerPath).fileName()),
-            Toast::Error);
-    }
+    // The failure itself is reported by onGroupFailed with the task's own
+    // message, which says why; a second toast here would only replace it.
+}
+
+void MainWindow::onGroupFailed(QString groupName, int taskCount,
+                               QStringList failedTaskNames, QStringList messages) {
+    if (failedTaskNames.isEmpty() || messages.isEmpty()) return;
+    // The task names carry the file name ("Deleting a.jpg"), the messages
+    // the reason; some reasons are bare errorStrings, so always show both.
+    const QString first = tr("%1 — %2").arg(failedTaskNames.first(), messages.first());
+    const QString text = failedTaskNames.size() == 1
+        ? first
+        : tr("%1: %2 of %3 failed. %4")
+              .arg(groupName).arg(failedTaskNames.size()).arg(taskCount).arg(first);
+    // Longer than the default hold: the reason is a sentence, not a status.
+    Toast::show(this, text, Toast::Error, 8000);
 }
 
 bool MainWindow::maybeDiscardEdits(bool saveSynchronously) {

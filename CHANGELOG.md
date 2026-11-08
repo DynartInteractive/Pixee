@@ -59,6 +59,12 @@ fixes bump the patch).
   position with it, by an amount that grew with how far down the folder the
   image was; in a folder of thousands you could land at the bottom. The list
   now keeps that image in view through the re-flow.
+- **A file operation that failed said nothing.** The task knew why (a
+  Delete on a drive without a Recycle Bin, a source that could not be read,
+  a destination that could not be written) but its entry left the Tasks
+  panel the moment it finished, taking the message with it. A failure now
+  shows the reason in a notification, naming the file; a batch with several
+  failures says how many and shows the first.
 
 ## [0.6.0] — 2026-10-14
 

@@ -74,6 +74,8 @@ private slots:
     // currently being viewed (if the "Select added files" setting is on) so
     // they can be selected once the folder refresh inserts their rows.
     void onGroupFinished(QStringList producedPaths);
+    void onGroupFailed(QString groupName, int taskCount,
+                       QStringList failedTaskNames, QStringList messages);
     void openSettings();
     // Pushes the settings that apply without a restart (viewer wheel role,
     // open zoom, thumbnail cell size) into the widgets. Called at the end of
