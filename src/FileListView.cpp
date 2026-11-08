@@ -9,6 +9,8 @@
 #include <QDropEvent>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QMimeData>
 #include <QPainter>
 #include <QPaintEvent>
@@ -35,6 +37,10 @@ constexpr int kUpdateDebounceMs = 50;
 // finishes. Larger = fewer iterations to cover a big folder, but each
 // batch is also bigger.
 constexpr int kExpansionStep = 100;
+// How long the layout has to stay quiet before scrollToSettled stops re-pinning
+// its row. The relayout it exists for arrives as a posted LayoutRequest, a
+// resize, then QListView's own 100 ms delayed layout; this is a few times that.
+constexpr int kScrollSettleMs = 500;
 }
 
 FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, FileFilterModel* fileFilterModel)
@@ -52,6 +58,15 @@ FileListView::FileListView(Config* config, Theme* theme, ThumbnailCache* cache, 
     setContextMenuPolicy(Qt::CustomContextMenu);
     setUniformItemSizes(true);
     setVerticalScrollMode(QAbstractItemView::ScrollPerItem);
+
+    _settleTimer.setSingleShot(true);
+    _settleTimer.setInterval(kScrollSettleMs);
+    connect(&_settleTimer, &QTimer::timeout, this, &FileListView::clearSettleTarget);
+    // actionTriggered fires for the user's own scrollbar input (drag, arrows,
+    // trough) and not for setValue, so it tells apart the user taking over
+    // from our re-pinning.
+    connect(verticalScrollBar(), &QScrollBar::actionTriggered,
+            this, &FileListView::clearSettleTarget);
 
     // Drag-and-drop. Drop = copy by default (Windows convention); Shift
     // forces move. setDragEnabled is for outgoing drags; the QDrag object
@@ -138,6 +153,7 @@ void FileListView::setRootIndex(const QModelIndex& index) {
     // the window width, since the grid re-flows. Start every folder at the
     // top instead.
     if (folderChanged) {
+        clearSettleTarget();
         verticalScrollBar()->setValue(0);
         horizontalScrollBar()->setValue(0);
     }
@@ -148,12 +164,47 @@ void FileListView::setRootIndex(const QModelIndex& index) {
     updateSubscriptions();
 }
 
+void FileListView::scrollToSettled(const QModelIndex& index) {
+    if (!index.isValid()) return;
+    _settleTarget = index;
+    _settleTimer.start();
+    // Runs any pending layout first (rectForIndex -> executePostedLayout),
+    // so this lands on the grid as it is now; doItemsLayout re-pins on the
+    // grid as it will be.
+    scrollTo(index, QAbstractItemView::EnsureVisible);
+}
+
+void FileListView::clearSettleTarget() {
+    _settleTarget = QPersistentModelIndex();
+    _settleTimer.stop();
+}
+
+void FileListView::doItemsLayout() {
+    QListView::doItemsLayout();
+    if (!_settleTarget.isValid()) return;
+    // The pending-layout flag is already down here, so this scrollTo cannot
+    // re-enter doItemsLayout.
+    scrollTo(_settleTarget, QAbstractItemView::EnsureVisible);
+    _settleTimer.start();
+}
+
 void FileListView::resizeEvent(QResizeEvent* event) {
     QListView::resizeEvent(event);
     scheduleSubscriptionUpdate();
 }
 
+void FileListView::mousePressEvent(QMouseEvent* event) {
+    clearSettleTarget();
+    QListView::mousePressEvent(event);
+}
+
+void FileListView::keyPressEvent(QKeyEvent* event) {
+    clearSettleTarget();
+    QListView::keyPressEvent(event);
+}
+
 void FileListView::wheelEvent(QWheelEvent* event) {
+    clearSettleTarget();
     // Qt's QListView::IconMode ignores setVerticalScrollMode(ScrollPerItem)
     // for the mouse wheel — see "Qt gotchas" in CLAUDE.md. Override so each
     // 120-unit mouse notch scrolls one visual row; pass touchpad pixelDelta

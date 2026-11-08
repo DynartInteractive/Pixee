@@ -26,6 +26,20 @@ public:
 
     void setRootIndex(const QModelIndex& index) override;
 
+    // scrollTo(EnsureVisible) that survives the grid re-flowing afterwards.
+    // In IconMode the scroll position is a raw pixel offset into the grid,
+    // so a scrollTo followed by a relayout to a different column count
+    // leaves the offset pointing at a different row -- by an error that
+    // grows with how far down the folder the row is. Relayouts do follow
+    // the moments we scroll programmatically: QWidget::hide() only
+    // invalidates the parent layout and posts the LayoutRequest (show()
+    // activates it synchronously), so dismissing the viewer -- which hides
+    // the viewer-only docks -- widens the list a tick after dismissViewer
+    // has scrolled. This scrolls now and re-pins the row after every
+    // doItemsLayout until the layout has been quiet for a moment, or until
+    // the user scrolls, clicks or navigates, whichever comes first.
+    void scrollToSettled(const QModelIndex& index);
+
     // Wires the bits the drop handler needs without reaching back into
     // MainWindow: where to enqueue tasks, and what widget to parent
     // dialogs / toasts to. Call once after construction.
@@ -51,8 +65,13 @@ public:
     };
     Selection selectionPaths() const;
 
+public slots:
+    void doItemsLayout() override;
+
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
@@ -91,6 +110,12 @@ private slots:
 private:
     void onCacheJobDone(const QString& path);
     void tryExpandWindow();
+    void clearSettleTarget();
+
+    // The row scrollToSettled is keeping in view, and the quiet period that
+    // ends the pinning (restarted by every relayout that re-pins).
+    QPersistentModelIndex _settleTarget;
+    QTimer _settleTimer;
 
     ThumbnailCache* _cache;
     FileFilterModel* _fileFilterModel;

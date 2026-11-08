@@ -2095,7 +2095,9 @@ void MainWindow::syncFileListSelectionTo(const QString& path, bool scroll) {
     // SelectionCommand, which is what we want — a single-row selection on
     // the active image.
     _fileListView->setCurrentIndex(proxyIdx);
-    if (scroll) _fileListView->scrollTo(proxyIdx, QAbstractItemView::EnsureVisible);
+    // Settled, not plain scrollTo: dismissViewer calls this right before the
+    // viewer-only docks' hide re-flows the grid (see FileListView).
+    if (scroll) _fileListView->scrollToSettled(proxyIdx);
 }
 
 void MainWindow::showViewerImageAt(int index) {

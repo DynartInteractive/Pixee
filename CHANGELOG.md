@@ -53,6 +53,12 @@ fixes bump the patch).
   pasted the file path next to the image. A Pixee drag now arrives exactly as
   one from Explorer does: a file list and nothing else.
 - **The crop bar has square corners**, like everything else in the dark theme.
+- **Closing the viewer in a large folder left the file list in the wrong
+  place.** The list did scroll to the image you had been looking at, but a
+  moment later the grid re-flowed to a different width and took the scroll
+  position with it, by an amount that grew with how far down the folder the
+  image was; in a folder of thousands you could land at the bottom. The list
+  now keeps that image in view through the re-flow.
 
 ## [0.6.0] — 2026-10-14
 
