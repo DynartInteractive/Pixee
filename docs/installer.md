@@ -124,11 +124,12 @@ tiff, webp, heic, heif, avif, psd, xcf, svg, ico, tga.
 [Registry]
 ; --- A ProgID describing "a Pixee image" ---
 Root: HKA; Subkey: "Software\Classes\Pixee.Image"; ValueType: string; ValueData: "Image file"
-Root: HKA; Subkey: "Software\Classes\Pixee.Image\DefaultIcon"; ValueType: string; ValueData: "{app}\Pixee.exe,0"
+Root: HKA; Subkey: "Software\Classes\Pixee.Image\DefaultIcon"; ValueType: string; ValueData: "{sys}\imageres.dll,-83"
 Root: HKA; Subkey: "Software\Classes\Pixee.Image\shell\open\command"; ValueType: string; ValueData: """{app}\Pixee.exe"" ""%1"""
 
 ; --- Register the app so it appears in "Open with" (SupportedTypes is the key part) ---
 Root: HKA; Subkey: "Software\Classes\Applications\Pixee.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "Pixee"
+Root: HKA; Subkey: "Software\Classes\Applications\Pixee.exe\DefaultIcon"; ValueType: string; ValueData: "{sys}\imageres.dll,-83"
 Root: HKA; Subkey: "Software\Classes\Applications\Pixee.exe\shell\open\command"; ValueType: string; ValueData: """{app}\Pixee.exe"" ""%1"""
 Root: HKA; Subkey: "Software\Classes\Applications\Pixee.exe\SupportedTypes"; ValueType: string; ValueName: ".jpg"; ValueData: ""
 Root: HKA; Subkey: "Software\Classes\Applications\Pixee.exe\SupportedTypes"; ValueType: string; ValueName: ".png"; ValueData: ""
@@ -149,6 +150,21 @@ Root: HKLM; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueN
 
 Key facts:
 
+- **`DefaultIcon` must be a *document* icon, never `Pixee.exe,0`.** It becomes
+  the shell icon of every `.png`/`.jpg` once Pixee is the default handler, and
+  Windows reads some of its *own* icons out of `.png` files: the Start-menu
+  search extracts packaged-app logos through the shell's file-icon path, so
+  with the app icon here, unrelated search results (Terminal, iTunes, …) showed
+  Pixee's icon — and came back after every cache rebuild. `{sys}\imageres.dll,-83`
+  is the stock picture-file icon `pngfile` uses. Set it on **both** `Pixee.Image`
+  and `Applications\Pixee.exe`: *Open with → Always* binds to the latter, and
+  with no `DefaultIcon` there the shell falls back to the `.exe` icon. A portable
+  Pixee chosen that way has no installer to write the key, so the fix on such a
+  machine is one line in PowerShell:
+  `New-Item 'HKCU:\Software\Classes\Applications\Pixee.exe\DefaultIcon' -Force | Set-ItemProperty -Name '(default)' -Value 'C:\Windows\System32\imageres.dll,-83'`,
+  then kill `SearchApp.exe` and rename
+  `%LOCALAPPDATA%\Packages\Microsoft.Windows.Search_cw5n1h2txyewy\LocalState\AppIconCache`
+  so search re-extracts.
 - **`SupportedTypes`** under `Applications\Pixee.exe` is what makes Pixee appear
   in *Open with → Choose another app* for those types. `OpenWithProgids` per
   extension reinforces it.

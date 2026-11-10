@@ -69,13 +69,23 @@ Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags
 [Registry]
 ; --- ProgID: "a Pixee image" (icon + open verb) ---
 Root: HKLM; Subkey: "Software\Classes\Pixee.Image"; ValueType: string; ValueData: "Image file"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\Pixee.Image\DefaultIcon"; ValueType: string; ValueData: "{app}\{#AppExe},0"
+; The DOCUMENT icon, deliberately not the app icon. Whatever this names becomes
+; the shell icon of every .png/.jpg once Pixee is the default handler -- and
+; Windows reads some of its own icons out of .png files (Start-menu search
+; extracts packaged-app logos that way), so "{app}\Pixee.exe,0" here made
+; unrelated Start search results (Terminal, iTunes...) show Pixee's icon.
+; imageres -83 is the stock picture-file icon that pngfile itself uses.
+Root: HKLM; Subkey: "Software\Classes\Pixee.Image\DefaultIcon"; ValueType: string; ValueData: "{sys}\imageres.dll,-83"
 Root: HKLM; Subkey: "Software\Classes\Pixee.Image\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExe}"" ""%1"""
 
 ; --- Application registration. SupportedTypes (below) is what puts Pixee in
 ; --- Explorer's "Open with" list; the base keys are declared here once. ---
 Root: HKLM; Subkey: "Software\Classes\Applications\{#AppExe}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#AppName}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Classes\Applications\{#AppExe}\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExe}"" ""%1"""
+; Same document icon here: "Open with -> Always" binds an extension to
+; Applications\Pixee.exe (not the ProgID), and without a DefaultIcon the shell
+; falls back to the .exe icon -- the same bug by another route.
+Root: HKLM; Subkey: "Software\Classes\Applications\{#AppExe}\DefaultIcon"; ValueType: string; ValueData: "{sys}\imageres.dll,-83"
 
 ; --- Capabilities: makes Pixee selectable in Settings > Default apps. Windows
 ; --- 10/11 blocks silently becoming the default; the user confirms there. ---

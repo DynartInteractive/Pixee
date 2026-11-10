@@ -43,6 +43,13 @@ fixes bump the patch).
 
 ### Fixed
 
+- **Pixee's icon appeared on unrelated Start-menu search results** (Terminal,
+  iTunes…) once Pixee was the default handler for `.png`, and survived every
+  icon-cache reset. The installer registered the *app* icon as the icon of
+  image files, and Windows reads some of its own icons out of `.png` files.
+  The installer now registers the stock picture-file icon for image documents
+  instead, on both the ProgID and the *Open with* entry. (The portable has no
+  installer; the one-line registry fix is in `docs/installer.md`.)
 - **The status bar said "Images: 0 | Folders: 0" for a folder entered for
   the first time**, startup included, until something made it recount. The
   counts were written before the folder's listing had arrived; they now
