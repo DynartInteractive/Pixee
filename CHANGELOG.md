@@ -5,7 +5,7 @@ on [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: features bump the minor,
 fixes bump the patch).
 
-## [Unreleased]
+## [0.7.0] — 2026-11-10
 
 ### Added
 

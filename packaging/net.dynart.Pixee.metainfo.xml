@@ -98,6 +98,25 @@
   </recommends>
 
   <releases>
+    <release version="0.7.0" date="2026-11-10">
+      <description>
+        <p>
+          Single keys toggle the panels (F, M, A, H, T), the viewer's status
+          bar shows the image position in the folder, Ctrl+F filters the
+          folder by name, Copy path puts the full path on the clipboard as
+          text, the remembered Copy to / Move to folders can be seen and
+          changed in Settings, and the side panels remember separately
+          whether they are open while browsing and while viewing.
+        </p>
+        <p>
+          A failed file operation now says why, dragging images into
+          Chromium-based apps works, closing the viewer keeps the right
+          image in view in large folders, and the Windows installer no
+          longer registers the app icon as the icon of image files.
+        </p>
+      </description>
+      <url type="details">https://github.com/DynartInteractive/Pixee/releases/tag/v0.7.0</url>
+    </release>
     <release version="0.6.0" date="2026-10-14">
       <description>
         <p>
